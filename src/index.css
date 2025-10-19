@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .card {
+    background-color: #fff;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    border-width: 1px;
+    border-color: #e5e7eb;
+  }
+  .btn-primary {
+    background-color: #008606;
+    color: #fff;
+    border-radius: 9999px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+  }
+  .btn-primary:hover {
+    background-color: #22c55e;
+  }
+  .btn-primary:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px #008606;
+  }
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-secondary {
+    border: 1px solid #d1d5db;
+    border-radius: 9999px;
+    color: #374151;
+    background-color: transparent;
+    transition: background-color 0.2s;
+  }
+  .btn-secondary:hover {
+    background-color: #f9fafb;
+  }
+  .input {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 9999px;
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+  .input:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px #008606;
+    border-color: transparent;
+  }
+}
