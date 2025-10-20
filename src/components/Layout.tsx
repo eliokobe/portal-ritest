@@ -17,6 +17,7 @@ import {
   FileText,
   Lightbulb,
   CheckSquare,
+  GraduationCap,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -31,6 +32,11 @@ interface NavigationItem {
   external?: boolean;
 }
 
+interface NavigationGroup {
+  title?: string;
+  items: NavigationItem[];
+}
+
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -43,17 +49,32 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     navigate('/login');
   };
 
-  const navigation: NavigationItem[] = [
-    { name: 'Panel Gráfico', href: '/panel-grafico', icon: BarChart3 },
-    { name: 'Tareas', href: '/tareas', icon: CheckSquare },
-    { name: 'Servicios', href: '/servicios', icon: Wrench },
-    { name: 'Técnicos', href: '/tecnicos', icon: Users },
-    { name: 'Asesoramientos', href: '/asesoramientos', icon: Lightbulb },
-    { name: 'Informe', href: '/informe', icon: FileText, external: true },
-    { name: 'Whatsapp', href: 'https://chat.ritest.es', icon: MessageCircle, external: true },
-    { name: 'Ipas', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
-    { name: 'Recursos', href: '/recursos', icon: FileDown },
-    { name: 'Ajustes', href: '/ajustes', icon: Settings },
+  const navigationGroups: NavigationGroup[] = [
+    {
+      title: 'Punto de Recarga',
+      items: [
+        { name: 'Panel Gráfico', href: '/panel-grafico', icon: BarChart3 },
+        { name: 'Servicios', href: '/servicios', icon: Wrench },
+        { name: 'Técnicos', href: '/tecnicos', icon: Users },
+        { name: 'Ipas', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
+        { name: 'Whatsapp', href: 'https://chat.ritest.es', icon: MessageCircle, external: true },
+        { name: 'Recursos', href: '/recursos', icon: FileDown },
+      ],
+    },
+    {
+      title: 'Asesoramiento',
+      items: [
+        { name: 'Asesoramientos', href: '/asesoramientos', icon: Lightbulb },
+        { name: 'Informe', href: '/informe', icon: FileText, external: true },
+        { name: 'Formación', href: 'https://formacion.ritest.es', icon: GraduationCap, external: true },
+      ],
+    },
+    {
+      items: [
+        { name: 'Tareas', href: '/tareas', icon: CheckSquare },
+        { name: 'Ajustes', href: '/ajustes', icon: Settings },
+      ],
+    },
   ];
 
   return (
@@ -70,43 +91,50 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <X className="h-6 w-6 text-gray-400" />
             </button>
           </div>
-          <nav className="flex-1 px-4 py-4 space-y-2">
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.href;
-              
-              if (item.external) {
-                const href = item.name === 'Informe' ? `${window.location.origin}${item.href}` : item.href;
-                return (
-                  <a
-                    key={item.name}
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors text-gray-700 hover:bg-gray-100"
-                  >
-                    <Icon className="h-5 w-5 mr-3" />
-                    {item.name}
-                  </a>
-                );
-              }
-              
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-brand-primary text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Icon className="h-5 w-5 mr-3" />
-                  {item.name}
-                </Link>
-              );
-            })}
+          <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
+            {navigationGroups.map((group, groupIndex) => (
+              <div key={groupIndex}>
+                {groupIndex > 0 && (
+                  <div className="my-3 border-t border-gray-200" />
+                )}
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.href;
+                  
+                  if (item.external) {
+                    const href = item.name === 'Informe' ? `${window.location.origin}${item.href}` : item.href;
+                    return (
+                      <a
+                        key={item.name}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors text-gray-700 hover:bg-gray-100"
+                      >
+                        <Icon className="h-5 w-5 mr-3" />
+                        {item.name}
+                      </a>
+                    );
+                  }
+                  
+                  return (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      onClick={() => setSidebarOpen(false)}
+                      className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'bg-brand-primary text-white'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <Icon className="h-5 w-5 mr-3" />
+                      {item.name}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
           </nav>
           <div className="p-4 border-t">
             <button
@@ -145,42 +173,51 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </button>
             )}
           </div>
-          <nav className={`flex-1 ${sidebarCollapsed ? 'px-2' : 'px-4'} py-4 space-y-2`}>
-            {navigation.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.href;
-              
-              if (item.external) {
-                const href = item.name === 'Informe' ? `${window.location.origin}${item.href}` : item.href;
-                return (
-                  <a
-                    key={item.name}
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2 py-2' : 'px-3 py-2'} rounded-lg text-sm font-medium transition-colors text-gray-700 hover:bg-gray-100`}
-                  >
-                    <Icon className={`h-5 w-5 ${sidebarCollapsed ? '' : 'mr-3'}`} />
-                    {!sidebarCollapsed && item.name}
-                  </a>
-                );
-              }
-              
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2 py-2' : 'px-3 py-2'} rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-brand-primary text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Icon className={`h-5 w-5 ${sidebarCollapsed ? '' : 'mr-3'}`} />
-                  {!sidebarCollapsed && item.name}
-                </Link>
-              );
-            })}
+          <nav className={`flex-1 ${sidebarCollapsed ? 'px-2' : 'px-4'} py-4 space-y-1 overflow-y-auto`}>
+            {navigationGroups.map((group, groupIndex) => (
+              <div key={groupIndex}>
+                {groupIndex > 0 && (
+                  <div className={`${sidebarCollapsed ? 'my-2' : 'my-3'} border-t border-gray-200`} />
+                )}
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.href;
+                  
+                  if (item.external) {
+                    const href = item.name === 'Informe' ? `${window.location.origin}${item.href}` : item.href;
+                    return (
+                      <a
+                        key={item.name}
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2 py-2' : 'px-3 py-2'} rounded-lg text-sm font-medium transition-colors text-gray-700 hover:bg-gray-100`}
+                        title={sidebarCollapsed ? item.name : undefined}
+                      >
+                        <Icon className={`h-5 w-5 ${sidebarCollapsed ? '' : 'mr-3'}`} />
+                        {!sidebarCollapsed && item.name}
+                      </a>
+                    );
+                  }
+                  
+                  return (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      className={`flex items-center ${sidebarCollapsed ? 'justify-center px-2 py-2' : 'px-3 py-2'} rounded-lg text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'bg-brand-primary text-white'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                      title={sidebarCollapsed ? item.name : undefined}
+                    >
+                      <Icon className={`h-5 w-5 ${sidebarCollapsed ? '' : 'mr-3'}`} />
+                      {!sidebarCollapsed && item.name}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
           </nav>
           <div className="p-4 border-t">
             {sidebarCollapsed ? (
