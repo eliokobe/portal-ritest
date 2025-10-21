@@ -19,7 +19,7 @@ const Login: React.FC = () => {
 
     try {
       await login(email, password);
-      navigate('/dashboard');
+      navigate('/panel-grafico');
     } catch {
       setError('Credenciales inválidas. Por favor, intenta de nuevo.');
     } finally {
