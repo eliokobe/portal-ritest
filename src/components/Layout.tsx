@@ -56,10 +56,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Panel Gráfico', href: '/panel-grafico', icon: BarChart3 },
         { name: 'Servicios', href: '/servicios', icon: Wrench },
         { name: 'Técnicos', href: '/tecnicos', icon: Users },
-        { name: 'Formación', href: 'https://formacion.ritest.es/reparadores', icon: GraduationCap, external: true },
         { name: 'Ipas', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
         { name: 'Whatsapp', href: 'https://chat.ritest.es', icon: MessageCircle, external: true },
-        { name: 'Recursos', href: '/recursos', icon: FileDown },
+        { name: 'Formación', href: 'https://formacion.ritest.es/reparadores', icon: GraduationCap, external: true },
       ],
     },
     {
@@ -73,6 +72,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     {
       items: [
         { name: 'Tareas', href: '/tareas', icon: CheckSquare },
+        { name: 'Recursos', href: '/recursos', icon: FileDown },
         { name: 'Ajustes', href: '/ajustes', icon: Settings },
       ],
     },
