@@ -1,0 +1,23 @@
+name: sonrisia-portal
+services:
+  - name: web
+    source_dir: /
+    github:
+      repo: tu-usuario/tu-repo
+      branch: main
+    dockerfile_path: Dockerfile
+    http_port: 80
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    health_check:
+      http_path: /
+    envs:
+      - key: VITE_AIRTABLE_BASE_ID
+        scope: BUILD_TIME
+        type: SECRET
+      - key: VITE_AIRTABLE_API_KEY
+        scope: BUILD_TIME
+        type: SECRET
+      - key: NODE_ENV
+        scope: RUN_TIME
+        value: production
