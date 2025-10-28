@@ -3,6 +3,19 @@ import { Search, Info, X, Check, XCircle, Eye, FileText, Wrench, Phone } from 'l
 import { airtableService } from '../services/airtable';
 import { useAuth } from '../contexts/AuthContext';
 
+interface AirtableAttachment {
+  id: string;
+  url: string;
+  filename: string;
+  size?: number;
+  type?: string;
+  thumbnails?: {
+    small?: { url: string; width: number; height: number };
+    large?: { url: string; width: number; height: number };
+    full?: { url: string; width: number; height: number };
+  };
+}
+
 interface Service {
   id: string;
   expediente?: string;
@@ -32,6 +45,7 @@ const GESTORA_OPERATIVA_FILTROS = [
   'Citado por técnico',
   'Pendiente de material',
   'En curso',
+  'Pendiente técnico'
 ];
 
 // Estados permitidos para Gestora Operativa
@@ -159,11 +173,10 @@ const Services: React.FC = () => {
     let servicesWithAllowedStates = services;
     
     if (isGestoraTecnica) {
-      // Para Gestora Técnica: solo Chatbot="Escalado" y estados específicos
+      // Para Gestora Técnica: filtrar por estados específicos
       const allowedEstadosTecnica = ['Sin contactar', 'Formulario enviado', 'Formulario completado', 'Llamado', 'Citado'];
       
       servicesWithAllowedStates = services.filter(service =>
-        service.chatbot === 'Escalado' && 
         service.estado && 
         allowedEstadosTecnica.includes(service.estado)
       );
@@ -928,7 +941,7 @@ const Services: React.FC = () => {
                     {selectedFormulario['Archivo 1'] && Array.isArray(selectedFormulario['Archivo 1']) && (
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-600">Archivo 1:</span>
-                        {selectedFormulario['Archivo 1'].map((file: any, idx: number) => (
+                        {selectedFormulario['Archivo 1'].map((file: AirtableAttachment, idx: number) => (
                           <a
                             key={idx}
                             href={file.url}
@@ -944,7 +957,7 @@ const Services: React.FC = () => {
                     {selectedFormulario['Archivo 2'] && Array.isArray(selectedFormulario['Archivo 2']) && (
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-600">Archivo 2:</span>
-                        {selectedFormulario['Archivo 2'].map((file: any, idx: number) => (
+                        {selectedFormulario['Archivo 2'].map((file: AirtableAttachment, idx: number) => (
                           <a
                             key={idx}
                             href={file.url}
@@ -960,7 +973,7 @@ const Services: React.FC = () => {
                     {selectedFormulario['Archivo 3'] && Array.isArray(selectedFormulario['Archivo 3']) && (
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-600">Archivo 3:</span>
-                        {selectedFormulario['Archivo 3'].map((file: any, idx: number) => (
+                        {selectedFormulario['Archivo 3'].map((file: AirtableAttachment, idx: number) => (
                           <a
                             key={idx}
                             href={file.url}
@@ -985,7 +998,7 @@ const Services: React.FC = () => {
                       <h4 className="text-xs font-medium text-gray-600 mb-2">Foto general</h4>
                       {selectedFormulario['Foto general'] && Array.isArray(selectedFormulario['Foto general']) && selectedFormulario['Foto general'].length > 0 ? (
                         <div className="space-y-2">
-                          {selectedFormulario['Foto general'].map((file: any, idx: number) => (
+                          {selectedFormulario['Foto general'].map((file: AirtableAttachment, idx: number) => (
                             <div key={idx} className="space-y-1">
                               <a
                                 href={file.url}
@@ -1015,7 +1028,7 @@ const Services: React.FC = () => {
                       <h4 className="text-xs font-medium text-gray-600 mb-2">Foto etiqueta</h4>
                       {selectedFormulario['Foto etiqueta'] && Array.isArray(selectedFormulario['Foto etiqueta']) && selectedFormulario['Foto etiqueta'].length > 0 ? (
                         <div className="space-y-2">
-                          {selectedFormulario['Foto etiqueta'].map((file: any, idx: number) => (
+                          {selectedFormulario['Foto etiqueta'].map((file: AirtableAttachment, idx: number) => (
                             <div key={idx} className="space-y-1">
                               <a
                                 href={file.url}
@@ -1045,7 +1058,7 @@ const Services: React.FC = () => {
                       <h4 className="text-xs font-medium text-gray-600 mb-2">Foto roto</h4>
                       {selectedFormulario['Foto roto'] && Array.isArray(selectedFormulario['Foto roto']) && selectedFormulario['Foto roto'].length > 0 ? (
                         <div className="space-y-2">
-                          {selectedFormulario['Foto roto'].map((file: any, idx: number) => (
+                          {selectedFormulario['Foto roto'].map((file: AirtableAttachment, idx: number) => (
                             <div key={idx} className="space-y-1">
                               <a
                                 href={file.url}

@@ -12,16 +12,31 @@ const GESTORA_OPERATIVA_FILTROS = [
   'Citado por técnico',
   'Pendiente de material',
   'En curso',
+  'Pendiente técnico'
 ];
 
+
+interface Servicio {
+  id: string;
+  expediente?: string;
+  nombre?: string;
+  estado?: string;
+  chatbot?: string;
+}
+
+interface Material {
+  id: string;
+  numeroSerie?: string;
+  modelo?: string;
+}
 
 interface Envio {
   id: string;
   seguimiento?: string;
-  servicio?: string; // linked record
+  servicio?: string;
   estado?: 'Envío creado' | 'Paquete recogido' | 'Paquete entregado';
   fechaEnvio?: string;
-  material?: string; // linked record
+  material?: string;
   producto?: string;
   fechaCambio?: string;
 }
@@ -77,21 +92,20 @@ export default function Envios() {
       let serviciosFiltrados = data;
       
       if (isGestoraTecnica) {
-        // Para Gestora Técnica: solo Chatbot="Escalado" y estados específicos
+        // Para Gestora Técnica: filtrar por estados específicos
         const allowedEstadosTecnica = ['Sin contactar', 'Formulario enviado', 'Formulario completado', 'Llamado', 'Citado'];
-        serviciosFiltrados = data.filter((s: any) =>
-          s.chatbot === 'Escalado' && 
+        serviciosFiltrados = data.filter((s: Servicio) =>
           s.estado && 
           allowedEstadosTecnica.includes(s.estado)
         );
       } else if (isGestoraOperativa) {
         // Para Gestora Operativa: filtrar por estados permitidos
-        serviciosFiltrados = data.filter((s: any) =>
+        serviciosFiltrados = data.filter((s: Servicio) =>
           s.estado && GESTORA_OPERATIVA_FILTROS.includes(s.estado)
         );
       }
       
-      setServicios(serviciosFiltrados.map((s: any) => ({ 
+      setServicios(serviciosFiltrados.map((s: Servicio) => ({ 
         id: s.id, 
         nombre: s.nombre || s.expediente || 'Servicio' 
       })));
@@ -104,12 +118,12 @@ export default function Envios() {
     try {
       const data = await airtableService.getInventario();
       console.log('Materiales recibidos:', data);
-      setMateriales(data.map((m: any) => ({
+      setMateriales(data.map((m: Material) => ({
         id: m.id,
         numeroSerie: String(m.numeroSerie || ''),
         producto: m.modelo || '',
       })));
-    } catch (error) {
+    } catch {
       setMateriales([]);
     }
   };

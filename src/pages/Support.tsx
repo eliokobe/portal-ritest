@@ -33,7 +33,7 @@ const Support: React.FC = () => {
       setSuccess('Ticket enviado correctamente. Te contactaremos pronto.');
       setSubject('');
       setMessage('');
-    } catch (e) {
+    } catch {
       setError('No fue posible enviar el ticket. Inténtalo de nuevo.');
     } finally {
       setLoading(false);

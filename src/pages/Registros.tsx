@@ -210,13 +210,11 @@ export default function Registros() {
       return matchesSearch && matchesEstado && matchesAsesor && !isExcluded;
     }
 
-    // Filtrar para Gestora Operativa (excluir Citado)
-    if (isGestoraOperativa) {
-      const matchesEstado = !registro.estado || registro.estado !== 'Citado';
-      return matchesSearch && matchesEstado && !isExcluded;
-    }
-
-    return matchesSearch && !isExcluded;
+  // Filtrar para Gestora Operativa
+  if (isGestoraOperativa) {
+    const matchesEstado = !registro.estado || GESTORA_OPERATIVA_ESTADOS.includes(registro.estado);
+    return matchesSearch && matchesEstado && !isExcluded;
+  }    return matchesSearch && !isExcluded;
   });
 
   if (loading) {

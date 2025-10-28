@@ -195,7 +195,7 @@ export const airtableService = {
       const services: ServiceRec[] = records
         .map((r: any) => {
           const fields = r.fields || {};
-          let fechaValue = fields['Fecha de registro'] ||
+          const fechaValue = fields['Fecha de registro'] ||
                           fields.Fecha || 
                           fields['Fecha de creación'] || 
                           fields['Created'] || 
