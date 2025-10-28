@@ -36,16 +36,18 @@ interface Service {
   chatbot?: string;
 }
 
-// Filtros permitidos para Gestora Operativa
+// Filtros permitidos para todos los usuarios (estados que se muestran en la tabla)
 const GESTORA_OPERATIVA_FILTROS = [
+  'Contactado',
+  'Formulario completado',
+  'Llamado',
   'Pendiente de asignar',
   'Pendiente de aceptación',
   'Aceptado',
   'Citado',
-  'Citado por técnico',
   'Pendiente de material',
-  'En curso',
-  'Pendiente técnico'
+  'Pendiente presupuesto',
+  'En curso'
 ];
 
 // Estados permitidos para Estado Ipas
@@ -59,20 +61,18 @@ const IPAS_STATUS_OPTIONS = [
 ];
 
 const STATUS_OPTIONS = [
-  'En curso',
-  'Finalizado',
-  'Cancelado',
-  'Sin contactar',
-  'Formulario enviado',
+  'Contactado',
   'Formulario completado',
-  'En chatbot',
   'Llamado',
   'Pendiente de asignar',
   'Pendiente de aceptación',
   'Aceptado',
   'Citado',
-  'Citado por técnico',
   'Pendiente de material',
+  'Pendiente presupuesto',
+  'En curso',
+  'Finalizado',
+  'Cancelado'
 ];
 
 const renderDetailValue = (value?: string) => {
@@ -151,7 +151,7 @@ const Services: React.FC = () => {
     }
 
     const term = searchTerm.trim().toLowerCase();
-    let filtered = term ? servicesWithAllowedStates.filter((service) => {
+    const filtered = term ? servicesWithAllowedStates.filter((service) => {
       const matchesExpediente = service.expediente?.toLowerCase().includes(term);
       const matchesNombre = service.nombre?.toLowerCase().includes(term);
       const matchesTelefono = service.telefono?.toLowerCase().includes(term);
