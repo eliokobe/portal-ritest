@@ -48,41 +48,7 @@ const GESTORA_OPERATIVA_FILTROS = [
   'Pendiente técnico'
 ];
 
-// Estados permitidos para Gestora Operativa
-const GESTORA_OPERATIVA_ESTADOS = [
-  'Pendiente de asignar',
-  'Pendiente de aceptación',
-  'Citado',
-  'Pendiente de material',
-  'En curso',
-  'Finalizado',
-];
-
-// Estados permitidos para Estado Ipas por Gestora Operativa
-const GESTORA_OPERATIVA_ESTADOS_IPAS = [
-  'Citado',
-  'Información visita',
-  'Finalizado',
-];
-
-// Estados permitidos para Gestora Técnica - campo Estado
-const GESTORA_TECNICA_ESTADOS = [
-  'Sin contactar',
-  'Llamado',
-  'Citado',
-  'Pendiente presupuesto',
-  'Pendiente de asignar',
-  'Finalizado',
-  'Cancelado',
-];
-
-// Estados permitidos para Gestora Técnica - campo Estado Ipas
-const GESTORA_TECNICA_ESTADOS_IPAS = [
-  'Citado',
-  'Información visita',
-  'Finalizado',
-];
-
+// Estados permitidos para Estado Ipas
 const IPAS_STATUS_OPTIONS = [
   'Sin citar',
   'Citado',
@@ -168,31 +134,14 @@ const Services: React.FC = () => {
     'En curso'
   ];
 
-  // Filtrado de servicios
+  // Filtrado de servicios - mismo para todos los usuarios (como Gestor Operativa)
   const filteredServices = useMemo<Service[]>(() => {
     let servicesWithAllowedStates = services;
     
-    if (isGestoraTecnica) {
-      // Para Gestora Técnica: filtrar por estados específicos
-      const allowedEstadosTecnica = ['Sin contactar', 'Formulario enviado', 'Formulario completado', 'Llamado', 'Citado'];
-      
-      servicesWithAllowedStates = services.filter(service =>
-        service.estado && 
-        allowedEstadosTecnica.includes(service.estado)
-      );
-    } else if (isGestoraOperativa) {
-      // Para Gestora Operativa: filtrar por estados permitidos
-      servicesWithAllowedStates = services.filter(service =>
-        service.estado && GESTORA_OPERATIVA_FILTROS.includes(service.estado)
-      );
-      console.log('Gestora Operativa - Filtered services:', servicesWithAllowedStates.length);
-    } else {
-      // Para otros roles: aplicar el filtro anterior
-      servicesWithAllowedStates = services.filter(service =>
-        service.estado && ALLOWED_STATES.includes(service.estado)
-      );
-      console.log('Other roles - Filtered services:', servicesWithAllowedStates.length);
-    }
+    // Filtrar por estados permitidos (excluyendo Finalizados, Pendiente de valoración, Valorados, Cancelador)
+    servicesWithAllowedStates = services.filter(service =>
+      service.estado && GESTORA_OPERATIVA_FILTROS.includes(service.estado)
+    );
 
     // Aplicar filtro por estado seleccionado
     if (estadoFilter) {
@@ -229,7 +178,7 @@ const Services: React.FC = () => {
 
     console.log('Services - Final filtered services:', finalFiltered.length);
     return finalFiltered;
-  }, [services, searchTerm, estadoFilter, isGestoraOperativa]);
+  }, [services, searchTerm, estadoFilter]);
 
   const handleCloseModal = () => setSelectedService(null);
   
@@ -408,27 +357,25 @@ const Services: React.FC = () => {
         </div>
       </div>
 
-      {/* Filtro por estado para Gestora Operativa */}
-      {isGestoraOperativa && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-4">
-            <label htmlFor="estadoFilter" className="text-sm font-medium text-gray-700 whitespace-nowrap">
-              Filtrar por estado:
-            </label>
-            <select
-              id="estadoFilter"
-              value={estadoFilter}
-              onChange={(e) => setEstadoFilter(e.target.value)}
-              className="flex-1 max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
-            >
-              <option value="">Todos los estados</option>
-              {GESTORA_OPERATIVA_FILTROS.map((estado: string) => (
-                <option key={estado} value={estado}>{estado}</option>
-              ))}
-            </select>
-          </div>
+      {/* Filtro por estado para todos los usuarios */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="flex items-center gap-4">
+          <label htmlFor="estadoFilter" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+            Filtrar por estado:
+          </label>
+          <select
+            id="estadoFilter"
+            value={estadoFilter}
+            onChange={(e) => setEstadoFilter(e.target.value)}
+            className="flex-1 max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+          >
+            <option value="">Todos los estados</option>
+            {GESTORA_OPERATIVA_FILTROS.map((estado: string) => (
+              <option key={estado} value={estado}>{estado}</option>
+            ))}
+          </select>
         </div>
-      )}
+      </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         {filteredServices.length === 0 ? (
@@ -471,10 +418,8 @@ const Services: React.FC = () => {
                             autoFocus
                           >
                             <option value="">Seleccionar...</option>
-                            {/* Mostrar estados según el rol */}
-                            {(isGestoraTecnica ? GESTORA_TECNICA_ESTADOS : 
-                              isGestoraOperativa ? GESTORA_OPERATIVA_ESTADOS : 
-                              STATUS_OPTIONS).map((opt: string) => 
+                            {/* Todos los usuarios pueden seleccionar cualquier estado */}
+                            {STATUS_OPTIONS.map((opt: string) => 
                               <option key={opt} value={opt}>{opt}</option>
                             )}
                           </select>
@@ -505,9 +450,7 @@ const Services: React.FC = () => {
                             autoFocus
                           >
                             <option value="">Seleccionar...</option>
-                            {(isGestoraTecnica ? GESTORA_TECNICA_ESTADOS_IPAS :
-                              isGestoraOperativa ? GESTORA_OPERATIVA_ESTADOS_IPAS : 
-                              IPAS_STATUS_OPTIONS).map((opt: string) => (
+                            {(IPAS_STATUS_OPTIONS).map((opt: string) => (
                               <option key={opt} value={opt}>{opt}</option>
                             ))}
                           </select>
