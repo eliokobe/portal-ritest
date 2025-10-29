@@ -576,6 +576,7 @@ export const airtableService = {
         notaTecnico: 'Nota técnico',
         cita: 'Cita',
         citaTecnico: 'Cita técnico',
+        trabajadores: 'Trabajadores',
       };
       
       const airtableField = fieldMap[field] || field;
@@ -587,6 +588,20 @@ export const airtableService = {
       });
     } catch (error) {
       console.error(`Error updating service field ${field}:`, error);
+      throw error;
+    }
+  },
+
+  // Actualizar campo linked records de un servicio (para arrays)
+  async updateServiceLinkedField(serviceId: string, field: string, value: string[]): Promise<void> {
+    try {
+      await serviciosApi.patch(`/Servicios/${serviceId}`, {
+        fields: {
+          [field]: value,
+        },
+      });
+    } catch (error) {
+      console.error(`Error updating service linked field ${field}:`, error);
       throw error;
     }
   },

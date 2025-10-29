@@ -1,5 +1,5 @@
 import React, { ChangeEvent, useEffect, useMemo, useState } from 'react';
-import { Search, Info, X, Check, XCircle, Eye, FileText, Wrench, Phone } from 'lucide-react';
+import { Search, Info, X, Check, XCircle, Eye, FileText, Wrench, Phone, ArrowUp } from 'lucide-react';
 import { airtableService } from '../services/airtable';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -298,6 +298,23 @@ const Services: React.FC = () => {
     }
   };
 
+  const handleEscalar = async (serviceId: string) => {
+    if (!confirm('¿Estás seguro de que quieres desasignar este servicio?')) {
+      return;
+    }
+    try {
+      // Para linked records en Airtable, enviamos un array vacío
+      await airtableService.updateServiceLinkedField(serviceId, 'Trabajadores', []);
+      // Recargar servicios para reflejar el cambio
+      const data = await airtableService.getServices(user?.clinic, user?.id);
+      setServices(data);
+      alert('Servicio desasignado correctamente');
+    } catch (error) {
+      console.error('Error escalando servicio:', error);
+      alert('Error al escalar el servicio');
+    }
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
     try {
@@ -510,6 +527,15 @@ const Services: React.FC = () => {
                             <Phone className="h-5 w-5" />
                           </a>
                         )}
+                        {/* Botón de escalar servicio */}
+                        <button
+                          type="button"
+                          onClick={() => handleEscalar(service.id)}
+                          className="inline-flex items-center justify-center p-2 rounded-full text-orange-600 hover:bg-orange-600 hover:text-white transition-all"
+                          title="Escalar servicio"
+                        >
+                          <ArrowUp className="h-5 w-5" />
+                        </button>
                       </div>
                     </td>
                   </tr>
