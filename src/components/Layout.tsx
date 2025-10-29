@@ -1,4 +1,4 @@
-import React, { ReactNode, useState, useEffect } from 'react';
+import React, { ReactNode, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -18,7 +18,6 @@ import {
   FileText,
   Lightbulb,
   CheckSquare,
-  GraduationCap,
   Package,
   Truck,
 } from 'lucide-react';
@@ -64,7 +63,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Packlink', href: 'https://pro.packlink.es/private/shipments/all', icon: Truck, external: true },
         { name: 'Ipas', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
         { name: 'Whatsapp', href: 'https://chat.ritest.es', icon: MessageCircle, external: true },
-        { name: 'Formación', href: 'https://formacion.ritest.es/reparadores', icon: GraduationCap, external: true },
       ],
     },
     {
@@ -85,14 +83,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Servicios', href: '/servicios', icon: Wrench },
         { name: 'Ipartner', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
         { name: 'Whatsapp', href: 'https://chat.ritest.es', icon: MessageCircle, external: true },
-        { name: 'Formación', href: 'https://formacion.ritest.es/reparadores', icon: GraduationCap, external: true },
       ],
     },
     {
       title: 'Asesoramiento',
       items: [
         { name: 'Asesoramientos', href: '/asesoramientos', icon: Lightbulb },
-        { name: 'Formación', href: 'https://formacion.ritest.es', icon: GraduationCap, external: true },
       ],
     },
     {
@@ -115,7 +111,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Técnicos', href: '/tecnicos', icon: Users },
         { name: 'Ipas', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
         { name: 'Whatsapp', href: 'https://chat.ritest.es', icon: MessageCircle, external: true },
-        { name: 'Formación', href: 'https://formacion.ritest.es/reparadores', icon: GraduationCap, external: true },
         { name: 'Packlink', href: 'https://pro.packlink.es/private/shipments/all', icon: ExternalLink, external: true },
       ],
     },
@@ -124,7 +119,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       items: [
         { name: 'Asesoramientos', href: '/asesoramientos', icon: Lightbulb },
         { name: 'Informe', href: '/informe', icon: FileText, external: true },
-        { name: 'Formación', href: 'https://formacion.ritest.es', icon: GraduationCap, external: true },
       ],
     },
     {
@@ -166,9 +160,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
             {activeNavigationGroups.map((group, groupIndex) => (
               <div key={groupIndex}>
-                {groupIndex > 0 && (
-                  <div className="my-3 border-t border-gray-200" />
-                )}
                 {group.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = location.pathname === item.href;
@@ -248,9 +239,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <nav className={`flex-1 ${sidebarCollapsed ? 'px-2' : 'px-4'} py-4 space-y-1 overflow-y-auto`}>
             {activeNavigationGroups.map((group, groupIndex) => (
               <div key={groupIndex}>
-                {groupIndex > 0 && (
-                  <div className={`${sidebarCollapsed ? 'my-2' : 'my-3'} border-t border-gray-200`} />
-                )}
                 {group.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = location.pathname === item.href;
