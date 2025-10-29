@@ -299,16 +299,23 @@ const Services: React.FC = () => {
   };
 
   const handleEscalar = async (serviceId: string) => {
-    if (!confirm('¿Estás seguro de que quieres desasignar este servicio?')) {
+    if (!confirm('¿Estás seguro de que quieres escalar este servicio?')) {
       return;
     }
     try {
-      // Limpiar el campo Linked Records "Trabajadores relacionado" con array vacío
-      await airtableService.updateServiceLinkedField(serviceId, 'Trabajadores relacionado', []);
+      // Buscar el ID del supervisor "Elio Kobe"
+      const supervisorId = await (airtableService as any).getWorkerIdByName('Elio Kobe');
+      if (!supervisorId) {
+        alert('No se encontró el supervisor "Elio Kobe"');
+        return;
+      }
+
+      // Asignar el supervisor al campo Linked Records "Trabajadores relacionado"
+      await airtableService.updateServiceLinkedField(serviceId, 'Trabajadores relacionado', [supervisorId]);
       // Recargar servicios para reflejar el cambio
       const data = await airtableService.getServices(user?.clinic, user?.id, user?.email);
       setServices(data);
-      alert('Servicio desasignado correctamente');
+      alert('Servicio escalado correctamente');
     } catch (error) {
       console.error('Error escalando servicio:', error);
       alert('Error al escalar el servicio');
