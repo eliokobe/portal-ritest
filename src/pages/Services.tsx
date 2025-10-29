@@ -103,7 +103,7 @@ const Services: React.FC = () => {
     const loadServices = async () => {
       setLoading(true);
       try {
-        const data = await airtableService.getServices(user?.clinic, user?.id);
+        const data = await airtableService.getServices(user?.clinic, user?.id, user?.email);
         if (isMounted) {
           setServices(data);
         }
@@ -306,7 +306,7 @@ const Services: React.FC = () => {
       // Para linked records en Airtable, enviamos un array vacío
       await airtableService.updateServiceLinkedField(serviceId, 'Trabajadores', []);
       // Recargar servicios para reflejar el cambio
-      const data = await airtableService.getServices(user?.clinic, user?.id);
+      const data = await airtableService.getServices(user?.clinic, user?.id, user?.email);
       setServices(data);
       alert('Servicio desasignado correctamente');
     } catch (error) {

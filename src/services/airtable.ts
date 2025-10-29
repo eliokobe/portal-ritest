@@ -458,7 +458,7 @@ export const airtableService = {
   },
 
   // Obtener servicios (tabla "Servicios")
-  async getServices(clinic?: string, workerId?: string): Promise<{
+  async getServices(clinic?: string, workerId?: string, workerEmail?: string): Promise<{
     id: string;
     expediente?: string;
     nombre?: string;
@@ -479,7 +479,7 @@ export const airtableService = {
     try {
       const params: Record<string, any> = {};
 
-      console.log('Airtable - getServices called with clinic:', clinic, 'workerId:', workerId);
+      console.log('Airtable - getServices called with clinic:', clinic, 'workerId:', workerId, 'workerEmail:', workerEmail);
 
       let formulaParts: string[] = [];
 
@@ -489,11 +489,16 @@ export const airtableService = {
         console.log('Airtable - Clinic filter:', formulaParts[formulaParts.length - 1]);
       }
 
-      if (workerId) {
+      if (workerEmail) {
+        const emailEsc = String(workerEmail).replace(/'/g, "\\'");
+        // Buscar por email en el campo Trabajadores (ahora es texto)
+        formulaParts.push(`FIND('${emailEsc}', {Trabajadores})`);
+        console.log('Airtable - Worker email filter:', formulaParts[formulaParts.length - 1]);
+      } else if (workerId) {
         const workerIdEsc = String(workerId).replace(/'/g, "\\'");
         // Para Linked Records, necesitamos usar ARRAYJOIN para convertir el array a string
         formulaParts.push(`FIND('${workerIdEsc}', ARRAYJOIN({Trabajadores}))`);
-        console.log('Airtable - Worker filter:', formulaParts[formulaParts.length - 1]);
+        console.log('Airtable - Worker ID filter:', formulaParts[formulaParts.length - 1]);
       }
 
       if (formulaParts.length > 0) {
