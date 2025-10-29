@@ -491,7 +491,8 @@ export const airtableService = {
 
       if (workerId) {
         const workerIdEsc = String(workerId).replace(/'/g, "\\'");
-        formulaParts.push(`FIND('${workerIdEsc}', {Trabajadores})`);
+        // Para Linked Records, necesitamos usar ARRAYJOIN para convertir el array a string
+        formulaParts.push(`FIND('${workerIdEsc}', ARRAYJOIN({Trabajadores}))`);
         console.log('Airtable - Worker filter:', formulaParts[formulaParts.length - 1]);
       }
 
