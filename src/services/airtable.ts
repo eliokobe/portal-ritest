@@ -458,7 +458,7 @@ export const airtableService = {
   },
 
   // Obtener servicios (tabla "Servicios")
-  async getServices(clinic?: string): Promise<{
+  async getServices(clinic?: string, workerId?: string): Promise<{
     id: string;
     expediente?: string;
     nombre?: string;
@@ -479,14 +479,27 @@ export const airtableService = {
     try {
       const params: Record<string, any> = {};
 
-      console.log('Airtable - getServices called with clinic:', clinic);
+      console.log('Airtable - getServices called with clinic:', clinic, 'workerId:', workerId);
+
+      let formulaParts: string[] = [];
 
       if (clinic) {
         const clinicEsc = String(clinic).replace(/'/g, "\\'");
-        params.filterByFormula = `OR({Empresa} = '${clinicEsc}', {Clinic} = '${clinicEsc}', {Cliente} = '${clinicEsc}')`;
-        console.log('Airtable - Filter formula:', params.filterByFormula);
+        formulaParts.push(`OR({Empresa} = '${clinicEsc}', {Clinic} = '${clinicEsc}', {Cliente} = '${clinicEsc}')`);
+        console.log('Airtable - Clinic filter:', formulaParts[formulaParts.length - 1]);
+      }
+
+      if (workerId) {
+        const workerIdEsc = String(workerId).replace(/'/g, "\\'");
+        formulaParts.push(`FIND('${workerIdEsc}', {Trabajadores})`);
+        console.log('Airtable - Worker filter:', formulaParts[formulaParts.length - 1]);
+      }
+
+      if (formulaParts.length > 0) {
+        params.filterByFormula = formulaParts.length === 1 ? formulaParts[0] : `AND(${formulaParts.join(', ')})`;
+        console.log('Airtable - Combined filter formula:', params.filterByFormula);
       } else {
-        console.log('Airtable - No clinic filter applied');
+        console.log('Airtable - No filters applied');
       }
 
       console.log('Airtable - Calling fetchAllServicios...');

@@ -103,7 +103,7 @@ const Services: React.FC = () => {
     const loadServices = async () => {
       setLoading(true);
       try {
-        const data = await airtableService.getServices(user?.clinic);
+        const data = await airtableService.getServices(user?.clinic, user?.id);
         if (isMounted) {
           setServices(data);
         }
@@ -662,44 +662,40 @@ const Services: React.FC = () => {
                 )}
                 {/* Primera fila: Cita y Cita técnico */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Cita - visible solo para Gestora Operativa y editable */}
-                  {isGestoraOperativa && (
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="text-sm font-semibold text-gray-700">Cita</h3>
-                        <button
-                          onClick={() => handleEdit(selectedService.id, 'cita', formatDateTimeForInput(selectedService.cita))}
-                          className="text-xs text-brand-primary hover:text-brand-green"
-                        >
-                          Editar
-                        </button>
-                      </div>
-                      {editingField?.id === selectedService.id && editingField?.field === 'cita' ? (
-                        <div className="space-y-2">
-                          <input
-                            type="datetime-local"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
-                            disabled={saving}
-                            autoFocus
-                          />
-                          <div className="flex gap-2">
-                            <button onClick={() => handleSave(selectedService.id, 'cita')} disabled={saving} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
-                              Guardar
-                            </button>
-                            <button onClick={handleCancel} disabled={saving} className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">
-                              Cancelar
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{renderDetailValue(selectedService.cita)}</p>
-                      )}
+                  {/* Cita - editable */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="text-sm font-semibold text-gray-700">Cita</h3>
+                      <button
+                        onClick={() => handleEdit(selectedService.id, 'cita', formatDateTimeForInput(selectedService.cita))}
+                        className="text-xs text-brand-primary hover:text-brand-green"
+                      >
+                        Editar
+                      </button>
                     </div>
-                  )}
-                  {/* Espacio vacío si no es Gestora Operativa para mantener el layout */}
-                  {!isGestoraOperativa && <div></div>}
+                    {editingField?.id === selectedService.id && editingField?.field === 'cita' ? (
+                      <div className="space-y-2">
+                        <input
+                          type="datetime-local"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                          disabled={saving}
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <button onClick={() => handleSave(selectedService.id, 'cita')} disabled={saving} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
+                            Guardar
+                          </button>
+                          <button onClick={handleCancel} disabled={saving} className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{renderDetailValue(selectedService.cita)}</p>
+                    )}
+                  </div>
                   {/* Cita técnico - siempre visible, solo lectura */}
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700">Cita técnico</h3>
