@@ -303,8 +303,8 @@ const Services: React.FC = () => {
       return;
     }
     try {
-      // Para linked records en Airtable, enviamos un array vacío
-      await airtableService.updateServiceLinkedField(serviceId, 'Trabajadores', []);
+      // Si Trabajadores es un campo de texto, enviar cadena vacía
+      await airtableService.updateServiceField(serviceId, 'trabajadores', '');
       // Recargar servicios para reflejar el cambio
       const data = await airtableService.getServices(user?.clinic, user?.id, user?.email);
       setServices(data);
