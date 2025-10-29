@@ -303,8 +303,8 @@ const Services: React.FC = () => {
       return;
     }
     try {
-      // Si Trabajadores es un campo de texto, enviar cadena vacía
-      await airtableService.updateServiceField(serviceId, 'trabajadores', '');
+      // Limpiar el campo Linked Records "Trabajadores relacionado" con array vacío
+      await airtableService.updateServiceLinkedField(serviceId, 'Trabajadores relacionado', []);
       // Recargar servicios para reflejar el cambio
       const data = await airtableService.getServices(user?.clinic, user?.id, user?.email);
       setServices(data);
