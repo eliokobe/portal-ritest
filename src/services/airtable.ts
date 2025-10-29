@@ -79,14 +79,25 @@ async function fetchAllRegistros(table: string, params: Record<string, any> = {}
 
 // Helper para paginar Airtable de la base específica de servicios
 async function fetchAllServicios(table: string, params: Record<string, any> = {}) {
+  console.log('fetchAllServicios - Table:', table, 'Params:', params);
+  console.log('fetchAllServicios - Base URL:', serviciosApi.defaults.baseURL);
+  
   const all: any[] = [];
   let offset: string | undefined;
-  do {
-    const { data } = await serviciosApi.get(`/${table}`, { params: { ...params, offset } });
-    const airtableData = data as { records?: any[]; offset?: string };
-    all.push(...(airtableData.records ?? []));
-    offset = airtableData.offset;
-  } while (offset);
+  try {
+    do {
+      const { data } = await serviciosApi.get(`/${table}`, { params: { ...params, offset } });
+      console.log('fetchAllServicios - Response:', data);
+      const airtableData = data as { records?: any[]; offset?: string };
+      all.push(...(airtableData.records ?? []));
+      offset = airtableData.offset;
+    } while (offset);
+  } catch (error) {
+    console.error('fetchAllServicios - Error:', error);
+    throw error;
+  }
+  
+  console.log('fetchAllServicios - Total records:', all.length);
   return all;
 }
 
@@ -490,17 +501,15 @@ export const airtableService = {
       }
 
       if (workerEmail) {
-        // Obtener el ID del trabajador por email
-        const workerIdFromEmail = await this.getWorkerIdByEmail(workerEmail);
-        if (workerIdFromEmail) {
-          // Filtrar por "Trabajadores relacionado" usando el ID
-          formulaParts.push(`FIND('${workerIdFromEmail}', ARRAYJOIN({Trabajadores relacionado}))`);
-          console.log('Airtable - Worker email filter (via ID):', formulaParts[formulaParts.length - 1]);
-        }
+        console.log('Airtable - Filtering by email in Email trabajador column');
+        // Filtrar por email en la columna "Email trabajador"
+        const emailEsc = String(workerEmail).replace(/'/g, "\\'");
+        formulaParts.push(`FIND('${emailEsc}', {Email trabajador})`);
+        console.log('Airtable - Worker email filter in Email trabajador:', formulaParts[formulaParts.length - 1]);
       } else if (workerId) {
         const workerIdEsc = String(workerId).replace(/'/g, "\\'");
-        // Para Linked Records, necesitamos usar ARRAYJOIN para convertir el array a string
-        formulaParts.push(`FIND('${workerIdEsc}', ARRAYJOIN({Trabajadores relacionado}))`);
+        // Para Linked Records, necesitamos usar ARRAYJOIN con un separador
+        formulaParts.push(`FIND('${workerIdEsc}', ARRAYJOIN({Trabajador}, ','))`);
         console.log('Airtable - Worker ID filter:', formulaParts[formulaParts.length - 1]);
       }
 
@@ -514,6 +523,20 @@ export const airtableService = {
       console.log('Airtable - Calling fetchAllServicios...');
       const records = await fetchAllServicios('Servicios', { ...params, pageSize: 100 });
       console.log('Airtable - Records received:', records.length);
+
+      // Debug: Ver algunos registros sin filtrar
+      if (records.length === 0 && (workerId || workerEmail)) {
+        console.log('Airtable - No records found with filter. Testing without filter...');
+        const allRecords = await fetchAllServicios('Servicios', { pageSize: 5 });
+        console.log('Airtable - Sample records (first 5):', allRecords.length);
+        allRecords.forEach((r: any, idx: number) => {
+          console.log(`Record ${idx + 1}:`, {
+            id: r.id,
+            fields: r.fields,
+            trabajadores: r.fields['Trabajador'] || r.fields['Trabajador relacionado'] || 'N/A'
+          });
+        });
+      }
 
       const mappedRecords = records.map((r: any) => {
         const f = r.fields ?? {};
@@ -585,7 +608,7 @@ export const airtableService = {
         notaTecnico: 'Nota técnico',
         cita: 'Cita',
         citaTecnico: 'Cita técnico',
-        trabajadores: 'Trabajadores relacionado',
+        trabajadores: 'Trabajador',
       };
       
       const airtableField = fieldMap[field] || field;
@@ -715,6 +738,10 @@ export const airtableService = {
   // Obtener ID del trabajador por email
   async getWorkerIdByEmail(email: string): Promise<string | null> {
     try {
+      console.log('Airtable - getWorkerIdByEmail called with email:', email);
+      console.log('Airtable - Using table:', AIRTABLE_WORKERS_TABLE);
+      console.log('Airtable - Using base:', SERVICIOS_BASE_ID);
+      
       const response = await serviciosApi.get(`/${AIRTABLE_WORKERS_TABLE}`, {
         params: {
           filterByFormula: `{Email} = '${email.replace(/'/g, "\\'")}'`,
@@ -722,6 +749,13 @@ export const airtableService = {
         },
       });
       const data = response.data as { records: any[] };
+      
+      console.log('Airtable - Worker records found:', data.records.length);
+      if (data.records.length > 0) {
+        console.log('Airtable - Worker record:', data.records[0]);
+        console.log('Airtable - Worker ID:', data.records[0].id);
+      }
+      
       return data.records.length > 0 ? data.records[0].id : null;
     } catch (error) {
       console.error('Error fetching worker by email:', error);

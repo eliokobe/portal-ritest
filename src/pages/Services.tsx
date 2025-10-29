@@ -310,8 +310,8 @@ const Services: React.FC = () => {
         return;
       }
 
-      // Asignar el supervisor al campo Linked Records "Trabajadores relacionado"
-      await airtableService.updateServiceLinkedField(serviceId, 'Trabajadores relacionado', [supervisorId]);
+      // Asignar el supervisor al campo Linked Records "Trabajador"
+      await airtableService.updateServiceLinkedField(serviceId, 'Trabajador', [supervisorId]);
       // Recargar servicios para reflejar el cambio
       const data = await airtableService.getServices(user?.clinic, user?.id, user?.email);
       setServices(data);
