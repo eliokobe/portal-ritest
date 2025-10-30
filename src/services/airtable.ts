@@ -750,34 +750,6 @@ export const airtableService = {
     }
   },
 
-  // Obtener ID del trabajador por email
-  async getWorkerIdByEmail(email: string): Promise<string | null> {
-    try {
-      console.log('Airtable - getWorkerIdByEmail called with email:', email);
-      console.log('Airtable - Using table:', AIRTABLE_WORKERS_TABLE);
-      console.log('Airtable - Using base:', SERVICIOS_BASE_ID);
-      
-      const response = await serviciosApi.get(`/${AIRTABLE_WORKERS_TABLE}`, {
-        params: {
-          filterByFormula: `{Email} = '${email.replace(/'/g, "\\'")}'`,
-          maxRecords: 1,
-        },
-      });
-      const data = response.data as { records: any[] };
-      
-      console.log('Airtable - Worker records found:', data.records.length);
-      if (data.records.length > 0) {
-        console.log('Airtable - Worker record:', data.records[0]);
-        console.log('Airtable - Worker ID:', data.records[0].id);
-      }
-      
-      return data.records.length > 0 ? data.records[0].id : null;
-    } catch (error) {
-      console.error('Error fetching worker by email:', error);
-      return null;
-    }
-  },
-
   // Obtener registros (tabla "Registros")
   async getRegistros(): Promise<{
     id: string;
@@ -833,9 +805,116 @@ export const airtableService = {
         fields['Comentarios'] = updates.comentarios;
       }
       
-      await registrosApi.patch(`/Registros/${registroId}`, { fields });
+      await serviciosApi.patch(`/Registros/${registroId}`, { fields });
     } catch (error) {
       console.error('Error updating registro:', error);
+      throw error;
+    }
+  },
+
+  // Obtener formulario por expediente
+  async getFormularioByExpediente(expediente: string): Promise<any> {
+    try {
+      const records = await fetchAllServicios('Formularios', {
+        filterByFormula: `{Expediente} = '${expediente.replace(/'/g, "\\'")}'`,
+        pageSize: 1,
+      });
+      
+      if (records.length === 0) {
+        throw new Error('Formulario no encontrado');
+      }
+      
+      const r = records[0];
+      const f = r.fields ?? {};
+      return {
+        id: r.id,
+        Expediente: f['Expediente'],
+        Problema: f['Problema'] ?? f['Problem'],
+        Detalles: f['Detalles'] ?? f['Details'] ?? f['Descripción'],
+        'Archivo 1': f['Archivo 1'] ?? f['File 1'],
+        'Archivo 2': f['Archivo 2'] ?? f['File 2'],
+        'Archivo 3': f['Archivo 3'] ?? f['File 3'],
+        'Foto general': f['Foto general'] ?? f['General Photo'],
+        'Foto etiqueta': f['Foto etiqueta'] ?? f['Label Photo'],
+        'Foto roto': f['Foto roto'] ?? f['Broken Photo'],
+      };
+    } catch (error) {
+      console.error('Error fetching formulario:', error);
+      throw error;
+    }
+  },
+
+  // Obtener reparaciones por expediente
+  async getReparacionesByExpediente(expediente: string): Promise<any> {
+    try {
+      const records = await fetchAllServicios('Reparaciones', {
+        filterByFormula: `{Expediente} = '${expediente.replace(/'/g, "\\'")}'`,
+        pageSize: 1,
+      });
+      
+      if (records.length === 0) {
+        throw new Error('Reparación no encontrada');
+      }
+      
+      const r = records[0];
+      const f = r.fields ?? {};
+      return {
+        id: r.id,
+        expediente: f['Expediente'],
+        tecnico: f['Técnico'] ?? f['Technician'],
+        resultado: f['Resultado'] ?? f['Result'],
+        reparacion: f['Reparación'] ?? f['Repair'],
+        cuadroElectrico: f['Cuadro eléctrico'] ?? f['Electrical Panel'],
+        problema: f['Problema'] ?? f['Problem'],
+        foto: f['Foto'] ?? f['Photo'],
+      };
+    } catch (error) {
+      console.error('Error fetching reparacion:', error);
+      throw error;
+    }
+  },
+
+  // Actualizar campo de formulario
+  async updateFormularioField(formId: string, field: string, value: string): Promise<void> {
+    try {
+      const fieldMap: Record<string, string> = {
+        'problema': 'Problema',
+        'detalles': 'Detalles',
+      };
+      
+      const airtableField = fieldMap[field] || field;
+      
+      await serviciosApi.patch(`/Formularios/${formId}`, {
+        fields: {
+          [airtableField]: value,
+        },
+      });
+    } catch (error) {
+      console.error(`Error updating formulario field ${field}:`, error);
+      throw error;
+    }
+  },
+
+  // Actualizar campo de reparación
+  async updateReparacionField(repId: string, field: string, value: string): Promise<void> {
+    try {
+      const fieldMap: Record<string, string> = {
+        'tecnico-rep': 'Técnico',
+        'resultado': 'Resultado',
+        'reparacion': 'Reparación',
+        'cuadroElectrico': 'Cuadro eléctrico',
+        'problema-rep': 'Problema',
+      };
+      
+      const airtableField = fieldMap[field] || field;
+      
+      await serviciosApi.patch(`/Reparaciones/${repId}`, {
+        fields: {
+          [airtableField]: value,
+        },
+      });
+    } catch (error) {
+      console.error(`Error updating reparacion field ${field}:`, error);
       throw error;
     }
   },
