@@ -11,6 +11,7 @@ export type CallItem = {
   date?: string;
   time?: string;
   recordingUrl?: string;
+  advisor?: string;
 };
 
 const Calls: React.FC = () => {
@@ -24,13 +25,13 @@ const Calls: React.FC = () => {
   useEffect(() => {
     const fetchCalls = async () => {
       try {
-        // Intenta con la clínica del usuario; si no hay resultados, reintenta sin filtro para alinear con el dashboard
-        const withClinic = await airtableService.getCalls(user?.clinic);
-        if (withClinic.length === 0 && user?.clinic) {
+        // Intenta con la clínica del usuario y su email como asesor; si no hay resultados, reintenta sin filtro para alinear con el dashboard
+        const withFilters = await airtableService.getCalls(user?.clinic, user?.email);
+        if (withFilters.length === 0 && (user?.clinic || user?.email)) {
           const all = await airtableService.getCalls();
           setCalls(all);
         } else {
-          setCalls(withClinic);
+          setCalls(withFilters);
         }
       } catch (e) {
         console.error('Error fetching calls', e);
@@ -39,7 +40,7 @@ const Calls: React.FC = () => {
       }
     };
     fetchCalls();
-  }, [user?.clinic]);
+  }, [user?.clinic, user?.email]);
 
   const statuses = useMemo(() => {
     const s = Array.from(new Set(calls.map(c => (c.status ?? '').trim()).filter(Boolean)));

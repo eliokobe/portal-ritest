@@ -382,8 +382,8 @@ export const airtableService = {
     }
   },
 
-  // Obtener llamadas (tabla "Llamadas")
-  async getCalls(clinic?: string): Promise<{
+  // Obtener llamadas (tabla "Llamadas" en base de registros)
+  async getCalls(clinic?: string, advisorEmail?: string): Promise<{
     id: string;
     phone?: string;
     status?: string;
@@ -391,17 +391,31 @@ export const airtableService = {
     date?: string;
     time?: string;
     recordingUrl?: string;
+    advisor?: string;
   }[]> {
     try {
-      // Filtro de últimos 30 días + opcionalmente clínica (soporta 'Clínica' y 'Clinic')
+      // Filtro de últimos 30 días + opcionalmente clínica y asesor
       const last30 = "IS_AFTER({Fecha}, DATEADD(TODAY(), -30, 'days'))";
       let formula = last30;
+      let conditions: string[] = [last30];
+
       if (clinic) {
         const clinicEsc = String(clinic).replace(/'/g, "\\'");
         const clinicCond = `OR({Clínica} = '${clinicEsc}', {Clinic} = '${clinicEsc}')`;
-        formula = `AND(${last30}, ${clinicCond})`;
+        conditions.push(clinicCond);
       }
-      const records = await fetchAllRecords('Llamadas', {
+
+      if (advisorEmail) {
+        const advisorEsc = String(advisorEmail).replace(/'/g, "\\'");
+        const advisorCond = `FIND('${advisorEsc}', {Asesor})`;
+        conditions.push(advisorCond);
+      }
+
+      if (conditions.length > 1) {
+        formula = `AND(${conditions.join(', ')})`;
+      }
+
+      const records = await fetchAllRegistros('Llamadas', {
         filterByFormula: formula,
         pageSize: 100,
       });
@@ -441,6 +455,7 @@ export const airtableService = {
           date: dateISO,
           time: timeStr,
           recordingUrl,
+          advisor: f['Asesor'] ?? f['Advisor'],
         };
       });
     } catch (error) {
@@ -763,48 +778,65 @@ export const airtableService = {
     }
   },
 
-  // Obtener recursos (tabla "Recursos")
-  async getResources(): Promise<{
+  // Obtener registros (tabla "Registros")
+  async getRegistros(): Promise<{
     id: string;
-    name: string;
-    description?: string;
-    fileUrl?: string;
-    fileName?: string;
-    imageUrl?: string;
-    roles?: string[]; // Campo multiselect de roles
-    enlace?: string; // Nuevo campo para enlace de video
+    contrato?: string;
+    nombre?: string;
+    telefono?: string;
+    email?: string;
+    direccion?: string;
+    estado?: string;
+    cita?: string;
+    comentarios?: string;
+    informe?: string;
+    asesor?: string;
   }[]> {
     try {
-      const records = await fetchAllServicios('Recursos', { pageSize: 100 });
+      const records = await fetchAllRegistros('Registros', { pageSize: 100 });
       return records.map((r: any) => {
         const f = r.fields ?? {};
-        const file = Array.isArray(f['Archivo'] ?? f['File']) ? (f['Archivo'] ?? f['File'])[0] : undefined;
-        const photo = Array.isArray(f['Foto'] ?? f['Photo']) ? (f['Foto'] ?? f['Photo'])[0] : undefined;
-        
-        // Obtener el campo Rol (multiselect)
-        let roles: string[] | undefined;
-        if (Array.isArray(f['Rol'])) {
-          roles = f['Rol'];
-        } else if (Array.isArray(f['Role'])) {
-          roles = f['Role'];
-        } else if (Array.isArray(f['Roles'])) {
-          roles = f['Roles'];
-        }
-        
         return {
           id: r.id,
-          name: f['Nombre'] ?? f['Name'] ?? 'Recurso',
-          description: f['Descripción'] ?? f['Descripcion'] ?? f['Description'],
-          fileUrl: file?.url,
-          fileName: file?.filename,
-          imageUrl: photo?.url,
-          roles: roles,
-          enlace: f['Enlace'] ?? f['Link'], // Nuevo campo enlace
+          contrato: f['Contrato'] ?? f['Nº Contrato'] ?? f['Numero'] ?? f['Número'],
+          nombre: f['Nombre'] ?? f['Cliente'],
+          telefono: f['Teléfono'] ?? f['Telefono'] ?? f['Tel'],
+          email: f['Email'] ?? f['Correo'],
+          direccion: f['Dirección'] ?? f['Direccion'] ?? f['Address'],
+          estado: f['Estado'],
+          cita: f['Cita'],
+          comentarios: f['Comentarios'],
+          informe: f['Informe'],
+          asesor: f['Asesor'] ?? f['Advisor'],
         };
       });
     } catch (error) {
-      console.error('Error fetching resources:', error);
+      console.error('Error fetching registros:', error);
       return [];
+    }
+  },
+
+  // Actualizar registro
+  async updateRegistro(registroId: string, updates: { estado?: string; cita?: string; comentarios?: string }): Promise<void> {
+    try {
+      const fields: Record<string, any> = {};
+      
+      if (updates.estado !== undefined) {
+        fields['Estado'] = updates.estado;
+      }
+      
+      if (updates.cita !== undefined) {
+        fields['Cita'] = updates.cita;
+      }
+      
+      if (updates.comentarios !== undefined) {
+        fields['Comentarios'] = updates.comentarios;
+      }
+      
+      await registrosApi.patch(`/Registros/${registroId}`, { fields });
+    } catch (error) {
+      console.error('Error updating registro:', error);
+      throw error;
     }
   },
 };   
