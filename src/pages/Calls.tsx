@@ -65,7 +65,13 @@ const Calls: React.FC = () => {
         }
       }
       if (statusFilter && c.status?.trim() !== statusFilter) return false;
-      return true;
+      
+      // Filtrar por estados específicos para asesoramiento: 1ª Llamada, 2ª Llamada, Citado, o estado vacío
+      const allowedStatuses = ['1ª Llamada', '2ª Llamada', 'Citado'];
+      const callStatus = c.status?.trim();
+      const isAllowedStatus = allowedStatuses.includes(callStatus || '') || !callStatus;
+      
+      return isAllowedStatus;
     });
   }, [calls, statusFilter, startDate, endDate]);
 
@@ -86,8 +92,8 @@ const Calls: React.FC = () => {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Llamadas</h1>
-        <p className="text-gray-600 mt-2">Historial de llamadas y grabaciones</p>
+        <h1 className="text-3xl font-bold text-gray-900">Asesoramiento</h1>
+        <p className="text-gray-600 mt-2">Llamadas pendientes de asesoramiento (1ª Llamada, 2ª Llamada, Citado)</p>
       </div>
 
       {/* Filtros */}
@@ -133,14 +139,14 @@ const Calls: React.FC = () => {
             </button>
           </div>
         </div>
-        <div className="text-xs text-gray-500 mt-2">Mostrando {filtered.length} de {calls.length} llamadas</div>
+                <div className="text-xs text-gray-500 mt-2">Mostrando {filtered.length} de {calls.length} llamadas de asesoramiento</div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         {filtered.length === 0 ? (
           <div className="text-center py-12">
             <PhoneCall className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">No hay llamadas registradas</p>
+            <p className="text-gray-500">No hay llamadas pendientes de asesoramiento</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
