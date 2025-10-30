@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { PhoneCall, Calendar /*, PlayCircle */ } from 'lucide-react';
+import { PhoneCall, Calendar, ChevronDown, X /*, PlayCircle */ } from 'lucide-react';
 import { airtableService } from '../services/airtable';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -14,6 +14,16 @@ export type CallItem = {
   advisor?: string;
 };
 
+const ESTADO_OPTIONS = [
+  '1ª Llamada',
+  '2ª Llamada',
+  'Citado',
+  'Ilocalizable',
+  'No interesado',
+  'Informe',
+  'Inglés'
+];
+
 const Calls: React.FC = () => {
   const { user } = useAuth();
   const [calls, setCalls] = useState<CallItem[]>([]);
@@ -21,6 +31,8 @@ const Calls: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
+  const [editingStatus, setEditingStatus] = useState<string | null>(null);
+  const [savingStatus, setSavingStatus] = useState(false);
 
   useEffect(() => {
     const fetchCalls = async () => {
@@ -80,6 +92,34 @@ const Calls: React.FC = () => {
     setStatusFilter('');
     setStartDate('');
     setEndDate('');
+  };
+
+  const handleSaveStatus = async (callId: string, newStatus: string) => {
+    if (savingStatus) return;
+    
+    setSavingStatus(true);
+    try {
+      await airtableService.updateCall(callId, newStatus);
+      
+      setCalls(prev => 
+        prev.map(call => 
+          call.id === callId 
+            ? { ...call, status: newStatus }
+            : call
+        )
+      );
+      
+      setEditingStatus(null);
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert('Error al actualizar el estado');
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const handleCancelStatusEdit = () => {
+    setEditingStatus(null);
   };
 
   if (loading) {
@@ -168,7 +208,41 @@ const Calls: React.FC = () => {
                       <div className="text-sm font-medium text-gray-900">{c.phone || '—'}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-700">{c.status || '—'}</span>
+                      {editingStatus === c.id ? (
+                        <div className="flex items-center space-x-1">
+                          <select
+                            value={c.status || ''}
+                            onChange={(e) => handleSaveStatus(c.id, e.target.value)}
+                            disabled={savingStatus}
+                            className="text-xs font-semibold rounded-full px-2 py-1 border border-gray-300 focus:ring-2 focus:ring-brand-dark/30 focus:border-transparent disabled:opacity-50"
+                            autoFocus
+                          >
+                            <option value="">Seleccionar estado</option>
+                            {ESTADO_OPTIONS.map((status) => (
+                              <option key={status} value={status}>
+                                {status}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={handleCancelStatusEdit}
+                            disabled={savingStatus}
+                            className="text-red-600 hover:text-red-800 disabled:opacity-50"
+                            title="Cancelar"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span 
+                          className="text-sm text-gray-700 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
+                          onClick={() => setEditingStatus(c.id)}
+                          title="Click para cambiar estado"
+                        >
+                          {c.status || 'Sin estado'}
+                          <ChevronDown className="h-3 w-3 ml-1 inline" />
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center text-sm text-gray-500">

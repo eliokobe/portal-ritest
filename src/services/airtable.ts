@@ -382,7 +382,7 @@ export const airtableService = {
     }
   },
 
-  // Obtener llamadas (tabla "Llamadas" en base de registros)
+  // Obtener llamadas (tabla "Registros" en base de registros)
   async getCalls(clinic?: string, advisorEmail?: string): Promise<{
     id: string;
     phone?: string;
@@ -415,7 +415,7 @@ export const airtableService = {
         formula = `AND(${conditions.join(', ')})`;
       }
 
-      const records = await fetchAllRegistros('Llamadas', {
+      const records = await fetchAllRegistros('Registros', {
         filterByFormula: formula,
         pageSize: 100,
       });
@@ -808,6 +808,20 @@ export const airtableService = {
       await serviciosApi.patch(`/Registros/${registroId}`, { fields });
     } catch (error) {
       console.error('Error updating registro:', error);
+      throw error;
+    }
+  },
+
+  // Actualizar estado de una llamada (en tabla Registros)
+  async updateCall(callId: string, estado: string): Promise<void> {
+    try {
+      await registrosApi.patch(`/Registros/${callId}`, {
+        fields: {
+          'Estado': estado,
+        },
+      });
+    } catch (error) {
+      console.error('Error updating call status:', error);
       throw error;
     }
   },
