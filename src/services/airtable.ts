@@ -815,17 +815,20 @@ export const airtableService = {
   // Obtener formulario por expediente
   async getFormularioByExpediente(expediente: string): Promise<any> {
     try {
-      const records = await fetchAllServicios('Formularios', {
+      console.log('Buscando formulario para expediente:', expediente);
+      const records = await fetchAllServicios('Formulario', {
         filterByFormula: `{Expediente} = '${expediente.replace(/'/g, "\\'")}'`,
         pageSize: 1,
       });
       
+      console.log('Records encontrados para formulario:', records.length);
       if (records.length === 0) {
-        throw new Error('Formulario no encontrado');
+        throw new Error(`Formulario no encontrado para expediente ${expediente}`);
       }
       
       const r = records[0];
       const f = r.fields ?? {};
+      console.log('Datos del formulario encontrado:', f);
       return {
         id: r.id,
         Expediente: f['Expediente'],
@@ -847,17 +850,20 @@ export const airtableService = {
   // Obtener reparaciones por expediente
   async getReparacionesByExpediente(expediente: string): Promise<any> {
     try {
-      const records = await fetchAllServicios('Reparaciones', {
+      console.log('Buscando reparación para expediente:', expediente);
+      const records = await fetchAllServicios('Reparacion', {
         filterByFormula: `{Expediente} = '${expediente.replace(/'/g, "\\'")}'`,
         pageSize: 1,
       });
       
+      console.log('Records encontrados para reparación:', records.length);
       if (records.length === 0) {
-        throw new Error('Reparación no encontrada');
+        throw new Error(`Reparación no encontrada para expediente ${expediente}`);
       }
       
       const r = records[0];
       const f = r.fields ?? {};
+      console.log('Datos de la reparación encontrada:', f);
       return {
         id: r.id,
         expediente: f['Expediente'],
@@ -884,7 +890,7 @@ export const airtableService = {
       
       const airtableField = fieldMap[field] || field;
       
-      await serviciosApi.patch(`/Formularios/${formId}`, {
+      await serviciosApi.patch(`/Formulario/${formId}`, {
         fields: {
           [airtableField]: value,
         },
@@ -908,7 +914,7 @@ export const airtableService = {
       
       const airtableField = fieldMap[field] || field;
       
-      await serviciosApi.patch(`/Reparaciones/${repId}`, {
+      await serviciosApi.patch(`/Reparacion/${repId}`, {
         fields: {
           [airtableField]: value,
         },

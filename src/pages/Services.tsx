@@ -183,22 +183,38 @@ const Services: React.FC = () => {
   const handleCloseModal = () => setSelectedService(null);
   
   const handleOpenFormulario = async (expediente?: string) => {
-    if (!expediente) return;
+    if (!expediente) {
+      console.error('No se proporcionó expediente para buscar formulario');
+      alert('No se puede abrir el formulario: expediente no disponible');
+      return;
+    }
+    
+    console.log('Abriendo formulario para expediente:', expediente);
     try {
       const data = await airtableService.getFormularioByExpediente(expediente);
+      console.log('Formulario encontrado:', data);
       setSelectedFormulario(data);
     } catch (error) {
       console.error('Error fetching formulario:', error);
+      alert(`Error al cargar el formulario: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   };
 
   const handleOpenReparacion = async (expediente?: string) => {
-    if (!expediente) return;
+    if (!expediente) {
+      console.error('No se proporcionó expediente para buscar reparación');
+      alert('No se puede abrir la reparación: expediente no disponible');
+      return;
+    }
+    
+    console.log('Abriendo reparación para expediente:', expediente);
     try {
       const data = await airtableService.getReparacionesByExpediente(expediente);
+      console.log('Reparación encontrada:', data);
       setSelectedReparacion(data);
     } catch (error) {
       console.error('Error fetching reparacion:', error);
+      alert(`Error al cargar la reparación: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   };
 
