@@ -816,7 +816,7 @@ export const airtableService = {
   async getFormularioByExpediente(expediente: string): Promise<any> {
     try {
       console.log('Buscando formulario para expediente:', expediente);
-      const records = await fetchAllServicios('Formulario', {
+      const records = await fetchAllServicios('Formularios', {
         filterByFormula: `{Expediente} = '${expediente.replace(/'/g, "\\'")}'`,
         pageSize: 1,
       });
@@ -851,7 +851,7 @@ export const airtableService = {
   async getReparacionesByExpediente(expediente: string): Promise<any> {
     try {
       console.log('Buscando reparación para expediente:', expediente);
-      const records = await fetchAllServicios('Reparacion', {
+      const records = await fetchAllServicios('Reparaciones', {
         filterByFormula: `{Expediente} = '${expediente.replace(/'/g, "\\'")}'`,
         pageSize: 1,
       });
@@ -890,7 +890,7 @@ export const airtableService = {
       
       const airtableField = fieldMap[field] || field;
       
-      await serviciosApi.patch(`/Formulario/${formId}`, {
+      await serviciosApi.patch(`/Formularios/${formId}`, {
         fields: {
           [airtableField]: value,
         },
@@ -914,7 +914,7 @@ export const airtableService = {
       
       const airtableField = fieldMap[field] || field;
       
-      await serviciosApi.patch(`/Reparacion/${repId}`, {
+      await serviciosApi.patch(`/Reparaciones/${repId}`, {
         fields: {
           [airtableField]: value,
         },
