@@ -805,7 +805,7 @@ export const airtableService = {
         fields['Comentarios'] = updates.comentarios;
       }
       
-      await serviciosApi.patch(`/Registros/${registroId}`, { fields });
+      await registrosApi.patch(`/Registros/${registroId}`, { fields });
     } catch (error) {
       console.error('Error updating registro:', error);
       throw error;
