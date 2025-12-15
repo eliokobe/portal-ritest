@@ -1,18 +1,33 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Wrench, CheckCircle } from 'lucide-react';
+import { Wrench, CheckCircle, AlertCircle, CheckSquare } from 'lucide-react';
 import { DashboardStats } from '../types';
 import { airtableService } from '../services/airtable';
+import { useAuth } from '../contexts/AuthContext';
 
 const Dashboard: React.FC = () => {
+  const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [adminStats, setAdminStats] = useState<{ unsynchronizedCount: number; synchronizedTodayCount: number } | null>(null);
+  const [techStats, setTechStats] = useState<{ assignedByDay: { date: string; count: number }[]; resolvedByDay: { date: string; count: number }[] } | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  const isAdministrativa = user?.role === 'Administrativa';
+  const isTecnico = user?.role === 'Técnico';
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const data = await airtableService.getDashboardStats();
-        setStats(data);
+        if (isAdministrativa) {
+          const data = await airtableService.getAdminDashboardStats();
+          setAdminStats(data);
+        } else if (isTecnico) {
+          const data = await airtableService.getTechnicianDashboardStats(user?.id);
+          setTechStats(data);
+        } else {
+          const data = await airtableService.getDashboardStats();
+          setStats(data);
+        }
       } catch (error) {
         console.error('Error fetching dashboard stats:', error);
       } finally {
@@ -21,7 +36,7 @@ const Dashboard: React.FC = () => {
     };
 
     fetchStats();
-  }, []);
+  }, [isAdministrativa, isTecnico, user?.id]);
 
   if (loading) {
     return (
@@ -31,6 +46,121 @@ const Dashboard: React.FC = () => {
     );
   }
 
+  if (!stats && !adminStats && !techStats) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">Error al cargar las estadísticas</p>
+      </div>
+    );
+  }
+  
+  // Dashboard para Técnico
+  if (isTecnico && techStats) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Panel Gráfico</h1>
+          <p className="text-gray-600 mt-2">Servicios asignados e incidencias resueltas</p>
+        </div>
+
+        {/* Gráficos para Técnico */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Gráfico de servicios asignados */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">Servicios Asignados (Últimas 2 Semanas)</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={techStats.assignedByDay}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="date" 
+                  tickFormatter={(value) => new Date(value).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                />
+                <YAxis />
+                <Tooltip 
+                  labelFormatter={(value) => new Date(value).toLocaleDateString('es-ES', { 
+                    weekday: 'long', 
+                    day: 'numeric', 
+                    month: 'short' 
+                  })}
+                />
+                <Bar dataKey="count" fill="#008606" name="Servicios Asignados" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Gráfico de incidencias resueltas */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-6">Incidencias Resueltas (Últimas 2 Semanas)</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={techStats.resolvedByDay}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="date" 
+                  tickFormatter={(value) => new Date(value).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                />
+                <YAxis />
+                <Tooltip 
+                  labelFormatter={(value) => new Date(value).toLocaleDateString('es-ES', { 
+                    weekday: 'long', 
+                    day: 'numeric', 
+                    month: 'short' 
+                  })}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="count" 
+                  stroke="#22c55e" 
+                  strokeWidth={3}
+                  name="Incidencias Resueltas"
+                  dot={{ fill: '#22c55e', strokeWidth: 2, r: 4 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Dashboard para Administrativa
+  if (isAdministrativa && adminStats) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Panel Gráfico</h1>
+          <p className="text-gray-600 mt-2">Estado de sincronización de servicios</p>
+        </div>
+
+        {/* Tarjetas de resumen para Administrativa */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pendientes de tramitar</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{adminStats.unsynchronizedCount}</p>
+              </div>
+              <div className="bg-red-500 p-3 rounded-lg">
+                <AlertCircle className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Tramitados hoy</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{adminStats.synchronizedTodayCount}</p>
+              </div>
+              <div className="bg-green-500 p-3 rounded-lg">
+                <CheckSquare className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
   if (!stats) {
     return (
       <div className="text-center py-12">

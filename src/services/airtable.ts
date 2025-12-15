@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import axios from 'axios';
-import { User, DashboardStats, Registro } from '../types';
+import { User, DashboardStats } from '../types';
 
 // Base ID fijo (no es secreto). Si se define VITE_AIRTABLE_BASE_ID la sobreescribe.
 const AIRTABLE_BASE_ID = import.meta.env.VITE_AIRTABLE_BASE_ID || 'appRMClMob8KPNooU';
@@ -10,6 +10,12 @@ const AIRTABLE_API_KEY = import.meta.env.VITE_AIRTABLE_API_KEY || 'your-api-key'
 const SERVICIOS_BASE_ID = import.meta.env.VITE_AIRTABLE_SERVICES_BASE_ID || 'appX3CBiSmPy4119D';
 // Nombre de la tabla de trabajadores. Se puede sobreescribir con VITE_AIRTABLE_WORKERS_TABLE, pero por defecto es 'Trabajadores'
 const AIRTABLE_WORKERS_TABLE = import.meta.env.VITE_AIRTABLE_WORKERS_TABLE || 'Trabajadores';
+// Nombre de la tabla de servicios. Se puede sobreescribir con VITE_AIRTABLE_SERVICES_TABLE, pero por defecto es 'Servicios'
+const AIRTABLE_SERVICES_TABLE = import.meta.env.VITE_AIRTABLE_SERVICES_TABLE || 'Servicios';
+// Nombre de la tabla de tramitaciones. Por defecto 'Tramitaciones'
+const AIRTABLE_TRAMITACIONES_TABLE = import.meta.env.VITE_AIRTABLE_TRAMITACIONES_TABLE || 'Tramitaciones';
+// Nombre de la tabla de envios. Por defecto 'Envíos'
+const AIRTABLE_ENVIOS_TABLE = import.meta.env.VITE_AIRTABLE_ENVIOS_TABLE || 'Envíos';
 
 if (AIRTABLE_BASE_ID === 'your-base-id') {
   // Build sin sustituir env -> avisamos en runtime
@@ -39,7 +45,31 @@ const serviciosApi = axios.create({
     'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
     'Content-Type': 'application/json',
   },
+  timeout: 30000, // 30 segundos de timeout
 });
+
+type ServiciosFieldSample = {
+  names: Set<string>;
+  sampleFields: Record<string, unknown>;
+};
+
+const serviciosFieldSampleCache: Record<string, ServiciosFieldSample> = {};
+
+async function inferServiciosFieldSample(tableName: string): Promise<ServiciosFieldSample> {
+  if (serviciosFieldSampleCache[tableName]) return serviciosFieldSampleCache[tableName];
+  try {
+    const { data } = await serviciosApi.get(`/${tableName}`, { params: { pageSize: 1 } });
+    const record = (data as any)?.records?.[0];
+    const fields = (record as any)?.fields ?? {};
+    const names = new Set(Object.keys(fields));
+    serviciosFieldSampleCache[tableName] = { names, sampleFields: fields };
+    return serviciosFieldSampleCache[tableName];
+  } catch (error) {
+    console.warn(`[Airtable] No se pudo inferir campos de ${tableName}; se continuará sin inferencia.`, error);
+    serviciosFieldSampleCache[tableName] = { names: new Set<string>(), sampleFields: {} };
+    return serviciosFieldSampleCache[tableName];
+  }
+}
 
 // Segunda base de Airtable para Registros
 const REGISTROS_BASE_ID = 'applcT2fcdNDpCRQ0';
@@ -50,19 +80,6 @@ const registrosApi = axios.create({
     'Content-Type': 'application/json',
   },
 });
-
-// Helper para paginar Airtable
-async function fetchAllRecords(table: string, params: Record<string, any> = {}) {
-  const all: any[] = [];
-  let offset: string | undefined;
-  do {
-    const { data } = await airtableApi.get(`/${table}`, { params: { ...params, offset } });
-    const airtableData = data as { records?: any[]; offset?: string };
-    all.push(...(airtableData.records ?? []));
-    offset = airtableData.offset;
-  } while (offset);
-  return all;
-}
 
 // Helper para paginar Airtable de la segunda base (Registros)
 async function fetchAllRegistros(table: string, params: Record<string, any> = {}) {
@@ -79,37 +96,234 @@ async function fetchAllRegistros(table: string, params: Record<string, any> = {}
 
 // Helper para paginar Airtable de la base específica de servicios
 async function fetchAllServicios(table: string, params: Record<string, any> = {}) {
-  console.log('fetchAllServicios - Table:', table, 'Params:', params);
-  console.log('fetchAllServicios - Base URL:', serviciosApi.defaults.baseURL);
-  
   const all: any[] = [];
   let offset: string | undefined;
   try {
     do {
       const { data } = await serviciosApi.get(`/${table}`, { params: { ...params, offset } });
-      console.log('fetchAllServicios - Response:', data);
       const airtableData = data as { records?: any[]; offset?: string };
       all.push(...(airtableData.records ?? []));
       offset = airtableData.offset;
     } while (offset);
-  } catch (error) {
-    console.error('fetchAllServicios - Error:', error);
+  } catch (error: any) {
+    console.error('fetchAllServicios - Error:', {
+      message: error.message,
+      status: error.response?.status,
+      data: error.response?.data,
+    });
     throw error;
   }
-  
-  console.log('fetchAllServicios - Total records:', all.length);
   return all;
+}
+
+type ServicioListado = {
+  id: string;
+  expediente?: string;
+  nombre?: string;
+  cliente?: string;
+  telefono?: string;
+  direccion?: string;
+  poblacion?: string;
+  codigoPostal?: string;
+  provincia?: string;
+  estado?: string;
+  estadoIpas?: string;
+  estadoEnvio?: string;
+  descripcion?: string;
+  comentarios?: string;
+  motivoCancelacion?: string;
+  cita?: string;
+  tecnico?: string;
+  trabajadorId?: string[];
+  notaTecnico?: string;
+  fechaRegistro?: string;
+  ultimoCambio?: string;
+  chatbot?: string;
+  fechaInstalacion?: string;
+  referencia?: string;
+  conversationId?: string;
+  sincronizado?: boolean;
+  tramitado?: boolean;
+};
+
+async function fetchServicesByTable(params: {
+  tableName: string;
+  clinic?: string;
+  workerId?: string;
+  workerEmail?: string;
+  onlyUnsynced?: boolean;
+}): Promise<ServicioListado[]> {
+  const { tableName, clinic, workerId, workerEmail, onlyUnsynced } = params;
+  try {
+    const queryParams: Record<string, any> = {};
+
+    const { names: serviciosFieldNames, sampleFields } = await inferServiciosFieldSample(tableName);
+
+    const escapeFormulaString = (value: unknown) => String(value ?? '').replace(/'/g, "\\'");
+    const pickExistingField = (candidates: string[]) => candidates.find((c) => serviciosFieldNames.has(c));
+    const isArrayField = (fieldName: string) => Array.isArray((sampleFields as any)?.[fieldName]);
+
+    const formulaParts: string[] = [];
+
+    if (clinic) {
+      const clinicEsc = escapeFormulaString(clinic);
+      const clinicFieldCandidates = ['Empresa', 'Clinic', 'Cliente'];
+      const existingClinicFields = clinicFieldCandidates.filter((f) => serviciosFieldNames.has(f));
+
+      if (existingClinicFields.length > 0) {
+        const ors = existingClinicFields.map((f) => `{${f}} = '${clinicEsc}'`).join(', ');
+        formulaParts.push(existingClinicFields.length === 1 ? ors : `OR(${ors})`);
+      }
+    }
+
+    if (workerEmail) {
+      const emailEsc = escapeFormulaString(workerEmail);
+      const emailField = pickExistingField([
+        'Email trabajador',
+        'Email Trabajador',
+        'Correo trabajador',
+        'Correo Trabajador',
+        'Email',
+        'Correo',
+      ]);
+
+      if (emailField) {
+        if (isArrayField(emailField)) {
+          formulaParts.push(`FIND('${emailEsc}', ARRAYJOIN({${emailField}}, ','))`);
+        } else {
+          formulaParts.push(`FIND('${emailEsc}', {${emailField}})`);
+        }
+      } else {
+        console.warn(`[Airtable] No existe columna de email del trabajador en ${tableName}; se omite filtro por email.`);
+      }
+    } else if (workerId) {
+      const workerIdEsc = escapeFormulaString(workerId);
+      const workerField = pickExistingField([
+        'Trabajador',
+        'Trabajadores',
+        'Worker',
+        'Workers',
+      ]);
+
+      if (workerField) {
+        if (isArrayField(workerField)) {
+          formulaParts.push(`FIND('${workerIdEsc}', ARRAYJOIN({${workerField}}, ','))`);
+        } else {
+          formulaParts.push(`FIND('${workerIdEsc}', {${workerField}})`);
+        }
+      } else {
+        console.warn(`[Airtable] No existe columna Trabajador/Workers en ${tableName}; se omite filtro por trabajador.`);
+      }
+    }
+
+    if (onlyUnsynced) {
+      // Para tramitaciones usamos campo "Tramitado" (checkbox) pendiente
+      if (serviciosFieldNames.has('Tramitado')) {
+        formulaParts.push('OR({Tramitado}=BLANK(), {Tramitado}=FALSE())');
+      } else if (serviciosFieldNames.has('Sincronizado')) {
+        // Fallback legacy
+        formulaParts.push('OR({Sincronizado}=BLANK(), {Sincronizado}=FALSE())');
+      } else {
+        console.warn(`[Airtable] La tabla ${tableName} no tiene campo "Tramitado" ni "Sincronizado"; no se aplicará filtro de sincronización.`);
+      }
+    }
+
+    if (formulaParts.length > 0) {
+      queryParams.filterByFormula = formulaParts.length === 1 ? formulaParts[0] : `AND(${formulaParts.join(', ')})`;
+    }
+
+    let records: any[] = [];
+    try {
+      records = await fetchAllServicios(tableName, { ...queryParams, pageSize: 100 });
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        throw new Error(`La tabla "${tableName}" no se encuentra. Verifica el nombre en Airtable.`);
+      }
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        throw new Error('Error de autenticación con Airtable. Verifica tu API key y permisos.');
+      }
+      if (error.response?.status === 422) {
+        const airtableMsg = error.response?.data?.error?.message;
+        throw new Error(`Error en filtros de Airtable (posibles columnas renombradas): ${airtableMsg ?? '422'}`);
+      }
+      throw error;
+    }
+
+    if (records.length === 0 && (workerId || workerEmail) && queryParams.filterByFormula) {
+      try {
+        records = await fetchAllServicios(tableName, { pageSize: 100 });
+      } catch {
+        // ignorar: devolveremos vacío
+      }
+    }
+
+    const mappedRecords: ServicioListado[] = records.map((r: any) => {
+      const f = r.fields ?? {};
+      return {
+        id: r.id,
+        expediente: f['Expediente'] ?? f['Nº Expediente'] ?? f['Numero'] ?? f['Número'],
+        nombre: f['Nombre'] ?? f['Cliente'],
+        cliente: f['Cliente'] ?? f['Nombre'],
+        telefono: f['Teléfono'] ?? f['Telefono'] ?? f['Tel'],
+        direccion: f['Dirección'] ?? f['Direccion'] ?? f['Address'],
+        poblacion: f['Población'] ?? f['Poblacion'],
+        codigoPostal: f['Código postal'] ?? f['Codigo postal'] ?? f['CP'],
+        provincia: f['Provincia'],
+        estado: f['Estado'],
+        estadoIpas: f['Estado Ipas'] ?? f['Estado IPAS'] ?? f['EstadoIpas'],
+        estadoEnvio: f['Estado envío'] ?? f['Estado envio'] ?? f['Estado Envío'] ?? f['Estado Envio'],
+        descripcion: f['Descripción'] ?? f['Descripcion'] ?? f['Description'],
+        comentarios: f['Comentarios'],
+        motivoCancelacion: f['Motivo cancelación'] ?? f['Motivo Cancelacion'] ?? f['Motivo cancelacion'],
+        cita: f['Cita'],
+        tecnico: f['Técnico'] ?? f['Tecnico'] ?? f['Technician'],
+        trabajadorId: f['Trabajador'],
+        notaTecnico: f['Nota técnico'] ?? f['Nota tecnico'] ?? f['Nota Técnico'] ?? f['Nota Tecnico'] ?? f['Observaciones técnico'],
+        citaTecnico: f['Cita técnico'] ?? f['Cita tecnico'] ?? f['Cita Técnico'],
+        fechaRegistro: f['Fecha de registro'] ?? f['Fecha'] ?? f['Created'] ?? r.createdTime,
+        ultimoCambio: f['Último cambio'] ?? f['Ultima modificacion'] ?? f['Last Modified'] ?? f['Modified'] ?? r.createdTime,
+        chatbot: f['Chatbot'],
+        fechaInstalacion: f['Fecha instalación'] ?? f['Fecha instalacion'] ?? f['Installation Date'],
+        referencia: f['Referencia'] ?? f['Reference'],
+        conversationId: f['Conversation id'] ?? f['Conversation ID'] ?? f['ConversationId'],
+        sincronizado: f['Sincronizado'] ?? false,
+        tramitado: f['Tramitado'] ?? false,
+      };
+    });
+
+    return mappedRecords;
+  } catch (error) {
+    console.error(`Error fetching servicios desde ${tableName}:`, error);
+    return [];
+  }
 }
 
 
 
 export const airtableService = {
+  // Obtener catálogo (linked records) tabla "Catálogo"
+  async getCatalogos(): Promise<{ id: string; nombre: string }[]> {
+    try {
+      const records = await fetchAllServicios('Catálogo', { pageSize: 100 });
+      return records.map((r: any) => {
+        const f = r.fields ?? {};
+        return {
+          id: r.id,
+          nombre: f['Nombre'] ?? 'Sin nombre',
+        };
+      });
+    } catch (error) {
+      console.error('Error fetching catálogo:', error);
+      return [];
+    }
+  },
+
   // Autenticación
   async authenticateUser(email: string, password: string): Promise<User | null> {
     try {
       const response = await serviciosApi.get(`/${AIRTABLE_WORKERS_TABLE}`, {
         params: {
-          filterByFormula: `AND({Email} = '${email}', {Contraseña} = '${password}')`,
+          filterByFormula: `AND({Email corporativo} = '${email}', {Contraseña} = '${password}')`,
         },
       });
 
@@ -135,11 +349,11 @@ export const airtableService = {
         
         return {
           id: record.id,
-          email: record.fields.Email,
+          email: record.fields['Email corporativo'] || record.fields.Email,
           name: record.fields.Nombre || record.fields.Name,
           phone: record.fields.Teléfono || record.fields.Phone,
           clinic: record.fields.Empresa || record.fields.Clinic,
-          role: record.fields.Rol || record.fields.Cargo || record.fields.Role,
+          role: record.fields.Puesto || record.fields.Rol || record.fields.Cargo || record.fields.Role,
           logoUrl,
         };
       }
@@ -163,6 +377,136 @@ export const airtableService = {
     } catch (error) {
       console.error('Error fetching worker logo:', error);
       return undefined;
+    }
+  },
+
+  // Obtener estadísticas del dashboard para Técnico
+  async getTechnicianDashboardStats(userId?: string): Promise<{
+    assignedByDay: { date: string; count: number }[];
+    resolvedByDay: { date: string; count: number }[];
+  }> {
+    try {
+      const records = await fetchAllServicios('Servicios', { pageSize: 100 });
+      const now = new Date();
+      const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+      
+      // Preparar mapa de días (últimos 14 días)
+      const dayKey = (d: Date) => d.toISOString().split('T')[0];
+      const last14Keys: string[] = [];
+      for (let i = 13; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        last14Keys.push(dayKey(d));
+      }
+      const assignedMap = new Map(last14Keys.map(k => [k, 0]));
+      const resolvedMap = new Map(last14Keys.map(k => [k, 0]));
+      
+      console.log(`Processing ${records.length} records for technician dashboard`);
+      
+      records.forEach((r: any) => {
+        const f = r.fields ?? {};
+        const fechaRegistro = f['Fecha de registro'];
+        const ultimoCambio = f['Último cambio'];
+        const estado = f['Estado'];
+        
+        // Servicios asignados (últimas 2 semanas por fecha de registro)
+        if (fechaRegistro) {
+          const regDate = new Date(fechaRegistro);
+          if (regDate >= fourteenDaysAgo && regDate <= now) {
+            const key = dayKey(regDate);
+            if (assignedMap.has(key)) {
+              assignedMap.set(key, assignedMap.get(key)! + 1);
+            }
+          }
+        }
+        
+        // Incidencias resueltas (estado Finalizado, últimas 2 semanas por último cambio)
+        if (estado === 'Finalizado' && ultimoCambio) {
+          const resDate = new Date(ultimoCambio);
+          if (resDate >= fourteenDaysAgo && resDate <= now) {
+            const key = dayKey(resDate);
+            if (resolvedMap.has(key)) {
+              resolvedMap.set(key, resolvedMap.get(key)! + 1);
+            }
+          }
+        }
+      });
+      
+      const assignedByDay = last14Keys.map(k => ({ date: k, count: assignedMap.get(k)! }));
+      const resolvedByDay = last14Keys.map(k => ({ date: k, count: resolvedMap.get(k)! }));
+      
+      console.log('Assigned by day:', assignedByDay);
+      console.log('Resolved by day:', resolvedByDay);
+      
+      return { assignedByDay, resolvedByDay };
+    } catch (error) {
+      console.error('Error fetching technician dashboard stats:', error);
+      const now = new Date();
+      const last14Keys: string[] = [];
+      for (let i = 13; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        last14Keys.push(d.toISOString().split('T')[0]);
+      }
+      return {
+        assignedByDay: last14Keys.map(k => ({ date: k, count: 0 })),
+        resolvedByDay: last14Keys.map(k => ({ date: k, count: 0 })),
+      };
+    }
+  },
+
+  // Obtener estadísticas del dashboard para Administrativa (sincronización)
+  async getAdminDashboardStats(): Promise<{
+    unsynchronizedCount: number;
+    synchronizedTodayCount: number;
+  }> {
+    try {
+      const records = await fetchAllServicios('Servicios', { pageSize: 100 });
+      const today = new Date().toISOString().split('T')[0];
+      const estadosPermitidos = [
+        'Formulario completado',
+        'Llamado',
+        'Pendiente Presupuesto',
+        'Pendiente presupuesto',
+        'Citado',
+        'Material enviado',
+        'Cancelado',
+        'Finalizado',
+      ];
+      
+      let unsynchronizedCount = 0;
+      let synchronizedTodayCount = 0;
+      
+      records.forEach((r: any) => {
+        const f = r.fields ?? {};
+        const tramitado = f['Tramitado'] ?? f['Sincronizado'] ?? f['Sincronizado '];
+        const fechaSincronizacion = f['Fecha sincronización'] ?? f['Fecha sincronizacion'];
+        const estado = f['Estado'];
+        const estadoOk = estado && estadosPermitidos.includes(estado);
+        if (!estadoOk) return;
+        
+        // Pendientes de tramitar (Tramitado vacío/false)
+        if (!tramitado || tramitado === false) {
+          unsynchronizedCount++;
+        }
+        
+        // Tramitados hoy (Tramitado true y fecha de sincronización hoy)
+        if (tramitado === true && fechaSincronizacion) {
+          const syncDate = new Date(fechaSincronizacion).toISOString().split('T')[0];
+          if (syncDate === today) {
+            synchronizedTodayCount++;
+          }
+        }
+      });
+      
+      return {
+        unsynchronizedCount,
+        synchronizedTodayCount,
+      };
+    } catch (error) {
+      console.error('Error fetching admin dashboard stats:', error);
+      return {
+        unsynchronizedCount: 0,
+        synchronizedTodayCount: 0,
+      };
     }
   },
 
@@ -336,6 +680,160 @@ export const airtableService = {
     }
   },
 
+  // Obtener envíos (tabla "Envíos")
+  async getEnvios(): Promise<{
+    id: string;
+    numero?: string;
+    seguimiento?: string;
+    servicio?: string;
+    estado?: string;
+    fechaEnvio?: string;
+    material?: string;
+    producto?: string;
+    fechaCambio?: string;
+    transporte?: string;
+    catalogo?: string;
+    comentarios?: string;
+    cliente?: string;
+    direccion?: string;
+    poblacion?: string;
+    codigoPostal?: string;
+    provincia?: string;
+    telefono?: string;
+  }[]> {
+    try {
+      const records = await fetchAllServicios(AIRTABLE_ENVIOS_TABLE, { pageSize: 100 });
+      return records.map((r: any) => {
+        const f = r.fields ?? {};
+        const materialField = f['Inventario'];
+        const servicioField = f['Servicio'];
+        const catalogoField = f['Catálogo'] ?? f['Catalogo'];
+
+        const numeroField = f['Número'] ?? f['Numero'];
+
+        return {
+          id: r.id,
+          numero: numeroField !== undefined ? String(numeroField) : undefined,
+          seguimiento: f['Seguimiento'],
+          servicio: Array.isArray(servicioField) ? servicioField[0] : servicioField,
+          estado: f['Estado'],
+          fechaEnvio: f['Fecha de envío'] ?? f['Fecha Envío'] ?? f['Fecha envio'],
+          material: Array.isArray(materialField) ? materialField[0] : materialField,
+          producto: f['Producto'] ?? f['Modelo'],
+          fechaCambio: f['Fecha Cambio'] ?? f['Last Modified'] ?? r.createdTime,
+          transporte: f['Transporte'],
+          catalogo: Array.isArray(catalogoField) ? catalogoField[0] : catalogoField,
+          comentarios: f['Comentarios'],
+          cliente: f['Cliente'],
+          direccion: f['Dirección'] ?? f['Direccion'],
+          poblacion: f['Población'] ?? f['Poblacion'],
+          codigoPostal: f['Código postal'] ?? f['Codigo postal'],
+          provincia: f['Provincia'],
+          telefono: f['Teléfono'] ?? f['Telefono'],
+        };
+      });
+    } catch (error) {
+      console.error('Error fetching envíos:', error);
+      return [];
+    }
+  },
+
+  // Actualizar envío
+  async updateEnvio(envioId: string, updates: Record<string, any>): Promise<void> {
+    try {
+      const fieldMap: Record<string, string> = {
+        numero: 'Número',
+        servicio: 'Servicio',
+        estado: 'Estado',
+        fechaEnvio: 'Fecha de envío',
+        material: 'Inventario',
+        transporte: 'Transporte',
+        catalogo: 'Catálogo',
+        comentarios: 'Comentarios',
+        cliente: 'Cliente',
+        direccion: 'Dirección',
+        poblacion: 'Población',
+        codigoPostal: 'Código postal',
+        provincia: 'Provincia',
+        telefono: 'Teléfono',
+      };
+
+      const fields: Record<string, any> = {};
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === undefined || value === null) return;
+        const airtableField = fieldMap[key];
+        if (!airtableField) return;
+        if (airtableField === 'Catálogo') {
+          fields[airtableField] = value ? [value] : [];
+        } else {
+          fields[airtableField] = value;
+        }
+      });
+
+      if (Object.keys(fields).length === 0) return;
+
+      await serviciosApi.patch(`/${AIRTABLE_ENVIOS_TABLE}/${envioId}`, { fields });
+    } catch (error) {
+      console.error('Error updating envío:', error);
+      throw error;
+    }
+  },
+
+  // Crear envío
+  async createEnvio(envio: {
+    numero?: string;
+    servicio: string;
+    estado?: string;
+    fechaEnvio?: string;
+    material?: string;
+    transporte?: string;
+    catalogo?: string;
+    comentarios?: string;
+    cliente?: string;
+    direccion?: string;
+    poblacion?: string;
+    codigoPostal?: string;
+    provincia?: string;
+    telefono?: string;
+  }): Promise<void> {
+    try {
+      const fields: Record<string, any> = {
+        'Servicio': envio.servicio ? [envio.servicio] : undefined,
+        'Estado': envio.estado ?? 'Envío creado',
+        'Fecha de envío': envio.fechaEnvio,
+        'Inventario': envio.material ? [envio.material] : undefined,
+        'Transporte': envio.transporte ?? 'Inbound Logística',
+        'Catálogo': envio.catalogo
+          ? (String(envio.catalogo).startsWith('rec') ? [envio.catalogo] : envio.catalogo)
+          : undefined,
+        'Comentarios': envio.comentarios,
+        'Cliente': envio.cliente,
+        'Dirección': envio.direccion,
+        'Población': envio.poblacion,
+        'Código postal': envio.codigoPostal !== undefined && envio.codigoPostal !== null
+          ? String(envio.codigoPostal)
+          : undefined,
+        'Provincia': envio.provincia,
+        'Teléfono': envio.telefono,
+      };
+
+      // Eliminar claves undefined para evitar errores 422
+      Object.keys(fields).forEach((k) => fields[k] === undefined && delete fields[k]);
+
+      await serviciosApi.post(`/${AIRTABLE_ENVIOS_TABLE}`, {
+        records: [
+          {
+            fields,
+          },
+        ],
+      });
+    } catch (error) {
+      const message = (error as any)?.response?.data?.error?.message;
+      console.error('Error creating envío:', message || error);
+      throw error;
+    }
+  },
+
 
 
 
@@ -484,112 +982,30 @@ export const airtableService = {
   },
 
   // Obtener servicios (tabla "Servicios")
-  async getServices(clinic?: string, workerId?: string, workerEmail?: string): Promise<{
-    id: string;
-    expediente?: string;
-    nombre?: string;
-    telefono?: string;
-    direccion?: string;
-    estado?: string;
-    estadoIpas?: string;
-    descripcion?: string;
-    comentarios?: string;
-    motivoCancelacion?: string;
-    cita?: string;
-    tecnico?: string;
-    notaTecnico?: string;
-    fechaRegistro?: string;
-    ultimoCambio?: string;
-    chatbot?: string;
-    fechaInstalacion?: string;
-  }[]> {
-    try {
-      const params: Record<string, any> = {};
+  async getServices(clinic?: string, workerId?: string, workerEmail?: string): Promise<ServicioListado[]> {
+    return fetchServicesByTable({ tableName: AIRTABLE_SERVICES_TABLE, clinic, workerId, workerEmail });
+  },
 
-      console.log('Airtable - getServices called with clinic:', clinic, 'workerId:', workerId, 'workerEmail:', workerEmail);
+  // Obtener tramitaciones (misma estructura que Servicios)
+  async getTramitaciones(
+    clinic?: string,
+    workerId?: string,
+    workerEmail?: string,
+    options?: { onlyUnsynced?: boolean },
+  ): Promise<ServicioListado[]> {
+    // Tramitaciones usan la misma tabla "Servicios"; se filtra por sincronizado si aplica.
+    const { onlyUnsynced = true } = options || {};
+    return fetchServicesByTable({ tableName: AIRTABLE_SERVICES_TABLE, clinic, workerId, workerEmail, onlyUnsynced });
+  },
 
-      let formulaParts: string[] = [];
-
-      if (clinic) {
-        const clinicEsc = String(clinic).replace(/'/g, "\\'");
-        formulaParts.push(`OR({Empresa} = '${clinicEsc}', {Clinic} = '${clinicEsc}', {Cliente} = '${clinicEsc}')`);
-        console.log('Airtable - Clinic filter:', formulaParts[formulaParts.length - 1]);
-      }
-
-      if (workerEmail) {
-        console.log('Airtable - Filtering by email in Email trabajador column');
-        // Filtrar por email en la columna "Email trabajador"
-        const emailEsc = String(workerEmail).replace(/'/g, "\\'");
-        formulaParts.push(`FIND('${emailEsc}', {Email trabajador})`);
-        console.log('Airtable - Worker email filter in Email trabajador:', formulaParts[formulaParts.length - 1]);
-      } else if (workerId) {
-        const workerIdEsc = String(workerId).replace(/'/g, "\\'");
-        // Para Linked Records, necesitamos usar ARRAYJOIN con un separador
-        formulaParts.push(`FIND('${workerIdEsc}', ARRAYJOIN({Trabajador}, ','))`);
-        console.log('Airtable - Worker ID filter:', formulaParts[formulaParts.length - 1]);
-      }
-
-      if (formulaParts.length > 0) {
-        params.filterByFormula = formulaParts.length === 1 ? formulaParts[0] : `AND(${formulaParts.join(', ')})`;
-        console.log('Airtable - Combined filter formula:', params.filterByFormula);
-      } else {
-        console.log('Airtable - No filters applied');
-      }
-
-      console.log('Airtable - Calling fetchAllServicios...');
-      const records = await fetchAllServicios('Servicios', { ...params, pageSize: 100 });
-      console.log('Airtable - Records received:', records.length);
-
-      // Debug: Ver algunos registros sin filtrar
-      if (records.length === 0 && (workerId || workerEmail)) {
-        console.log('Airtable - No records found with filter. Testing without filter...');
-        const allRecords = await fetchAllServicios('Servicios', { pageSize: 5 });
-        console.log('Airtable - Sample records (first 5):', allRecords.length);
-        allRecords.forEach((r: any, idx: number) => {
-          console.log(`Record ${idx + 1}:`, {
-            id: r.id,
-            fields: r.fields,
-            trabajadores: r.fields['Trabajador'] || r.fields['Trabajador relacionado'] || 'N/A'
-          });
-        });
-      }
-
-      const mappedRecords = records.map((r: any) => {
-        const f = r.fields ?? {};
-        return {
-          id: r.id,
-          expediente: f['Expediente'] ?? f['Nº Expediente'] ?? f['Numero'] ?? f['Número'],
-          nombre: f['Nombre'] ?? f['Cliente'],
-          telefono: f['Teléfono'] ?? f['Telefono'] ?? f['Tel'],
-          direccion: f['Dirección'] ?? f['Direccion'] ?? f['Address'],
-          estado: f['Estado'],
-          estadoIpas: f['Estado Ipas'] ?? f['Estado IPAS'] ?? f['EstadoIpas'],
-          descripcion: f['Descripción'] ?? f['Descripcion'] ?? f['Description'],
-          comentarios: f['Comentarios'],
-          motivoCancelacion: f['Motivo cancelación'] ?? f['Motivo Cancelacion'] ?? f['Motivo cancelacion'],
-          cita: f['Cita'],
-          tecnico: f['Técnico'] ?? f['Tecnico'] ?? f['Technician'],
-          notaTecnico: f['Nota técnico'] ?? f['Nota tecnico'] ?? f['Nota Técnico'] ?? f['Nota Tecnico'] ?? f['Observaciones técnico'],
-          citaTecnico: f['Cita técnico'] ?? f['Cita tecnico'] ?? f['Cita Técnico'],
-          fechaRegistro: f['Fecha de registro'] ?? f['Fecha'] ?? f['Created'] ?? r.createdTime,
-          ultimoCambio: f['Último cambio'] ?? f['Ultima modificacion'] ?? f['Last Modified'] ?? f['Modified'] ?? r.createdTime,
-          chatbot: f['Chatbot'],
-          fechaInstalacion: f['Fecha instalación'] ?? f['Fecha instalacion'] ?? f['Installation Date'],
-        };
-      });
-
-      console.log('Airtable - Mapped records:', mappedRecords.length);
-      return mappedRecords;
-    } catch (error) {
-      console.error('Error fetching services:', error);
-      return [];
-    }
+  async setTramitacionTramitado(recordId: string, value: boolean): Promise<void> {
+    return this.updateServiceField(recordId, 'Tramitado', value, AIRTABLE_SERVICES_TABLE);
   },
 
   // Actualizar comentarios de un servicio
-  async updateServiceComments(serviceId: string, comentarios: string): Promise<void> {
+  async updateServiceComments(serviceId: string, comentarios: string, tableName: string = AIRTABLE_SERVICES_TABLE): Promise<void> {
     try {
-      await serviciosApi.patch(`/Servicios/${serviceId}`, {
+      await serviciosApi.patch(`/${tableName}/${serviceId}`, {
         fields: {
           'Comentarios': comentarios,
         },
@@ -601,9 +1017,9 @@ export const airtableService = {
   },
 
   // Actualizar estado de un servicio
-  async updateServiceStatus(serviceId: string, estado: string): Promise<void> {
+  async updateServiceStatus(serviceId: string, estado: string, tableName: string = AIRTABLE_SERVICES_TABLE): Promise<void> {
     try {
-      await serviciosApi.patch(`/Servicios/${serviceId}`, {
+      await serviciosApi.patch(`/${tableName}/${serviceId}`, {
         fields: {
           'Estado': estado,
         },
@@ -615,7 +1031,7 @@ export const airtableService = {
   },
 
   // Actualizar campo genérico de un servicio
-  async updateServiceField(serviceId: string, field: string, value: string): Promise<void> {
+  async updateServiceField(serviceId: string, field: string, value: string | string[] | boolean, tableName: string = AIRTABLE_SERVICES_TABLE): Promise<void> {
     try {
       const fieldMap: Record<string, string> = {
         estado: 'Estado',
@@ -625,13 +1041,14 @@ export const airtableService = {
         notaTecnico: 'Nota técnico',
         cita: 'Cita',
         citaTecnico: 'Cita técnico',
-        trabajadores: 'Trabajador',
+        trabajadorId: 'Trabajador',
         motivoCancelacion: 'Motivo cancelación',
+        sincronizado: 'Sincronizado',
       };
       
       const airtableField = fieldMap[field] || field;
       
-      await serviciosApi.patch(`/Servicios/${serviceId}`, {
+      await serviciosApi.patch(`/${tableName}/${serviceId}`, {
         fields: {
           [airtableField]: value,
         },
@@ -643,9 +1060,9 @@ export const airtableService = {
   },
 
   // Actualizar campo linked records de un servicio (para arrays)
-  async updateServiceLinkedField(serviceId: string, field: string, value: string[]): Promise<void> {
+  async updateServiceLinkedField(serviceId: string, field: string, value: string[], tableName: string = AIRTABLE_SERVICES_TABLE): Promise<void> {
     try {
-      await serviciosApi.patch(`/Servicios/${serviceId}`, {
+      await serviciosApi.patch(`/${tableName}/${serviceId}`, {
         fields: {
           [field]: value,
         },
@@ -656,21 +1073,64 @@ export const airtableService = {
     }
   },
 
-  // Obtener técnicos desde Airtable
-  async getTechnicians(): Promise<import('../types').Tecnico[]> {
+  // Actualizar técnico de un servicio (linked record)
+  async updateServiceTecnico(serviceId: string, tecnicoId: string | string[], tableName: string = AIRTABLE_SERVICES_TABLE): Promise<void> {
     try {
-      const records = await fetchAllServicios('Técnicos', { pageSize: 100 });
+      const value = Array.isArray(tecnicoId) ? tecnicoId : (tecnicoId ? [tecnicoId] : []);
+      await serviciosApi.patch(`/${tableName}/${serviceId}`, {
+        fields: {
+          'Técnico': value,
+        },
+      });
+    } catch (error) {
+      console.error('Error updating service técnico:', error);
+      throw error;
+    }
+  },
+
+  // Obtener trabajadores desde Airtable
+  async getTrabajadores(): Promise<{ id: string; nombre: string }[]> {
+    try {
+      const records = await fetchAllServicios(AIRTABLE_WORKERS_TABLE, { pageSize: 100 });
       return records.map((r: any) => {
         const f = r.fields ?? {};
         return {
           id: r.id,
-          nombre: f['Nombre'] ?? f['Name'],
-          provincia: f['Provincia'] ?? f['Province'],
-          estado: f['Estado'] ?? f['Status'],
-          telefono: f['Teléfono'] ?? f['Telefono'] ?? f['Phone'],
-          observaciones: f['Observaciones'] ?? f['Observacion'] ?? f['Notes'],
+          nombre: f['Nombre'] ?? f['Name'] ?? 'Sin nombre',
         };
       });
+    } catch (error) {
+      console.error('Error fetching trabajadores:', error);
+      return [];
+    }
+  },
+
+  // Obtener técnicos desde Airtable
+  async getTechnicians(): Promise<import('../types').Tecnico[]> {
+    try {
+      const records = await fetchAllServicios('Técnicos', { pageSize: 100 });
+      const technicians = records
+        .map((r: any) => {
+          const f = r.fields ?? {};
+          const estado = f['Estado'] ?? f['Status'];
+
+          // Omitimos técnicos en estado "De baja" para no mostrarlos en los listados.
+          if (typeof estado === 'string' && estado.toLowerCase() === 'de baja') {
+            return null;
+          }
+
+          return {
+            id: r.id,
+            nombre: f['Nombre'] ?? f['Name'],
+            provincia: f['Provincia'] ?? f['Province'],
+            estado,
+            telefono: f['Teléfono'] ?? f['Telefono'] ?? f['Phone'],
+            observaciones: f['Observaciones'] ?? f['Observacion'] ?? f['Notes'],
+          };
+        })
+        .filter(Boolean) as import('../types').Tecnico[];
+
+      return technicians;
     } catch (error) {
       console.error('Error fetching technicians:', error);
       return [];
@@ -829,72 +1289,72 @@ export const airtableService = {
     }
   },
 
-  // Obtener formulario por expediente
-  async getFormularioByExpediente(expediente: string): Promise<any> {
+  // Obtener formularios por expediente (pueden ser múltiples)
+  async getFormularioByExpediente(expediente: string): Promise<any[]> {
     try {
-      console.log('Buscando formulario para expediente:', expediente);
+      console.log('Buscando formularios para expediente:', expediente);
       const records = await fetchAllServicios('Formularios', {
         filterByFormula: `{Expediente} = '${expediente.replace(/'/g, "\\'")}'`,
-        pageSize: 1,
+        pageSize: 100,
       });
       
-      console.log('Records encontrados para formulario:', records.length);
+      console.log('Records encontrados para formularios:', records.length);
       if (records.length === 0) {
         throw new Error(`Formulario no encontrado para expediente ${expediente}`);
       }
       
-      const r = records[0];
-      const f = r.fields ?? {};
-      console.log('Datos del formulario encontrado:', f);
-      return {
-        id: r.id,
-        Expediente: f['Expediente'],
-        Detalles: f['Detalles'] ?? f['Details'] ?? f['Descripción'],
-        'Potencia contratada': f['Potencia contratada'] ?? f['Contracted Power'],
-        'Fecha instalación': f['Fecha instalación'] ?? f['Installation Date'],
-        'Archivo 1': f['Archivo 1'] ?? f['File 1'],
-        'Archivo 2': f['Archivo 2'] ?? f['File 2'],
-        'Archivo 3': f['Archivo 3'] ?? f['File 3'],
-        'Foto general': f['Foto general'] ?? f['General Photo'],
-        'Foto etiqueta': f['Foto etiqueta'] ?? f['Label Photo'],
-        'Foto roto': f['Foto roto'] ?? f['Broken Photo'],
-        'Foto cuadro': f['Foto cuadro'] ?? f['Panel Photo'],
-      };
+      return records.map((r: any) => {
+        const f = r.fields ?? {};
+        return {
+          id: r.id,
+          Expediente: f['Expediente'],
+          Detalles: f['Detalles'] ?? f['Details'] ?? f['Descripción'],
+          'Potencia contratada': f['Potencia contratada'] ?? f['Contracted Power'],
+          'Fecha instalación': f['Fecha instalación'] ?? f['Installation Date'],
+          'Archivo 1': f['Archivo 1'] ?? f['File 1'],
+          'Archivo 2': f['Archivo 2'] ?? f['File 2'],
+          'Archivo 3': f['Archivo 3'] ?? f['File 3'],
+          'Foto general': f['Foto general'] ?? f['General Photo'],
+          'Foto etiqueta': f['Foto etiqueta'] ?? f['Label Photo'],
+          'Foto roto': f['Foto roto'] ?? f['Broken Photo'],
+          'Foto cuadro': f['Foto cuadro'] ?? f['Panel Photo'],
+        };
+      });
     } catch (error) {
-      console.error('Error fetching formulario:', error);
+      console.error('Error fetching formularios:', error);
       throw error;
     }
   },
 
-  // Obtener reparaciones por expediente
-  async getReparacionesByExpediente(expediente: string): Promise<any> {
+  // Obtener reparaciones por expediente (pueden ser múltiples)
+  async getReparacionesByExpediente(expediente: string): Promise<any[]> {
     try {
-      console.log('Buscando reparación para expediente:', expediente);
+      console.log('Buscando reparaciones para expediente:', expediente);
       const records = await fetchAllServicios('Reparaciones', {
         filterByFormula: `{Expediente} = '${expediente.replace(/'/g, "\\'")}'`,
-        pageSize: 1,
+        pageSize: 100,
       });
       
-      console.log('Records encontrados para reparación:', records.length);
+      console.log('Records encontrados para reparaciones:', records.length);
       if (records.length === 0) {
         throw new Error(`Reparación no encontrada para expediente ${expediente}`);
       }
       
-      const r = records[0];
-      const f = r.fields ?? {};
-      console.log('Datos de la reparación encontrada:', f);
-      return {
-        id: r.id,
-        expediente: f['Expediente'],
-        tecnico: f['Técnico'] ?? f['Technician'],
-        resultado: f['Resultado'] ?? f['Result'],
-        reparacion: f['Reparación'] ?? f['Repair'],
-        cuadroElectrico: f['Cuadro eléctrico'] ?? f['Electrical Panel'],
-        detalles: f['Detalles'] ?? f['Details'] ?? f['Descripción'],
-        foto: f['Foto'] ?? f['Photo'],
-      };
+      return records.map((r: any) => {
+        const f = r.fields ?? {};
+        return {
+          id: r.id,
+          expediente: f['Expediente'],
+          tecnico: f['Técnico'] ?? f['Technician'],
+          resultado: f['Resultado'] ?? f['Result'],
+          reparacion: f['Reparación'] ?? f['Repair'],
+          cuadroElectrico: f['Cuadro eléctrico'] ?? f['Electrical Panel'],
+          detalles: f['Detalles'] ?? f['Details'] ?? f['Descripción'],
+          foto: f['Foto'] ?? f['Photo'],
+        };
+      });
     } catch (error) {
-      console.error('Error fetching reparacion:', error);
+      console.error('Error fetching reparaciones:', error);
       throw error;
     }
   },
@@ -969,7 +1429,7 @@ export const airtableService = {
   },
 
   // Obtener recursos desde la tabla "Recursos" en la base de servicios
-  async getResources(): Promise<{
+  async getResources(workerId?: string): Promise<{
     id: string;
     name: string;
     description?: string;
@@ -980,7 +1440,16 @@ export const airtableService = {
   }[]> {
     try {
       const records = await fetchAllServicios('Recursos', { pageSize: 100 });
-      return records.map((r: any) => {
+      return records
+        .filter((r: any) => {
+          if (!workerId) return true;
+          const f = r.fields ?? {};
+          const trabajadores = f['Trabajadores'] || f['Trabajador'];
+          if (!trabajadores) return false;
+          const trabajadoresArray = Array.isArray(trabajadores) ? trabajadores : [trabajadores];
+          return trabajadoresArray.includes(workerId);
+        })
+        .map((r: any) => {
         const f = r.fields ?? {};
         
         // Procesar archivo adjunto

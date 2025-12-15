@@ -1,5 +1,5 @@
 import React, { ChangeEvent, useEffect, useMemo, useState } from 'react';
-import { Search, Info, X, Check, XCircle, Eye, FileText, Wrench, Phone, ArrowUp, Upload } from 'lucide-react';
+import { Search, Info, X, Check, XCircle, Eye, FileText, Wrench, Phone, Upload, MessageCircle } from 'lucide-react';
 import { airtableService } from '../services/airtable';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -25,16 +25,25 @@ interface Service {
   direccion?: string;
   estado?: string;
   estadoIpas?: string;
+  estadoEnvio?: string;
   ultimoCambio?: string;
   descripcion?: string;
   comentarios?: string;
   motivoCancelacion?: string;
   cita?: string;
   tecnico?: string;
+  trabajadorId?: string[];
   notaTecnico?: string;
   citaTecnico?: string;
   chatbot?: string;
   fechaInstalacion?: string;
+  referencia?: string;
+  conversationId?: string;
+  sincronizado?: boolean;
+  poblacion?: string;
+  tramitado?: boolean;
+  codigoPostal?: string;
+  provincia?: string;
 }
 
 // Filtros permitidos para todos los usuarios (estados que se muestran en la tabla)
@@ -46,9 +55,10 @@ const GESTORA_OPERATIVA_FILTROS = [
   'Pendiente de aceptación',
   'Aceptado',
   'Citado',
+  'Pendiente técnico',
   'Pendiente de material',
   'Pendiente presupuesto',
-  'En curso'
+  'Material enviado'
 ];
 
 // Estados permitidos para Estado Ipas
@@ -69,9 +79,10 @@ const STATUS_OPTIONS = [
   'Pendiente de aceptación',
   'Aceptado',
   'Citado',
+  'Pendiente técnico',
   'Pendiente de material',
   'Pendiente presupuesto',
-  'En curso',
+  'Material enviado',
   'Finalizado',
   'Cancelado'
 ];
@@ -81,19 +92,30 @@ const renderDetailValue = (value?: string) => {
   return cleaned ? cleaned : 'Sin información';
 };
 
-const Services: React.FC = () => {
+type ServicesVariant = 'servicios' | 'tramitaciones';
+
+const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicios' }) => {
   const { user } = useAuth();
+  const isTramitacion = variant === 'tramitaciones';
   const [services, setServices] = useState<Service[]>([]);
+  const [tecnicos, setTecnicos] = useState<{ id: string; nombre: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [estadoFilter, setEstadoFilter] = useState<string>(''); // Filtro por estado
+  const [activeTab, setActiveTab] = useState<'requiere-accion' | 'en-espera'>('requiere-accion');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [formularios, setFormularios] = useState<any[]>([]);
+  const [selectedFormularioIndex, setSelectedFormularioIndex] = useState(0);
   const [selectedFormulario, setSelectedFormulario] = useState<any | null>(null);
+  const [reparaciones, setReparaciones] = useState<any[]>([]);
+  const [selectedReparacionIndex, setSelectedReparacionIndex] = useState(0);
   const [selectedReparacion, setSelectedReparacion] = useState<any | null>(null);
   const [editingField, setEditingField] = useState<{ id: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [tecnicoSearchTerm, setTecnicoSearchTerm] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   // Determinar si el usuario es Gestora Operativa
   const isGestoraOperativa = user?.role === 'Gestora Operativa';
@@ -104,13 +126,23 @@ const Services: React.FC = () => {
 
     const loadServices = async () => {
       setLoading(true);
+      setError(null);
       try {
-        const data = await airtableService.getServices(user?.clinic, user?.id, user?.email);
+        console.log(`${isTramitacion ? 'Tramitaciones' : 'Services'} - Starting to load...`);
+        const data = isTramitacion
+          ? await airtableService.getTramitaciones(user?.clinic, user?.id, user?.email, { onlyUnsynced: true })
+          : await airtableService.getServices(user?.clinic, user?.id, user?.email);
+        console.log(`${isTramitacion ? 'Tramitaciones' : 'Services'} - Data received:`, data.length, 'records');
         if (isMounted) {
           setServices(data);
         }
-      } catch (error) {
-        console.error('Error fetching services:', error);
+      } catch (error: any) {
+        console.error(`${isTramitacion ? 'Tramitaciones' : 'Services'} - Error fetching data:`, error);
+        if (isMounted) {
+          const errorMessage = error.message || `Error desconocido al cargar ${isTramitacion ? 'tramitaciones' : 'servicios'}`;
+          setError(errorMessage);
+          alert(`Error al cargar ${isTramitacion ? 'tramitaciones' : 'servicios'}: ${errorMessage}`);
+        }
       } finally {
         if (isMounted) {
           setLoading(false);
@@ -123,22 +155,170 @@ const Services: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [user?.clinic]);
+  }, [user?.clinic, user?.id, user?.email]);
+
+  useEffect(() => {
+    const loadTecnicos = async () => {
+      try {
+        const data = await airtableService.getTechnicians();
+        setTecnicos(data);
+      } catch (error) {
+        console.error('Error loading técnicos:', error);
+      }
+    };
+
+    loadTecnicos();
+  }, []);
 
   // Filtrado de servicios - mismo para todos los usuarios (como Gestor Operativa)
   const filteredServices = useMemo<Service[]>(() => {
-    let servicesWithAllowedStates = services;
+    console.log('Services - Total services before filtering:', services.length);
     
-    // Filtrar por estados permitidos (excluyendo Finalizados, Pendiente de valoración, Valorados, Cancelador)
-    servicesWithAllowedStates = services.filter(service =>
-      service.estado && GESTORA_OPERATIVA_FILTROS.includes(service.estado)
-    );
+    let servicesWithAllowedStates = services;
 
-    // Aplicar filtro por estado seleccionado
-    if (estadoFilter) {
-      servicesWithAllowedStates = servicesWithAllowedStates.filter(
-        service => service.estado === estadoFilter
+    if (isTramitacion) {
+      // Para tramitación: no aplicar el filtro estándar; usar condiciones específicas
+      const estadosPermitidos = [
+        'Formulario completado',
+        'Llamado',
+        'Pendiente Presupuesto',
+        'Pendiente presupuesto',
+        'Citado',
+        'Material enviado',
+        'Cancelado',
+        'Finalizado',
+      ];
+      servicesWithAllowedStates = servicesWithAllowedStates.filter((s) => {
+        const estadoOk = s.estado && estadosPermitidos.includes(s.estado);
+        const tramitadoOk = !s.tramitado;
+        return !!estadoOk && tramitadoOk;
+      });
+    } else {
+      // Filtrar por estados permitidos para servicios
+      servicesWithAllowedStates = services.filter(service =>
+        service.estado && GESTORA_OPERATIVA_FILTROS.includes(service.estado)
       );
+    }
+    
+    console.log('Services - After estado filter:', servicesWithAllowedStates.length);
+    console.log('Services - Filtered out services without estado or not in allowed list:', services.length - servicesWithAllowedStates.length);
+    
+    // Ver estados de los primeros servicios rechazados
+    const rejectedServices = services.filter(service =>
+      !service.estado || !GESTORA_OPERATIVA_FILTROS.includes(service.estado)
+    ).slice(0, 10);
+    console.log('Services - Sample rejected services (first 10):', rejectedServices.map(s => ({
+      expediente: s.expediente,
+      estado: s.estado || 'SIN ESTADO',
+      nombre: s.nombre
+    })));
+
+    // Aplicar filtro por tab (solo para Servicios, no Tramitaciones)
+    if (!isTramitacion) {
+      const now = new Date();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      
+      // Si el puesto es Técnico, excluir completamente ciertos estados de ambas pestañas
+      if (user?.role === 'Técnico') {
+        const estadosExcluidosTecnico = [
+          'Pendiente de material',
+          'Pendiente técnico',
+          'Pendiente de técnico',
+          'Pendiente presupuesto',
+          'Pendiente de presupuesto',
+          'Pendiente de asignar',
+          'Pendiente de aceptación',
+          'Aceptado',
+        ];
+        servicesWithAllowedStates = servicesWithAllowedStates.filter(
+          (s) => !(s.estado && estadosExcluidosTecnico.includes(s.estado))
+        );
+        // Además, excluir "Citado" si tiene "Cita técnico" rellena
+        servicesWithAllowedStates = servicesWithAllowedStates.filter(
+          (s) => !(s.estado === 'Citado' && !!s.citaTecnico)
+        );
+      }
+
+      servicesWithAllowedStates = servicesWithAllowedStates.filter(service => {
+        const estado = service.estado;
+        const cita = service.cita ? new Date(service.cita) : null;
+        const citaTecnico = service.citaTecnico ? new Date(service.citaTecnico) : null;
+        const ultimoCambio = service.ultimoCambio ? new Date(service.ultimoCambio) : null;
+        const estadoEnvio = service.estadoEnvio;
+        
+        // Determinar tipo de cita según estado y campos
+        const isCitaInterna = estado === 'Citado' && cita;
+        const isCitaTecnico = estado === 'Citado' && citaTecnico;
+        
+        // Verificar si último cambio fue hace más de 24 horas
+        const isUltimoCambioOld = ultimoCambio && ultimoCambio < twentyFourHoursAgo;
+        const isUltimoCambioRecent = ultimoCambio && ultimoCambio >= twentyFourHoursAgo;
+        
+        if (activeTab === 'requiere-accion') {
+          // Estados activos que siempre requieren acción
+          const estadosActivos = ['Sin contactar', 'Llamado', 'Pendiente de presupuesto', 'Pendiente de asignar', 'Formulario completado', 'Pendiente técnico', 'Pendiente de material'];
+          if (estado && estadosActivos.includes(estado)) return true;
+
+          // Contactado: solo si último cambio > 24 horas
+          if (estado === 'Contactado' && isUltimoCambioOld) return true;
+          
+          // Pendiente de aceptación: solo si último cambio > 24 horas
+          if (estado === 'Pendiente de aceptación' && isUltimoCambioOld) return true;
+          
+          // Aceptado: solo si último cambio > 24 horas
+          if (estado === 'Aceptado' && isUltimoCambioOld) return true;
+          
+          // Material enviado: solo si Estado envío es "Entregado"
+          if (estado === 'Material enviado' && estadoEnvio === 'Entregado') return true;
+          
+          // Cita interna: HOY o ANTERIOR
+          if (isCitaInterna && cita) {
+            cita.setHours(0, 0, 0, 0);
+            if (cita <= today) return true;
+          }
+          
+          // Cita técnico: ANTERIOR a hoy (reclamar informe)
+          if (isCitaTecnico && citaTecnico) {
+            citaTecnico.setHours(0, 0, 0, 0);
+            if (citaTecnico < today) return true;
+          }
+          
+          return false;
+        }
+        
+        if (activeTab === 'en-espera') {
+          // Pendiente de aceptación: solo si último cambio < 24 horas
+          if (estado === 'Pendiente de aceptación' && isUltimoCambioRecent) return true;
+          
+          // Aceptado: solo si último cambio < 24 horas
+          if (estado === 'Aceptado' && isUltimoCambioRecent) return true;
+
+          // Contactado: solo si último cambio < 24 horas
+          if (estado === 'Contactado' && isUltimoCambioRecent) return true;
+          
+          // Material enviado: si NO es estado "Entregado"
+          if (estado === 'Material enviado' && estadoEnvio !== 'Entregado') return true;
+          
+          // Cita interna: FUTURA
+          if (isCitaInterna && cita) {
+            cita.setHours(0, 0, 0, 0);
+            if (cita > today) return true;
+          }
+          
+          // Cita técnico: HOY o FUTURA
+          if (isCitaTecnico && citaTecnico) {
+            citaTecnico.setHours(0, 0, 0, 0);
+            if (citaTecnico >= today) return true;
+          }
+          
+          return false;
+        }
+        
+        return false;
+      });
+      console.log('Services - After tab filter:', servicesWithAllowedStates.length);
     }
 
     const term = searchTerm.trim().toLowerCase();
@@ -149,6 +329,7 @@ const Services: React.FC = () => {
       const matchesDireccion = service.direccion?.toLowerCase().includes(term);
       const matchesEstado = service.estado?.toLowerCase().includes(term);
       const matchesEstadoIpas = service.estadoIpas?.toLowerCase().includes(term);
+      const matchesReferencia = service.referencia?.toLowerCase().includes(term);
 
       return (
         matchesExpediente ||
@@ -156,9 +337,14 @@ const Services: React.FC = () => {
         matchesTelefono ||
         matchesDireccion ||
         matchesEstado ||
-        matchesEstadoIpas
+        matchesEstadoIpas ||
+        matchesReferencia
       );
     }) : servicesWithAllowedStates;
+
+    if (term) {
+      console.log('Services - After search term filter:', filtered.length);
+    }
 
     // Ordenar por fecha de registro, del más antiguo al más reciente
     const finalFiltered = filtered.sort((a, b) => {
@@ -169,7 +355,7 @@ const Services: React.FC = () => {
 
     console.log('Services - Final filtered services:', finalFiltered.length);
     return finalFiltered;
-  }, [services, searchTerm, estadoFilter]);
+  }, [services, searchTerm, activeTab, isTramitacion]);
 
   const handleCloseModal = () => setSelectedService(null);
   
@@ -180,13 +366,15 @@ const Services: React.FC = () => {
       return;
     }
     
-    console.log('Abriendo formulario para expediente:', expediente);
+    console.log('Abriendo formularios para expediente:', expediente);
     try {
       const data = await airtableService.getFormularioByExpediente(expediente);
-      console.log('Formulario encontrado:', data);
-      setSelectedFormulario(data);
+      console.log('Formularios encontrados:', data);
+      setFormularios(data);
+      setSelectedFormularioIndex(0);
+      setSelectedFormulario(data[0]);
     } catch (error) {
-      console.error('Error fetching formulario:', error);
+      console.error('Error fetching formularios:', error);
       alert(`Error al cargar el formulario: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   };
@@ -198,19 +386,44 @@ const Services: React.FC = () => {
       return;
     }
     
-    console.log('Abriendo reparación para expediente:', expediente);
+    console.log('Abriendo reparaciones para expediente:', expediente);
     try {
       const data = await airtableService.getReparacionesByExpediente(expediente);
-      console.log('Reparación encontrada:', data);
-      setSelectedReparacion(data);
+      console.log('Reparaciones encontradas:', data);
+      setReparaciones(data);
+      setSelectedReparacionIndex(0);
+      setSelectedReparacion(data[0]);
     } catch (error) {
-      console.error('Error fetching reparacion:', error);
+      console.error('Error fetching reparaciones:', error);
       alert(`Error al cargar la reparación: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   };
 
-  const handleCloseFormulario = () => setSelectedFormulario(null);
-  const handleCloseReparacion = () => setSelectedReparacion(null);
+  const handleCloseFormulario = () => {
+    setSelectedFormulario(null);
+    setFormularios([]);
+    setSelectedFormularioIndex(0);
+  };
+  
+  const handleCloseReparacion = () => {
+    setSelectedReparacion(null);
+    setReparaciones([]);
+    setSelectedReparacionIndex(0);
+  };
+
+  const handleMarkSynced = async (id: string) => {
+    if (!isTramitacion) return;
+    if (updatingId) return;
+    setUpdatingId(id);
+    try {
+      await airtableService.setTramitacionTramitado(id, true);
+      setServices((prev) => prev.filter((s) => s.id !== id));
+    } catch (err: any) {
+      alert(err?.message || 'No se pudo marcar como tramitado');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   const handleEdit = (serviceId: string, field: string, currentValue: string) => {
     setEditingField({ id: serviceId, field });
@@ -353,29 +566,7 @@ const Services: React.FC = () => {
     }
   };
 
-  const handleEscalar = async (serviceId: string) => {
-    if (!confirm('¿Estás seguro de que quieres escalar este servicio?')) {
-      return;
-    }
-    try {
-      // Buscar el ID del supervisor "Elio Kobe"
-      const supervisorId = await (airtableService as any).getWorkerIdByName('Elio Kobe');
-      if (!supervisorId) {
-        alert('No se encontró el supervisor "Elio Kobe"');
-        return;
-      }
 
-      // Asignar el supervisor al campo Linked Records "Trabajador"
-      await airtableService.updateServiceLinkedField(serviceId, 'Trabajador', [supervisorId]);
-      // Recargar servicios para reflejar el cambio
-      const data = await airtableService.getServices(user?.clinic, user?.id, user?.email);
-      setServices(data);
-      alert('Servicio escalado correctamente');
-    } catch (error) {
-      console.error('Error escalando servicio:', error);
-      alert('Error al escalar el servicio');
-    }
-  };
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
@@ -386,6 +577,21 @@ const Services: React.FC = () => {
         month: '2-digit',
         year: 'numeric',
       });
+    } catch {
+      return '-';
+    }
+  };
+
+  const formatDateTime = (dateString?: string) => {
+    if (!dateString) return '-';
+    try {
+      const date = new Date(dateString);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${day}/${month}/${year} ${hours}:${minutes}`;
     } catch {
       return '-';
     }
@@ -411,6 +617,25 @@ const Services: React.FC = () => {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
+        <p className="ml-4 text-gray-600">Cargando {isTramitacion ? 'tramitaciones' : 'servicios'}...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <XCircle className="h-12 w-12 text-red-500" />
+        <div className="text-center">
+          <h3 className="text-lg font-semibold text-gray-900">Error al cargar {isTramitacion ? 'tramitaciones' : 'servicios'}</h3>
+          <p className="text-gray-600 mt-2">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-hover transition-colors"
+          >
+            Reintentar
+          </button>
+        </div>
       </div>
     );
   }
@@ -419,8 +644,8 @@ const Services: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div className="flex-shrink-0">
-          <h1 className="text-3xl font-bold text-gray-900">Servicios</h1>
-          <p className="text-gray-600 mt-2">Consulta y gestiona los servicios activos de punto de recarga.</p>
+          <h1 className="text-3xl font-bold text-gray-900">{isTramitacion ? 'Tramitaciones' : 'Servicios'}</h1>
+          <p className="text-gray-600 mt-2">{isTramitacion ? 'Consulta y gestiona las tramitaciones pendientes de sincronizar.' : 'Consulta y gestiona los servicios activos de punto de recarga.'}</p>
         </div>
         <div className="flex-1 max-w-2xl">
           <div className="relative">
@@ -436,25 +661,32 @@ const Services: React.FC = () => {
         </div>
       </div>
 
-      {/* Filtro por estado para todos los usuarios */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-        <div className="flex items-center gap-4">
-          <label htmlFor="estadoFilter" className="text-sm font-medium text-gray-700 whitespace-nowrap">
-            Filtrar por estado:
-          </label>
-          <select
-            id="estadoFilter"
-            value={estadoFilter}
-            onChange={(e) => setEstadoFilter(e.target.value)}
-            className="flex-1 max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
-          >
-            <option value="">Todos los estados</option>
-            {GESTORA_OPERATIVA_FILTROS.map((estado: string) => (
-              <option key={estado} value={estado}>{estado}</option>
-            ))}
-          </select>
+      {!isTramitacion && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="flex border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('requiere-accion')}
+              className={`flex-1 px-6 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'requiere-accion'
+                  ? 'bg-brand-primary text-white border-b-2 border-brand-primary'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-brand-primary'
+              }`}
+            >
+              Requiere Acción
+            </button>
+            <button
+              onClick={() => setActiveTab('en-espera')}
+              className={`flex-1 px-6 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'en-espera'
+                  ? 'bg-brand-primary text-white border-b-2 border-brand-primary'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-brand-primary'
+              }`}
+            >
+              En Espera
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         {filteredServices.length === 0 ? (
@@ -470,11 +702,9 @@ const Services: React.FC = () => {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expediente</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Registro</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Nombre</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teléfono</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-48">Dirección</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado Ipas</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Último Cambio</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{isTramitacion ? 'Estado' : 'Teléfono'}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{isTramitacion ? 'Estado Ipas' : 'Estado'}</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{isTramitacion ? 'Tramitado' : 'Último Cambio'}</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
@@ -484,78 +714,66 @@ const Services: React.FC = () => {
                     <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{service.expediente || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">{formatDate(service.fechaRegistro)}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 w-40"><div className="max-w-[10rem] truncate">{service.nombre || '-'}</div></td>
-                    <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">{service.telefono || '-'}</td>
-                    <td className="px-4 py-3 text-sm text-gray-900 w-48"><div className="max-w-[12rem] truncate">{service.direccion || '-'}</div></td>
-                    <td className="px-4 py-3">
-                      {editingField?.id === service.id && editingField?.field === 'estado' ? (
-                        <div className="flex items-center gap-1">
-                          <select
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            className="text-sm px-2 py-1 border rounded focus:ring-1 focus:ring-brand-primary w-full"
-                            disabled={saving}
-                            autoFocus
-                          >
-                            <option value="">Seleccionar...</option>
-                            {/* Todos los usuarios pueden seleccionar cualquier estado */}
-                            {STATUS_OPTIONS.map((opt: string) => 
-                              <option key={opt} value={opt}>{opt}</option>
-                            )}
-                          </select>
-                          <button onClick={() => handleSave(service.id, 'estado')} disabled={saving} className="text-green-600 hover:text-green-800 flex-shrink-0">
-                            <Check className="h-4 w-4" />
-                          </button>
-                          <button onClick={handleCancel} disabled={saving} className="text-red-600 hover:text-red-800 flex-shrink-0">
-                            <XCircle className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div
-                          onClick={() => handleEdit(service.id, 'estado', service.estado || '')}
-                          className="text-sm text-gray-900 cursor-pointer hover:text-brand-primary transition-colors truncate"
-                        >
-                          {service.estado || 'Sin estado'}
-                        </div>
-                      )}
+                    <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
+                      {isTramitacion ? (service.estado || '-') : (service.telefono || '-')}
                     </td>
                     <td className="px-4 py-3">
-                      {editingField?.id === service.id && editingField?.field === 'estadoIpas' ? (
-                        <div className="flex items-center gap-1">
-                          <select
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            className="text-sm px-2 py-1 border rounded focus:ring-1 focus:ring-brand-primary w-full"
-                            disabled={saving}
-                            autoFocus
-                          >
-                            <option value="">Seleccionar...</option>
-                            {(IPAS_STATUS_OPTIONS).map((opt: string) => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                          </select>
-                          <button onClick={() => handleSave(service.id, 'estadoIpas')} disabled={saving} className="text-green-600 hover:text-green-800 flex-shrink-0">
-                            <Check className="h-4 w-4" />
-                          </button>
-                          <button onClick={handleCancel} disabled={saving} className="text-red-600 hover:text-red-800 flex-shrink-0">
-                            <XCircle className="h-4 w-4" />
-                          </button>
-                        </div>
+                      {isTramitacion ? (
+                        <div className="text-sm text-gray-900 truncate">{service.estadoIpas || 'Sin estado'}</div>
                       ) : (
-                        <div
-                          onClick={() => handleEdit(service.id, 'estadoIpas', service.estadoIpas || '')}
-                          className="text-sm text-gray-900 cursor-pointer hover:text-brand-primary transition-colors truncate"
-                        >
-                          {service.estadoIpas || 'Sin estado'}
-                        </div>
+                        editingField?.id === service.id && editingField?.field === 'estado' ? (
+                          <div className="flex items-center gap-1">
+                            <select
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              className="text-sm px-2 py-1 border rounded focus:ring-1 focus:ring-brand-primary w-full"
+                              disabled={saving}
+                              autoFocus
+                            >
+                              <option value="">Seleccionar...</option>
+                              {/* Todos los usuarios pueden seleccionar cualquier estado */}
+                              {STATUS_OPTIONS.map((opt: string) => 
+                                <option key={opt} value={opt}>{opt}</option>
+                              )}
+                            </select>
+                            <button onClick={() => handleSave(service.id, 'estado')} disabled={saving} className="text-green-600 hover:text-green-800 flex-shrink-0">
+                              <Check className="h-4 w-4" />
+                            </button>
+                            <button onClick={handleCancel} disabled={saving} className="text-red-600 hover:text-red-800 flex-shrink-0">
+                              <XCircle className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => handleEdit(service.id, 'estado', service.estado || '')}
+                            className="text-sm text-gray-900 cursor-pointer hover:text-brand-primary transition-colors truncate"
+                          >
+                            {service.estado || 'Sin estado'}
+                          </div>
+                        )
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">{formatDate(service.ultimoCambio)}</td>
+                    {isTramitacion ? (
+                      <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => handleMarkSynced(service.id)}
+                          disabled={updatingId === service.id}
+                          className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-gray-300 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                          title="Marcar como tramitado"
+                        >
+                          <Check className="h-4 w-4" />
+                        </button>
+                      </td>
+                    ) : (
+                      <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">{formatDate(service.ultimoCambio)}</td>
+                    )}
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
                           type="button"
                           onClick={() => setSelectedService(service)}
-                          className="inline-flex items-center justify-center p-2 rounded-full text-brand-primary hover:bg-brand-primary hover:text-white transition-all"
+                          className="inline-flex items-center justify-center p-2 rounded-full text-green-600 hover:bg-green-600 hover:text-white transition-all"
                           title="Ver detalles"
                         >
                           <Eye className="h-5 w-5" />
@@ -573,11 +791,23 @@ const Services: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => handleOpenReparacion(service.expediente)}
-                            className="inline-flex items-center justify-center p-2 rounded-full text-green-700 hover:bg-green-700 hover:text-white transition-all"
+                            className="inline-flex items-center justify-center p-2 rounded-full text-green-600 hover:bg-green-600 hover:text-white transition-all"
                             title="Ver reparaciones"
                           >
                             <Wrench className="h-5 w-5" />
                           </button>
+                        )}
+                        {/* Botón de chat */}
+                        {service.conversationId && (
+                          <a
+                            href={`https://chat.ritest.es/app/accounts/1/inbox-view/conversation/${service.conversationId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center justify-center p-2 rounded-full text-green-600 hover:bg-green-600 hover:text-white transition-all"
+                            title="Abrir chat"
+                          >
+                            <MessageCircle className="h-5 w-5" />
+                          </a>
                         )}
                         {/* Botón de llamar al cliente */}
                         {service.telefono && (
@@ -589,15 +819,6 @@ const Services: React.FC = () => {
                             <Phone className="h-5 w-5" />
                           </a>
                         )}
-                        {/* Botón de escalar servicio */}
-                        <button
-                          type="button"
-                          onClick={() => handleEscalar(service.id)}
-                          className="inline-flex items-center justify-center p-2 rounded-full text-orange-600 hover:bg-orange-600 hover:text-white transition-all"
-                          title="Escalar servicio"
-                        >
-                          <ArrowUp className="h-5 w-5" />
-                        </button>
                       </div>
                     </td>
                   </tr>
@@ -614,7 +835,7 @@ const Services: React.FC = () => {
           onClick={handleCloseModal}
         >
           <div
-            className="relative w-full max-w-4xl bg-white rounded-2xl shadow-lg border border-gray-200"
+            className="relative w-full max-w-4xl bg-white rounded-2xl shadow-lg border border-gray-200 max-h-[90vh] overflow-y-auto"
             onClick={(event) => event.stopPropagation()}
           >
             <button
@@ -649,6 +870,18 @@ const Services: React.FC = () => {
                 <div>
                   <p className="text-xs uppercase text-gray-500">Dirección</p>
                   <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.direccion)}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Código postal</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.codigoPostal)}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Provincia</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.provincia)}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Población</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.poblacion)}</p>
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">
@@ -694,19 +927,27 @@ const Services: React.FC = () => {
                   <p className="text-sm text-gray-900 mt-1">{renderDetailValue(formatDate(selectedService.ultimoCambio))}</p>
                 </div>
                 <div>
+                  <p className="text-xs uppercase text-gray-500">Estado envío</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.estadoEnvio)}</p>
+                </div>
+                <div>
                   <p className="text-xs uppercase text-gray-500">Fecha instalación</p>
                   <p className="text-sm text-gray-900 mt-1">{renderDetailValue(formatDate(selectedService.fechaInstalacion))}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Referencia</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.referencia)}</p>
                 </div>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-700">Descripción</h3>
+                  <p className="text-xs uppercase text-gray-500 mb-1">Descripción</p>
                   <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{renderDetailValue(selectedService.descripcion)}</p>
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-sm font-semibold text-gray-700">Comentarios</h3>
+                    <p className="text-xs uppercase text-gray-500">Comentarios</p>
                     <button
                       onClick={() => handleEdit(selectedService.id, 'comentarios', selectedService.comentarios || '')}
                       className="text-xs text-brand-primary hover:text-brand-green"
@@ -749,7 +990,7 @@ const Services: React.FC = () => {
                 {!isGestoraOperativa && (
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <h3 className="text-sm font-semibold text-gray-700">Motivo cancelación</h3>
+                      <p className="text-xs uppercase text-gray-500">Motivo cancelación</p>
                       <button
                         onClick={() => handleEdit(selectedService.id, 'motivoCancelacion', selectedService.motivoCancelacion || '')}
                         className="text-xs text-brand-primary hover:text-brand-green"
@@ -795,7 +1036,7 @@ const Services: React.FC = () => {
                   {/* Cita - editable */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <h3 className="text-sm font-semibold text-gray-700">Cita</h3>
+                      <p className="text-xs uppercase text-gray-500">Cita</p>
                       <button
                         onClick={() => handleEdit(selectedService.id, 'cita', formatDateTimeForInput(selectedService.cita))}
                         className="text-xs text-brand-primary hover:text-brand-green"
@@ -823,13 +1064,13 @@ const Services: React.FC = () => {
                         </div>
                       </div>
                     ) : (
-                      <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{renderDetailValue(selectedService.cita)}</p>
+                      <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{renderDetailValue(formatDateTime(selectedService.cita))}</p>
                     )}
                   </div>
                   {/* Cita técnico - siempre visible, solo lectura */}
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-700">Cita técnico</h3>
-                    <p className="mt-1 text-sm text-gray-900">{renderDetailValue(selectedService.citaTecnico)}</p>
+                    <p className="text-xs uppercase text-gray-500 mb-1">Cita técnico</p>
+                    <p className="mt-1 text-sm text-gray-900">{renderDetailValue(formatDateTime(selectedService.citaTecnico))}</p>
                   </div>
                 </div>
 
@@ -837,26 +1078,76 @@ const Services: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <h3 className="text-sm font-semibold text-gray-700">Técnico</h3>
+                      <p className="text-xs uppercase text-gray-500">Técnico</p>
                       <button
-                        onClick={() => handleEdit(selectedService.id, 'tecnico', selectedService.tecnico || '')}
+                        onClick={() => {
+                          const currentTecnicoId = selectedService.trabajadorId?.[0] || '';
+                          handleEdit(selectedService.id, 'trabajadorId', currentTecnicoId);
+                          setTecnicoSearchTerm('');
+                        }}
                         className="text-xs text-brand-primary hover:text-brand-green"
                       >
                         Editar
                       </button>
                     </div>
-                    {editingField?.id === selectedService.id && editingField?.field === 'tecnico' ? (
+                    {editingField?.id === selectedService.id && editingField?.field === 'trabajadorId' ? (
                       <div className="space-y-2">
                         <input
                           type="text"
+                          placeholder="Buscar técnico..."
+                          value={tecnicoSearchTerm}
+                          onChange={(e) => setTecnicoSearchTerm(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                          autoFocus
+                        />
+                        <select
                           value={editValue}
                           onChange={(e) => setEditValue(e.target.value)}
                           className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
                           disabled={saving}
-                          autoFocus
-                        />
+                          size={5}
+                        >
+                          <option value="">Seleccionar técnico...</option>
+                          {tecnicos
+                            .filter((tecnico) =>
+                              tecnico.nombre.toLowerCase().includes(tecnicoSearchTerm.toLowerCase())
+                            )
+                            .map((tecnico) => (
+                              <option key={tecnico.id} value={tecnico.id}>
+                                {tecnico.nombre}
+                              </option>
+                            ))}
+                        </select>
                         <div className="flex gap-2">
-                          <button onClick={() => handleSave(selectedService.id, 'tecnico')} disabled={saving} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
+                          <button 
+                            onClick={async () => {
+                              if (saving) return;
+                              setSaving(true);
+                              try {
+                                await airtableService.updateServiceTecnico(selectedService.id, editValue);
+                                setServices(prevServices =>
+                                  prevServices.map(service =>
+                                    service.id === selectedService.id
+                                      ? { ...service, trabajadorId: editValue ? [editValue] : [] }
+                                      : service
+                                  )
+                                );
+                                if (selectedService?.id === selectedService.id) {
+                                  setSelectedService(prev => prev ? { ...prev, trabajadorId: editValue ? [editValue] : [] } : null);
+                                }
+                                setEditingField(null);
+                                setEditValue('');
+                                setTecnicoSearchTerm('');
+                              } catch (error) {
+                                console.error('Error updating técnico:', error);
+                                alert('Error al guardar los cambios');
+                              } finally {
+                                setSaving(false);
+                              }
+                            }} 
+                            disabled={saving} 
+                            className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                          >
                             Guardar
                           </button>
                           <button onClick={handleCancel} disabled={saving} className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">
@@ -865,12 +1156,16 @@ const Services: React.FC = () => {
                         </div>
                       </div>
                     ) : (
-                      <p className="mt-1 text-sm text-gray-900">{renderDetailValue(selectedService.tecnico)}</p>
+                      <p className="mt-1 text-sm text-gray-900">
+                        {selectedService.trabajadorId && selectedService.trabajadorId.length > 0
+                          ? tecnicos.find(t => t.id === selectedService.trabajadorId?.[0])?.nombre || 'Sin información'
+                          : 'Sin información'}
+                      </p>
                     )}
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <h3 className="text-sm font-semibold text-gray-700">Nota técnico</h3>
+                      <p className="text-xs uppercase text-gray-500">Nota técnico</p>
                       <button
                         onClick={() => handleEdit(selectedService.id, 'notaTecnico', selectedService.notaTecnico || '')}
                         className="text-xs text-brand-primary hover:text-brand-green"
@@ -928,10 +1223,34 @@ const Services: React.FC = () => {
             </button>
             <div className="p-6 space-y-6">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">Formulario</h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  Expediente {selectedFormulario.Expediente || 'sin expediente asignado'}
-                </p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">Formulario</h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Expediente {selectedFormulario.Expediente || 'sin expediente asignado'}
+                    </p>
+                  </div>
+                  {formularios.length > 1 && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-gray-500 uppercase">Seleccionar formulario:</label>
+                      <select
+                        value={selectedFormularioIndex}
+                        onChange={(e) => {
+                          const index = parseInt(e.target.value);
+                          setSelectedFormularioIndex(index);
+                          setSelectedFormulario(formularios[index]);
+                        }}
+                        className="px-3 py-1 border rounded-lg text-sm focus:ring-2 focus:ring-brand-primary"
+                      >
+                        {formularios.map((form, index) => (
+                          <option key={index} value={index}>
+                            Formulario {index + 1}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -1294,10 +1613,34 @@ const Services: React.FC = () => {
             </button>
             <div className="p-6 space-y-6">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">Reparaciones</h2>
-                <p className="text-sm text-gray-500 mt-1">
-                  Expediente {selectedReparacion.expediente || 'sin expediente asignado'}
-                </p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">Reparaciones</h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Expediente {selectedReparacion.expediente || 'sin expediente asignado'}
+                    </p>
+                  </div>
+                  {reparaciones.length > 1 && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-gray-500 uppercase">Seleccionar reparación:</label>
+                      <select
+                        value={selectedReparacionIndex}
+                        onChange={(e) => {
+                          const index = parseInt(e.target.value);
+                          setSelectedReparacionIndex(index);
+                          setSelectedReparacion(reparaciones[index]);
+                        }}
+                        className="px-3 py-1 border rounded-lg text-sm focus:ring-2 focus:ring-brand-primary"
+                      >
+                        {reparaciones.map((rep, index) => (
+                          <option key={index} value={index}>
+                            Reparación {index + 1}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

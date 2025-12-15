@@ -20,6 +20,7 @@ import {
   CheckSquare,
   Package,
   Truck,
+  ClipboardList,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -50,54 +51,50 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     navigate('/login');
   };
 
-  // Navegación personalizada para Gestora Operativa
-  const navigationGroupsOperativa: NavigationGroup[] = [
+  // Navegación para Administrativa
+  const navigationGroupsAdministrativa: NavigationGroup[] = [
     {
       title: 'Punto de Recarga',
       items: [
-        ...(user?.role === 'Administrador' ? [{ name: 'Panel Gráfico', href: '/panel-grafico', icon: BarChart3 }] : []),
+        { name: 'Panel Gráfico', href: '/panel-grafico', icon: BarChart3 },
         { name: 'Servicios', href: '/servicios', icon: Wrench },
+        { name: 'Tramitación', href: '/tramitacion', icon: ClipboardList },
         { name: 'Técnicos', href: '/tecnicos', icon: Users },
         { name: 'Envíos', href: '/envios', icon: Package },
-        { name: 'Inventario', href: '/inventario', icon: FileDown },
-        { name: 'Packlink', href: 'https://pro.packlink.es/private/shipments/all', icon: Truck, external: true },
         { name: 'Ipas', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
-        { name: 'Whatsapp', href: 'https://chat.ritest.es', icon: MessageCircle, external: true },
       ],
     },
     {
       items: [
-        { name: 'Tareas', href: '/tareas', icon: CheckSquare },
-        { name: 'Email', href: '/email', icon: Mail },
         { name: 'Recursos', href: '/recursos', icon: FileDown },
-        { name: 'Ajustes', href: '/ajustes', icon: Settings },
       ],
     },
   ];
 
-  // Navegación personalizada para Gestora Técnica
-  const navigationGroupsTecnica: NavigationGroup[] = [
-    {
-      title: 'Punto de Recarga',
-      items: [
-        { name: 'Servicios', href: '/servicios', icon: Wrench },
-        { name: 'Técnicos', href: '/tecnicos', icon: Users },
-        { name: 'Ipartner', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
-        { name: 'Whatsapp', href: 'https://chat.ritest.es', icon: MessageCircle, external: true },
-      ],
-    },
+  // Navegación para Asesora energética
+  const navigationGroupsAsesora: NavigationGroup[] = [
     {
       title: 'Asesoramiento',
       items: [
         { name: 'Asesoramientos', href: '/asesoramientos', icon: Lightbulb },
       ],
     },
+  ];
+
+  // Navegación para Técnico
+  const navigationGroupsTecnico: NavigationGroup[] = [
+    {
+      title: 'Punto de Recarga',
+      items: [
+        { name: 'Panel Gráfico', href: '/panel-grafico', icon: BarChart3 },
+        { name: 'Servicios', href: '/servicios', icon: Wrench },
+        { name: 'Técnicos', href: '/tecnicos', icon: Users },
+        { name: 'Envíos', href: '/envios', icon: Package },
+      ],
+    },
     {
       items: [
-        { name: 'Tareas', href: '/tareas', icon: CheckSquare },
-        { name: 'Email', href: '/email', icon: Mail },
         { name: 'Recursos', href: '/recursos', icon: FileDown },
-        { name: 'Ajustes', href: '/ajustes', icon: Settings },
       ],
     },
   ];
@@ -109,10 +106,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       items: [
         { name: 'Panel Gráfico', href: '/panel-grafico', icon: BarChart3 },
         { name: 'Servicios', href: '/servicios', icon: Wrench },
+        { name: 'Tramitación', href: '/tramitacion', icon: ClipboardList },
         { name: 'Técnicos', href: '/tecnicos', icon: Users },
+        { name: 'Envíos', href: '/envios', icon: Package },
         { name: 'Ipas', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
-        { name: 'Whatsapp', href: 'https://chat.ritest.es', icon: MessageCircle, external: true },
-        { name: 'Packlink', href: 'https://pro.packlink.es/private/shipments/all', icon: ExternalLink, external: true },
       ],
     },
     {
@@ -124,24 +121,28 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     },
     {
       items: [
-        { name: 'Tareas', href: '/tareas', icon: CheckSquare },
-        { name: 'Email', href: '/email', icon: Mail },
         { name: 'Recursos', href: '/recursos', icon: FileDown },
-        { name: 'Ajustes', href: '/ajustes', icon: Settings },
       ],
     },
   ];
 
-  // Seleccionar navegación según el rol
+  // Seleccionar navegación según el rol (Puesto)
   const activeNavigationGroups = 
-    user?.role === 'Gestora Operativa' ? navigationGroupsOperativa :
-    user?.role === 'Gestora Técnica' ? navigationGroupsTecnica :
+    user?.role === 'Administrativa' ? navigationGroupsAdministrativa :
+    user?.role === 'Asesora energética' ? navigationGroupsAsesora :
+    user?.role === 'Técnico' ? navigationGroupsTecnico :
     navigationGroups;
+
+  // Ocultar "Técnicos" en el sidebar para todos excepto Responsable
+  const finalNavigationGroups: NavigationGroup[] = (user?.role === 'Responsable')
+    ? activeNavigationGroups
+    : activeNavigationGroups.map((group) => ({
+        ...group,
+        items: group.items.filter((item) => item.name !== 'Técnicos')
+      }));
 
   // Debug: Ver qué rol tiene el usuario
   console.log('User role:', user?.role);
-  console.log('Is Gestora Operativa?', user?.role === 'Gestora Operativa');
-  console.log('Is Gestora Técnica?', user?.role === 'Gestora Técnica');
   console.log('Active navigation groups:', activeNavigationGroups.length);
 
   return (
@@ -159,7 +160,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             </button>
           </div>
           <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-            {activeNavigationGroups.map((group, groupIndex) => (
+            {finalNavigationGroups.map((group, groupIndex) => (
               <div key={groupIndex}>
                 {group.items.map((item) => {
                   const Icon = item.icon;
@@ -238,7 +239,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             )}
           </div>
           <nav className={`flex-1 ${sidebarCollapsed ? 'px-2' : 'px-4'} py-4 space-y-1 overflow-y-auto`}>
-            {activeNavigationGroups.map((group, groupIndex) => (
+            {finalNavigationGroups.map((group, groupIndex) => (
               <div key={groupIndex}>
                 {group.items.map((item) => {
                   const Icon = item.icon;

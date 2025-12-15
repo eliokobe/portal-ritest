@@ -170,21 +170,6 @@ export default function Technicians() {
     return matchesSearch;
   });
 
-  const getStatusColor = (status?: string) => {
-    switch (status?.toLowerCase()) {
-      case 'contratado':
-        return 'bg-green-100 text-green-800';
-      case 'contactado':
-        return 'bg-green-200 text-green-900';
-      case 'sin contactar':
-        return 'bg-green-50 text-green-700';
-      case 'de baja':
-        return 'bg-gray-100 text-gray-600';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -288,13 +273,13 @@ export default function Technicians() {
                           </button>
                         </div>
                       ) : (
-                        <span 
-                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 ${getStatusColor(technician.estado)}`}
+                        <span
+                          className="inline-flex items-center gap-1 text-sm font-medium text-gray-900 cursor-pointer hover:text-brand-primary transition-colors"
                           onClick={() => handleEditStatus(technician.id)}
                           title="Click para cambiar estado"
                         >
                           {technician.estado || 'Sin estado'}
-                          <ChevronDown className="h-3 w-3 ml-1" />
+                          <ChevronDown className="h-3 w-3" />
                         </span>
                       )}
                     </td>

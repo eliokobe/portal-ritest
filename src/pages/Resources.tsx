@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Download, Play } from 'lucide-react';
 import { airtableService } from '../services/airtable';
+import { useAuth } from '../contexts/AuthContext';
 
 type Resource = {
   id: string;
@@ -13,13 +14,14 @@ type Resource = {
 };
 
 const Resources = () => {
+  const { user } = useAuth();
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await airtableService.getResources();
+        const data = await airtableService.getResources(user?.id);
         console.log('Resources fetched from Airtable:', data);
         setResources(data);
       } finally {
@@ -27,7 +29,7 @@ const Resources = () => {
       }
     };
     load();
-  }, []);
+  }, [user?.id]);
 
   // Mostrar todos los recursos para todos los usuarios (sin filtro por rol)
   const filteredResources = useMemo(() => {

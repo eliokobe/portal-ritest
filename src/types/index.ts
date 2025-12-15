@@ -45,8 +45,15 @@ export interface Tecnico {
   id: string;
   nombre?: string;
   provincia?: string;
-  estado?: 'Contratado' | 'Contactado' | 'Sin contactar' | 'De baja';
+  cliente?: string;
+  direccion?: string;
+  poblacion?: string;
+  codigoPostal?: string;
   telefono?: string;
+  catalogo?: string;
+  transporte?: string;
+  comentarios?: string;
+  estado?: 'Contratado' | 'Contactado' | 'Sin contactar' | 'De baja';
   observaciones?: string;
 }
 
@@ -67,13 +74,23 @@ export interface Registro {
 
 export interface Envio {
   id: string;
+  numero?: string;
   seguimiento?: string;
-  tipoOperacion?: 'Envío' | 'Recogida';
-  estado?: 'Envío creado' | 'Paquete recogido' | 'Paquete entregado';
+  servicio?: string;
+  estado?: 'Envío creado' | 'Listo para enviar' | 'Enviado' | 'Entregado';
+  transporte?: string;
+  catalogo?: string;
+  comentarios?: string;
   fechaEnvio?: string;
   material?: string;
   producto?: string; // Solo lectura (lookup)
   fechaCambio?: string; // Solo lectura (timestamp)
+  cliente?: string;
+  direccion?: string;
+  poblacion?: string;
+  codigoPostal?: string;
+  provincia?: string;
+  telefono?: string;
 }
 
 export interface DashboardStats {

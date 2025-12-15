@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Search, Package, Plus, X } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Search, Package, Plus, X, ExternalLink } from 'lucide-react';
 import { airtableService } from '../services/airtable';
 import { useAuth } from '../contexts/AuthContext';
+import { Envio } from '../types';
 
 // Filtros permitidos para Gestora Operativa (mismos que en Services)
 const GESTORA_OPERATIVA_FILTROS = [
@@ -15,6 +16,12 @@ const GESTORA_OPERATIVA_FILTROS = [
   'Pendiente técnico'
 ];
 
+const TRACKING_BASE = 'https://app.cttexpress.com/Forms/Destinatarios.aspx?c=00828000964&r=IL88P';
+const ESTADO_OPTIONS = ['Envío creado', 'Listo para enviar', 'Enviado', 'Entregado'];
+
+const normalizeText = (value?: string | number) => (value ?? '').toString().toLowerCase();
+const normalizeExpediente = (value?: string | number) => (value ?? '').toString().replace(/\s+/g, '').toLowerCase();
+
 
 interface Servicio {
   id: string;
@@ -22,25 +29,30 @@ interface Servicio {
   nombre?: string;
   estado?: string;
   chatbot?: string;
+  cliente?: string;
+  telefono?: string;
+  direccion?: string;
+  poblacion?: string;
+  codigoPostal?: string;
+  provincia?: string;
 }
 
-interface Material {
+interface CatalogoItem {
   id: string;
-  numeroSerie?: string;
-  modelo?: string;
+  nombre: string;
 }
 
-interface Envio {
+interface ServicioInfo {
   id: string;
-  seguimiento?: string;
-  servicio?: string;
-  estado?: 'Envío creado' | 'Paquete recogido' | 'Paquete entregado';
-  fechaEnvio?: string;
-  material?: string;
-  producto?: string;
-  fechaCambio?: string;
+  nombre?: string;
+  expediente?: string;
+  cliente?: string;
+  telefono?: string;
+  direccion?: string;
+  poblacion?: string;
+  codigoPostal?: string;
+  provincia?: string;
 }
-
 
 export default function Envios() {
   const { user } = useAuth();
@@ -51,16 +63,22 @@ export default function Envios() {
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [selectedEnvio, setSelectedEnvio] = useState<Envio | null>(null);
   const [newEnvio, setNewEnvio] = useState<Omit<Envio, 'id'>>({
-    seguimiento: '',
     servicio: '',
-    estado: 'Envío creado',
-    fechaEnvio: '',
-    material: '',
+    catalogo: '',
+    cliente: '',
+    direccion: '',
+    poblacion: '',
+    codigoPostal: '',
+    provincia: '',
+    telefono: '',
   });
-  const [materialSN, setMaterialSN] = useState(''); // S/N que escribe el usuario
-  const [servicios, setServicios] = useState<{ id: string; nombre: string }[]>([]);
-  const [materiales, setMateriales] = useState<{ id: string; numeroSerie: string; producto: string }[]>([]);
+  const [expedienteQuery, setExpedienteQuery] = useState('');
+  const [expedienteError, setExpedienteError] = useState<string | null>(null);
+  const [servicios, setServicios] = useState<{ id: string; nombre: string; expediente?: string }[]>([]);
+  const [serviciosInfo, setServiciosInfo] = useState<ServicioInfo[]>([]);
+  const [catalogos, setCatalogos] = useState<CatalogoItem[]>([]);
 
   // Determinar si el usuario es Gestora Operativa
   const isGestoraOperativa = user?.role === 'Gestora Operativa';
@@ -70,7 +88,7 @@ export default function Envios() {
   useEffect(() => {
     fetchEnvios();
     fetchServicios();
-    fetchMateriales();
+    fetchCatalogos();
   }, []);
 
   const fetchEnvios = async () => {
@@ -107,32 +125,36 @@ export default function Envios() {
       
       setServicios(serviciosFiltrados.map((s: Servicio) => ({ 
         id: s.id, 
-        nombre: s.nombre || s.expediente || 'Servicio' 
+        nombre: s.nombre || s.expediente || 'Servicio',
+        expediente: s.expediente,
+      })));
+      setServiciosInfo(serviciosFiltrados.map((s: Servicio) => ({
+        id: s.id,
+        nombre: s.nombre,
+        expediente: s.expediente,
+        cliente: s.cliente ?? s.nombre,
+        telefono: s.telefono,
+        direccion: s.direccion,
+        poblacion: s.poblacion,
+        codigoPostal: s.codigoPostal,
+        provincia: s.provincia,
       })));
     } catch (error) {
       setServicios([]);
+      setServiciosInfo([]);
     }
   };
 
-  const fetchMateriales = async () => {
+  const fetchCatalogos = async () => {
     try {
-      const data = await airtableService.getInventario();
-      console.log('Materiales recibidos:', data);
-      setMateriales(data.map((m: Material) => ({
-        id: m.id,
-        numeroSerie: String(m.numeroSerie || ''),
-        producto: m.modelo || '',
-      })));
+      const data = await airtableService.getCatalogos();
+      setCatalogos(data);
     } catch {
-      setMateriales([]);
+      setCatalogos([]);
     }
   };
 
-  // Auxiliar para mostrar material (S/N y producto)
-  const getMaterialLabel = (materialId: string): string => {
-    const mat = materiales.find((m) => m.id === materialId);
-    return mat ? `${mat.numeroSerie}${mat.producto ? ` - ${mat.producto}` : ''}` : '-';
-  };
+  const getCatalogoNombre = (catalogoId?: string) => catalogos.find((c) => c.id === catalogoId)?.nombre;
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
@@ -148,9 +170,11 @@ export default function Envios() {
     switch (estado) {
       case 'Envío creado':
         return 'bg-yellow-100 text-yellow-800';
-      case 'Paquete recogido':
+      case 'Listo para enviar':
         return 'bg-blue-100 text-blue-800';
-      case 'Paquete entregado':
+      case 'Enviado':
+        return 'bg-indigo-100 text-indigo-800';
+      case 'Entregado':
         return 'bg-green-200 text-green-900';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -158,13 +182,43 @@ export default function Envios() {
   };
 
   const filteredEnvios = envios.filter(envio => {
-    const matchesSearch = !searchTerm || 
-      envio.seguimiento?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      envio.material?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      envio.producto?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesSearch;
+    if (!searchTerm) return true;
+    const needle = searchTerm.toLowerCase();
+    return (
+      normalizeText(envio.seguimiento).includes(needle) ||
+      normalizeText(envio.numero).includes(needle) ||
+      normalizeText(envio.producto).includes(needle)
+    );
   });
+
+  const sortedEnvios = useMemo(() => {
+    return [...filteredEnvios].sort((a, b) => {
+      const aNum = normalizeText(a.numero);
+      const bNum = normalizeText(b.numero);
+      return aNum.localeCompare(bNum, undefined, { numeric: true, sensitivity: 'base' });
+    });
+  }, [filteredEnvios]);
+
+  const handleSelectServicioPorExpediente = () => {
+    const needle = normalizeExpediente(expedienteQuery);
+    const match = serviciosInfo.find((s) => normalizeExpediente(s.expediente) === needle);
+    if (!needle || !match) {
+      setExpedienteError('Expediente no encontrado');
+      setNewEnvio((prev) => ({ ...prev, servicio: '' }));
+      return;
+    }
+    setExpedienteError(null);
+    setNewEnvio((prev) => ({
+      ...prev,
+      servicio: match.id,
+      cliente: match.cliente || prev.cliente,
+      telefono: match.telefono || prev.telefono,
+      direccion: match.direccion || prev.direccion,
+      poblacion: match.poblacion || prev.poblacion,
+      codigoPostal: match.codigoPostal || prev.codigoPostal,
+      provincia: match.provincia || prev.provincia,
+    }));
+  };
 
   if (loading) {
     return (
@@ -215,7 +269,7 @@ export default function Envios() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Buscar por seguimiento, material o producto..."
+              placeholder="Buscar por número, seguimiento o producto..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-full focus:ring-2 focus:ring-brand-primary focus:border-transparent"
@@ -250,18 +304,18 @@ export default function Envios() {
                   Fecha de Envío
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Material
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Producto
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Fecha Cambio
                 </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Detalles
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredEnvios.length === 0 ? (
+              {sortedEnvios.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center">
                     <Package className="mx-auto h-12 w-12 text-gray-400" />
@@ -271,53 +325,35 @@ export default function Envios() {
                   </td>
                 </tr>
               ) : (
-                filteredEnvios.map((envio) => (
+                sortedEnvios.map((envio) => (
                   <tr key={envio.id} className="hover:bg-gray-50">
                     {/* Seguimiento */}
                     <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">
-                      {editing && editing.id === envio.id && editing.field === 'seguimiento' ? (
-                        <input
-                          type="text"
-                          value={editing.value}
-                          onChange={handleChange}
-                          onBlur={handleBlur}
-                          disabled={saving}
-                          autoFocus
-                          className="border rounded px-2 py-1 text-sm w-32"
-                        />
-                      ) : (
-                        <span
-                          onClick={() => handleEdit(envio.id, 'seguimiento', envio.seguimiento || '')}
-                          className="cursor-pointer hover:underline"
-                        >
-                          {envio.seguimiento || '-'}
-                        </span>
+                      {(() => {
+                        const trackingUrl = envio.seguimiento || (envio.numero ? `${TRACKING_BASE}${envio.numero}` : undefined);
+                        if (!trackingUrl) return '-';
+                        return (
+                          <a
+                            href={trackingUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-brand-primary hover:text-brand-primary/80"
+                            title="Abrir seguimiento"
+                          >
+                            Ver seguimiento
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        );
+                      })()}
+                      {envio.numero && (
+                        <div className="text-xs text-gray-500">Nº {envio.numero}</div>
                       )}
                     </td>
                     {/* Servicio */}
                     <td className="px-4 py-3 text-sm text-gray-900">
-                      {editing && editing.id === envio.id && editing.field === 'servicio' ? (
-                        <select
-                          value={editing.value}
-                          onChange={handleChange}
-                          onBlur={handleBlur}
-                          disabled={saving}
-                          autoFocus
-                          className="border rounded px-2 py-1 text-sm"
-                        >
-                          <option value="">Seleccionar servicio</option>
-                          {servicios.map((s) => (
-                            <option key={s.id} value={s.id}>{s.nombre}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span
-                          onClick={() => handleEdit(envio.id, 'servicio', envio.servicio || '')}
-                          className="cursor-pointer hover:underline"
-                        >
-                          {servicios.find(s => s.id === envio.servicio)?.nombre || '-'}
-                        </span>
-                      )}
+                      <span>
+                        {servicios.find(s => s.id === envio.servicio)?.nombre || '-'}
+                      </span>
                     </td>
                     {/* Estado */}
                     <td className="px-4 py-3 whitespace-nowrap">
@@ -331,9 +367,9 @@ export default function Envios() {
                           className="border rounded px-2 py-1 text-sm"
                         >
                           <option value="">Seleccionar</option>
-                          <option value="Envío creado">Envío creado</option>
-                          <option value="Paquete recogido">Paquete recogido</option>
-                          <option value="Paquete entregado">Paquete entregado</option>
+                          {ESTADO_OPTIONS.map((opt) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
                         </select>
                       ) : (
                         <span
@@ -365,31 +401,6 @@ export default function Envios() {
                         </span>
                       )}
                     </td>
-                    {/* Material */}
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {editing && editing.id === envio.id && editing.field === 'material' ? (
-                          <select
-                            value={editing.value}
-                            onChange={handleChange}
-                            onBlur={handleBlur}
-                            disabled={saving}
-                            autoFocus
-                            className="border rounded px-2 py-1 text-sm"
-                          >
-                            <option value="">Seleccionar material</option>
-                            {materiales.map((m) => (
-                              <option key={m.id} value={m.id}>{m.numeroSerie}{m.producto ? ` - ${m.producto}` : ''}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span
-                            onClick={() => handleEdit(envio.id, 'material', envio.material || '')}
-                            className="cursor-pointer hover:underline"
-                          >
-                            {getMaterialLabel(envio.material || '')}
-                          </span>
-                        )}
-                      </td>
                     {/* Producto (solo lectura) */}
                     <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
                       {envio.producto || '-'}
@@ -397,6 +408,16 @@ export default function Envios() {
                     {/* Fecha Cambio (solo lectura) */}
                     <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
                       {formatDate(envio.fechaCambio)}
+                    </td>
+                    {/* Detalles */}
+                    <td className="px-4 py-3 text-sm text-right">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedEnvio(envio)}
+                        className="text-brand-primary hover:text-brand-primary/80 font-medium"
+                      >
+                        Ver detalles
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -422,14 +443,35 @@ export default function Envios() {
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
-                if (!newEnvio.seguimiento?.trim() || !newEnvio.servicio || !newEnvio.material) return;
+                if (!newEnvio.servicio) return;
                 setCreating(true);
                 try {
                   // Crear el envío en Airtable
-                  await airtableService.createEnvio({ ...newEnvio });
+                  const numeroAuto = expedienteQuery?.trim() ? expedienteQuery.trim() : undefined;
+                  await airtableService.createEnvio({
+                    numero: numeroAuto,
+                    servicio: newEnvio.servicio || '',
+                    catalogo: newEnvio.catalogo,
+                    cliente: newEnvio.cliente,
+                    direccion: newEnvio.direccion,
+                    poblacion: newEnvio.poblacion,
+                    codigoPostal: newEnvio.codigoPostal,
+                    provincia: newEnvio.provincia,
+                    telefono: newEnvio.telefono,
+                  });
                   await fetchEnvios();
-                  setNewEnvio({ seguimiento: '', servicio: '', estado: 'Envío creado', fechaEnvio: '', material: '' });
-                  setMaterialSN('');
+                  setNewEnvio({
+                    servicio: '',
+                    catalogo: '',
+                    cliente: '',
+                    direccion: '',
+                    poblacion: '',
+                    codigoPostal: '',
+                    provincia: '',
+                    telefono: '',
+                  });
+                  setExpedienteQuery('');
+                  setExpedienteError(null);
                   setShowModal(false);
                 } catch (error) {
                   alert('Error al crear el envío.');
@@ -440,83 +482,132 @@ export default function Envios() {
               className="space-y-4"
             >
               <div>
-                <label htmlFor="seguimiento" className="block text-sm font-medium text-gray-700 mb-1">
-                  Seguimiento *
+                <label htmlFor="expediente" className="block text-sm font-medium text-gray-700 mb-1">
+                  Expediente *
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    id="expediente"
+                    value={expedienteQuery}
+                    onChange={(e) => {
+                      setExpedienteQuery(e.target.value);
+                      setExpedienteError(null);
+                    }}
+                    onBlur={handleSelectServicioPorExpediente}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                    placeholder="Introduce el expediente"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSelectServicioPorExpediente}
+                    className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg border border-gray-300 hover:bg-gray-200"
+                  >
+                    Buscar
+                  </button>
+                </div>
+                {expedienteError && <p className="text-xs text-red-600 mt-1">{expedienteError}</p>}
+                {newEnvio.servicio && !expedienteError && (
+                  <p className="text-xs text-green-600 mt-1">Expediente vinculado</p>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="cliente" className="block text-sm font-medium text-gray-700 mb-1">
+                    Cliente
+                  </label>
+                  <input
+                    type="text"
+                    id="cliente"
+                    value={newEnvio.cliente || ''}
+                    onChange={(e) => setNewEnvio((prev) => ({ ...prev, cliente: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                    placeholder="Nombre del cliente"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="telefono" className="block text-sm font-medium text-gray-700 mb-1">
+                    Teléfono
+                  </label>
+                  <input
+                    type="tel"
+                    id="telefono"
+                    value={newEnvio.telefono || ''}
+                    onChange={(e) => setNewEnvio((prev) => ({ ...prev, telefono: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                    placeholder="Teléfono de contacto"
+                  />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="direccion" className="block text-sm font-medium text-gray-700 mb-1">
+                  Dirección
                 </label>
                 <input
                   type="text"
-                  id="seguimiento"
-                  required
-                  value={newEnvio.seguimiento}
-                  onChange={(e) => setNewEnvio((prev) => ({ ...prev, seguimiento: e.target.value }))}
+                  id="direccion"
+                  value={newEnvio.direccion || ''}
+                  onChange={(e) => setNewEnvio((prev) => ({ ...prev, direccion: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
-                  placeholder="Código de seguimiento"
+                  placeholder="Dirección completa"
                 />
               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="poblacion" className="block text-sm font-medium text-gray-700 mb-1">
+                    Población
+                  </label>
+                  <input
+                    type="text"
+                    id="poblacion"
+                    value={newEnvio.poblacion || ''}
+                    onChange={(e) => setNewEnvio((prev) => ({ ...prev, poblacion: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                    placeholder="Ciudad"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="codigoPostal" className="block text-sm font-medium text-gray-700 mb-1">
+                    Código postal
+                  </label>
+                  <input
+                    type="text"
+                    id="codigoPostal"
+                    value={newEnvio.codigoPostal || ''}
+                    onChange={(e) => setNewEnvio((prev) => ({ ...prev, codigoPostal: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                    placeholder="CP"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="provincia" className="block text-sm font-medium text-gray-700 mb-1">
+                    Provincia
+                  </label>
+                  <input
+                    type="text"
+                    id="provincia"
+                    value={newEnvio.provincia || ''}
+                    onChange={(e) => setNewEnvio((prev) => ({ ...prev, provincia: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                    placeholder="Provincia"
+                  />
+                </div>
+              </div>
               <div>
-                <label htmlFor="servicio" className="block text-sm font-medium text-gray-700 mb-1">
-                  Servicio *
+                <label htmlFor="catalogo" className="block text-sm font-medium text-gray-700 mb-1">
+                  Catálogo
                 </label>
                 <select
-                  id="servicio"
-                  required
-                  value={newEnvio.servicio}
-                  onChange={(e) => setNewEnvio((prev) => ({ ...prev, servicio: e.target.value }))}
+                  id="catalogo"
+                  value={newEnvio.catalogo || ''}
+                  onChange={(e) => setNewEnvio((prev) => ({ ...prev, catalogo: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
                 >
-                  <option value="">Seleccionar servicio</option>
-                  {servicios.map((s) => (
-                    <option key={s.id} value={s.id}>{s.nombre}</option>
+                  <option value="">Seleccionar producto</option>
+                  {catalogos.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <label htmlFor="material" className="block text-sm font-medium text-gray-700 mb-1">
-                  Material (S/N) *
-                </label>
-                <input
-                  type="text"
-                  id="material"
-                  required
-                  list="materiales-list"
-                  value={materialSN}
-                  onChange={(e) => {
-                    const sn = e.target.value.trim();
-                    setMaterialSN(sn);
-                    // Buscar el material que coincida con el S/N (ignorando espacios y mayúsculas)
-                    const material = materiales.find(m => 
-                      String(m.numeroSerie || '').trim().toLowerCase() === sn.toLowerCase()
-                    );
-                    setNewEnvio((prev) => ({ ...prev, material: material?.id || '' }));
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
-                  placeholder="Escribir número de serie"
-                />
-                <datalist id="materiales-list">
-                  {materiales.map((m) => (
-                    <option key={m.id} value={m.numeroSerie}>{m.producto}</option>
-                  ))}
-                </datalist>
-                {materialSN && !materiales.find(m => String(m.numeroSerie || '').trim().toLowerCase() === materialSN.trim().toLowerCase()) && (
-                  <p className="text-xs text-red-600 mt-1">S/N no encontrado en inventario</p>
-                )}
-                {materialSN && materiales.find(m => String(m.numeroSerie || '').trim().toLowerCase() === materialSN.trim().toLowerCase()) && (
-                  <p className="text-xs text-green-600 mt-1">
-                    ✓ {materiales.find(m => String(m.numeroSerie || '').trim().toLowerCase() === materialSN.trim().toLowerCase())?.producto || 'Material encontrado'}
-                  </p>
-                )}
-              </div>
-              <div>
-                <label htmlFor="fechaEnvio" className="block text-sm font-medium text-gray-700 mb-1">
-                  Fecha de Envío
-                </label>
-                <input
-                  type="date"
-                  id="fechaEnvio"
-                  value={newEnvio.fechaEnvio}
-                  onChange={(e) => setNewEnvio((prev) => ({ ...prev, fechaEnvio: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
-                />
               </div>
               <div className="flex gap-3 pt-4">
                 <button
@@ -528,13 +619,78 @@ export default function Envios() {
                 </button>
                 <button
                   type="submit"
-                  disabled={creating || !newEnvio.seguimiento?.trim() || !newEnvio.servicio || !newEnvio.material}
+                  disabled={creating || !newEnvio.servicio}
                   className="flex-1 px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {creating ? 'Creando...' : 'Crear Envío'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de detalles */}
+      {selectedEnvio && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedEnvio(null)}>
+          <div
+            className="bg-white rounded-xl max-w-xl w-full p-6 relative shadow-lg"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setSelectedEnvio(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+              aria-label="Cerrar"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Detalles del envío</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs uppercase text-gray-500">Número</p>
+                <p className="text-sm text-gray-900">{selectedEnvio.numero || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-gray-500">Estado</p>
+                <p className="text-sm text-gray-900">{selectedEnvio.estado || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-gray-500">Cliente</p>
+                <p className="text-sm text-gray-900">{selectedEnvio.cliente || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-gray-500">Teléfono</p>
+                <p className="text-sm text-gray-900">{selectedEnvio.telefono || '-'}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-xs uppercase text-gray-500">Dirección</p>
+                <p className="text-sm text-gray-900">{selectedEnvio.direccion || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-gray-500">Población</p>
+                <p className="text-sm text-gray-900">{selectedEnvio.poblacion || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-gray-500">Código postal</p>
+                <p className="text-sm text-gray-900">{selectedEnvio.codigoPostal || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-gray-500">Provincia</p>
+                <p className="text-sm text-gray-900">{selectedEnvio.provincia || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-gray-500">Transporte</p>
+                <p className="text-sm text-gray-900">{selectedEnvio.transporte || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase text-gray-500">Catálogo</p>
+                <p className="text-sm text-gray-900">{getCatalogoNombre(selectedEnvio.catalogo) || selectedEnvio.catalogo || '-'}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-xs uppercase text-gray-500">Comentarios</p>
+                <p className="text-sm text-gray-900 whitespace-pre-line">{selectedEnvio.comentarios || '-'}</p>
+              </div>
+            </div>
           </div>
         </div>
       )}
