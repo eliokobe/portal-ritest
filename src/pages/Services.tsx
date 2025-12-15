@@ -652,7 +652,11 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Buscar por expediente, nombre, teléfono, dirección, estado o estado Ipas..."
+              placeholder={
+                isTramitacion
+                  ? 'Buscar por expediente, nombre, teléfono, dirección o estado...'
+                  : 'Buscar por expediente, nombre, teléfono, dirección, estado o estado Ipas...'
+              }
               value={searchTerm}
               onChange={(event: ChangeEvent<HTMLInputElement>) => setSearchTerm(event.target.value)}
               className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-full focus:ring-2 focus:ring-brand-primary focus:border-transparent"
@@ -703,7 +707,9 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Registro</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Nombre</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{isTramitacion ? 'Estado' : 'Teléfono'}</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{isTramitacion ? 'Estado Ipas' : 'Estado'}</th>
+                  {!isTramitacion && (
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                  )}
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{isTramitacion ? 'Tramitado' : 'Último Cambio'}</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                 </tr>
@@ -717,11 +723,9 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
                     <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
                       {isTramitacion ? (service.estado || '-') : (service.telefono || '-')}
                     </td>
-                    <td className="px-4 py-3">
-                      {isTramitacion ? (
-                        <div className="text-sm text-gray-900 truncate">{service.estadoIpas || 'Sin estado'}</div>
-                      ) : (
-                        editingField?.id === service.id && editingField?.field === 'estado' ? (
+                    {!isTramitacion && (
+                      <td className="px-4 py-3">
+                        {editingField?.id === service.id && editingField?.field === 'estado' ? (
                           <div className="flex items-center gap-1">
                             <select
                               value={editValue}
@@ -731,10 +735,9 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
                               autoFocus
                             >
                               <option value="">Seleccionar...</option>
-                              {/* Todos los usuarios pueden seleccionar cualquier estado */}
-                              {STATUS_OPTIONS.map((opt: string) => 
+                              {STATUS_OPTIONS.map((opt: string) => (
                                 <option key={opt} value={opt}>{opt}</option>
-                              )}
+                              ))}
                             </select>
                             <button onClick={() => handleSave(service.id, 'estado')} disabled={saving} className="text-green-600 hover:text-green-800 flex-shrink-0">
                               <Check className="h-4 w-4" />
@@ -750,9 +753,9 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
                           >
                             {service.estado || 'Sin estado'}
                           </div>
-                        )
-                      )}
-                    </td>
+                        )}
+                      </td>
+                    )}
                     {isTramitacion ? (
                       <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
                         <button
