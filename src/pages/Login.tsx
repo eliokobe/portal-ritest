@@ -32,7 +32,7 @@ const Login: React.FC = () => {
       <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8">
         <div className="text-center mb-8">
           <img src="/ritest-logo.png" alt="Ritest" className="mx-auto mb-4 w-32 h-auto" />
-          <p className="text-gray-600 mt-2">Portal para el personal administrativo</p>
+          <p className="text-gray-600 mt-2">Portal de Gestión Operativa</p>
         </div>
 
         {error && (
