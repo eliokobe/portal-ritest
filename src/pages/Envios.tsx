@@ -64,6 +64,8 @@ export default function Envios() {
   const [showModal, setShowModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [selectedEnvio, setSelectedEnvio] = useState<Envio | null>(null);
+  const [commentDraft, setCommentDraft] = useState('');
+  const [savingComment, setSavingComment] = useState(false);
   const [newEnvio, setNewEnvio] = useState<Omit<Envio, 'id'>>({
     servicio: '',
     catalogo: '',
@@ -94,13 +96,18 @@ export default function Envios() {
   const fetchEnvios = async () => {
     try {
       const data = await airtableService.getEnvios();
-      setEnvios(data);
+      setEnvios(data as Envio[]);
     } catch (error) {
       console.error('Error fetching envíos:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // Sync draft when modal opens
+    setCommentDraft(selectedEnvio?.comentarios || '');
+  }, [selectedEnvio?.id]);
 
   const fetchServicios = async () => {
     try {
@@ -253,6 +260,20 @@ export default function Envios() {
     } finally {
       setEditing(null);
       setSaving(false);
+    }
+  };
+
+  const handleSaveComment = async () => {
+    if (!selectedEnvio) return;
+    setSavingComment(true);
+    try {
+      await airtableService.updateEnvio(selectedEnvio.id, { comentarios: commentDraft });
+      setEnvios((prev) => prev.map((e) => (e.id === selectedEnvio.id ? { ...e, comentarios: commentDraft } : e)));
+      setSelectedEnvio((prev) => (prev ? { ...prev, comentarios: commentDraft } : prev));
+    } catch (error) {
+      alert('Error al guardar los comentarios');
+    } finally {
+      setSavingComment(false);
     }
   };
 
@@ -688,7 +709,31 @@ export default function Envios() {
               </div>
               <div className="sm:col-span-2">
                 <p className="text-xs uppercase text-gray-500">Comentarios</p>
-                <p className="text-sm text-gray-900 whitespace-pre-line">{selectedEnvio.comentarios || '-'}</p>
+                <textarea
+                  value={commentDraft}
+                  onChange={(e) => setCommentDraft(e.target.value)}
+                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                  rows={4}
+                  placeholder="Añade comentarios"
+                />
+                <div className="mt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCommentDraft(selectedEnvio.comentarios || '')}
+                    className="px-3 py-1 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    disabled={savingComment}
+                  >
+                    Deshacer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveComment}
+                    className="px-4 py-1.5 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={savingComment}
+                  >
+                    {savingComment ? 'Guardando...' : 'Guardar comentarios'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

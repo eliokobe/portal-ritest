@@ -142,7 +142,6 @@ type ServicioListado = {
   fechaInstalacion?: string;
   referencia?: string;
   conversationId?: string;
-  sincronizado?: boolean;
   tramitado?: boolean;
 };
 
@@ -220,11 +219,8 @@ async function fetchServicesByTable(params: {
       // Para tramitaciones usamos campo "Tramitado" (checkbox) pendiente
       if (serviciosFieldNames.has('Tramitado')) {
         formulaParts.push('OR({Tramitado}=BLANK(), {Tramitado}=FALSE())');
-      } else if (serviciosFieldNames.has('Sincronizado')) {
-        // Fallback legacy
-        formulaParts.push('OR({Sincronizado}=BLANK(), {Sincronizado}=FALSE())');
       } else {
-        console.warn(`[Airtable] La tabla ${tableName} no tiene campo "Tramitado" ni "Sincronizado"; no se aplicará filtro de sincronización.`);
+        console.warn(`[Airtable] La tabla ${tableName} no tiene campo "Tramitado"; no se aplicará filtro de sincronización.`);
       }
     }
 
@@ -286,7 +282,6 @@ async function fetchServicesByTable(params: {
         fechaInstalacion: f['Fecha instalación'] ?? f['Fecha instalacion'] ?? f['Installation Date'],
         referencia: f['Referencia'] ?? f['Reference'],
         conversationId: f['Conversation id'] ?? f['Conversation ID'] ?? f['ConversationId'],
-        sincronizado: f['Sincronizado'] ?? false,
         tramitado: f['Tramitado'] ?? false,
       };
     });
@@ -386,7 +381,7 @@ export const airtableService = {
     resolvedByDay: { date: string; count: number }[];
   }> {
     try {
-      const records = await fetchAllServicios('Servicios', { pageSize: 100 });
+      const records = await fetchAllServicios(AIRTABLE_SERVICES_TABLE, { pageSize: 100 });
       const now = new Date();
       const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
       
@@ -459,12 +454,11 @@ export const airtableService = {
     synchronizedTodayCount: number;
   }> {
     try {
-      const records = await fetchAllServicios('Servicios', { pageSize: 100 });
+      const records = await fetchAllServicios(AIRTABLE_SERVICES_TABLE, { pageSize: 100 });
       const today = new Date().toISOString().split('T')[0];
       const estadosPermitidos = [
         'Formulario completado',
         'Llamado',
-        'Pendiente Presupuesto',
         'Pendiente presupuesto',
         'Citado',
         'Material enviado',
@@ -477,7 +471,7 @@ export const airtableService = {
       
       records.forEach((r: any) => {
         const f = r.fields ?? {};
-        const tramitado = f['Tramitado'] ?? f['Sincronizado'] ?? f['Sincronizado '];
+        const tramitado = f['Tramitado'];
         const fechaSincronizacion = f['Fecha sincronización'] ?? f['Fecha sincronizacion'];
         const estado = f['Estado'];
         const estadoOk = estado && estadosPermitidos.includes(estado);
@@ -520,7 +514,7 @@ export const airtableService = {
       // Traer TODOS los servicios sin filtros
       let records: any[] = [];
       try {
-        records = await fetchAllServicios('Servicios', {
+        records = await fetchAllServicios(AIRTABLE_SERVICES_TABLE, {
           pageSize: 100,
         });
         console.log('Total de registros obtenidos:', records.length);
@@ -993,7 +987,7 @@ export const airtableService = {
     workerEmail?: string,
     options?: { onlyUnsynced?: boolean },
   ): Promise<ServicioListado[]> {
-    // Tramitaciones usan la misma tabla "Servicios"; se filtra por sincronizado si aplica.
+    // Tramitaciones usan la misma tabla "Servicios"; se filtra por Tramitado pendiente si aplica.
     const { onlyUnsynced = true } = options || {};
     return fetchServicesByTable({ tableName: AIRTABLE_SERVICES_TABLE, clinic, workerId, workerEmail, onlyUnsynced });
   },
@@ -1031,7 +1025,7 @@ export const airtableService = {
   },
 
   // Actualizar campo genérico de un servicio
-  async updateServiceField(serviceId: string, field: string, value: string | string[] | boolean, tableName: string = AIRTABLE_SERVICES_TABLE): Promise<void> {
+  async updateServiceField(serviceId: string, field: string, value: string | string[] | boolean | null, tableName: string = AIRTABLE_SERVICES_TABLE): Promise<void> {
     try {
       const fieldMap: Record<string, string> = {
         estado: 'Estado',
@@ -1043,7 +1037,6 @@ export const airtableService = {
         citaTecnico: 'Cita técnico',
         trabajadorId: 'Trabajador',
         motivoCancelacion: 'Motivo cancelación',
-        sincronizado: 'Sincronizado',
       };
       
       const airtableField = fieldMap[field] || field;
