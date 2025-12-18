@@ -594,7 +594,17 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
   const formatDateTime = (dateString?: string) => {
     if (!dateString) return '-';
     try {
-      const date = new Date(dateString);
+      // Parsear la fecha manteniendo la hora exacta sin conversión de zona horaria
+      let date: Date;
+      if (dateString.includes('T')) {
+        // Si ya tiene formato ISO, extraer componentes directamente para evitar conversión
+        const [datePart, timePart] = dateString.split('T');
+        const [year, month, day] = datePart.split('-').map(Number);
+        const [hours, minutes] = timePart.split(':').map(Number);
+        date = new Date(year, month - 1, day, hours, minutes);
+      } else {
+        date = new Date(dateString);
+      }
       const day = String(date.getDate()).padStart(2, '0');
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const year = date.getFullYear();
@@ -609,8 +619,12 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
   const formatDateTimeForInput = (dateString?: string) => {
     if (!dateString) return '';
     try {
+      // Si ya está en formato ISO, extraer directamente sin conversión de zona horaria
+      if (dateString.includes('T')) {
+        return dateString.substring(0, 16); // YYYY-MM-DDTHH:MM
+      }
+      // Si es una fecha sin hora, usar el formato directo
       const date = new Date(dateString);
-      // Format to YYYY-MM-DDTHH:MM for datetime-local input
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
@@ -1069,11 +1083,15 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
                         onBlur={async (e) => {
                           const newValue = e.target.value;
                           if (newValue === formatDateTimeForInput(selectedService.cita)) return;
+                          if (!newValue) return;
                           setSaving(true);
                           try {
-                            await airtableService.updateServiceField(selectedService.id, 'Cita', newValue);
-                            setServices(services.map(s => s.id === selectedService.id ? {...s, cita: newValue} : s));
-                            setSelectedService({...selectedService, cita: newValue});
+                            // Convertir YYYY-MM-DDTHH:MM a ISO manteniendo la hora exacta seleccionada
+                            // Agregamos ':00' para segundos y guardamos sin zona horaria
+                            const isoString = newValue + ':00';
+                            await airtableService.updateServiceField(selectedService.id, 'Cita', isoString);
+                            setServices(services.map(s => s.id === selectedService.id ? {...s, cita: isoString} : s));
+                            setSelectedService({...selectedService, cita: isoString});
                           } catch (error) {
                             console.error('Error:', error);
                             alert('Error al guardar');
