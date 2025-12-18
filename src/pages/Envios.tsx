@@ -17,7 +17,7 @@ const GESTORA_OPERATIVA_FILTROS = [
 ];
 
 const TRACKING_BASE = 'https://app.cttexpress.com/Forms/Destinatarios.aspx?c=00828000964&r=IL88P';
-const ESTADO_OPTIONS = ['Envío creado', 'Listo para enviar', 'Enviado', 'Entregado'];
+const ESTADO_OPTIONS = ['Envío creado', 'Listo para enviar', 'Enviado', 'Entregado', 'Devuelto', 'Reclamado', 'Recogida hecha', 'Pendiente recogida', 'Recogida enviada'];
 
 const normalizeText = (value?: string | number) => (value ?? '').toString().toLowerCase();
 const normalizeExpediente = (value?: string | number) => (value ?? '').toString().replace(/\s+/g, '').toLowerCase();
@@ -66,6 +66,8 @@ export default function Envios() {
   const [selectedEnvio, setSelectedEnvio] = useState<Envio | null>(null);
   const [commentDraft, setCommentDraft] = useState('');
   const [savingComment, setSavingComment] = useState(false);
+  const [transporteDraft, setTransporteDraft] = useState('');
+  const [savingTransporte, setSavingTransporte] = useState(false);
   const [newEnvio, setNewEnvio] = useState<Omit<Envio, 'id'>>({
     servicio: '',
     catalogo: '',
@@ -107,6 +109,7 @@ export default function Envios() {
   useEffect(() => {
     // Sync draft when modal opens
     setCommentDraft(selectedEnvio?.comentarios || '');
+    setTransporteDraft(selectedEnvio?.transporte || '');
   }, [selectedEnvio?.id]);
 
   const fetchServicios = async () => {
@@ -183,12 +186,25 @@ export default function Envios() {
         return 'bg-indigo-100 text-indigo-800';
       case 'Entregado':
         return 'bg-green-200 text-green-900';
+      case 'Devuelto':
+        return 'bg-red-100 text-red-800';
+      case 'Reclamado':
+        return 'bg-orange-100 text-orange-800';
+      case 'Recogida hecha':
+        return 'bg-green-100 text-green-800';
+      case 'Pendiente recogida':
+        return 'bg-purple-100 text-purple-800';
+      case 'Recogida enviada':
+        return 'bg-teal-100 text-teal-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
   };
 
   const filteredEnvios = envios.filter(envio => {
+    // Excluir envíos con estado "Entregado"
+    if (envio.estado === 'Entregado') return false;
+    
     if (!searchTerm) return true;
     const needle = searchTerm.toLowerCase();
     return (
@@ -274,6 +290,20 @@ export default function Envios() {
       alert('Error al guardar los comentarios');
     } finally {
       setSavingComment(false);
+    }
+  };
+
+  const handleSaveTransporte = async () => {
+    if (!selectedEnvio) return;
+    setSavingTransporte(true);
+    try {
+      await airtableService.updateEnvio(selectedEnvio.id, { transporte: transporteDraft });
+      setEnvios((prev) => prev.map((e) => (e.id === selectedEnvio.id ? { ...e, transporte: transporteDraft } : e)));
+      setSelectedEnvio((prev) => (prev ? { ...prev, transporte: transporteDraft } : prev));
+    } catch (error) {
+      alert('Error al guardar el transporte');
+    } finally {
+      setSavingTransporte(false);
     }
   };
 
@@ -700,12 +730,44 @@ export default function Envios() {
                 <p className="text-sm text-gray-900">{selectedEnvio.provincia || '-'}</p>
               </div>
               <div>
-                <p className="text-xs uppercase text-gray-500">Transporte</p>
-                <p className="text-sm text-gray-900">{selectedEnvio.transporte || '-'}</p>
+                <p className="text-xs uppercase text-gray-500">Referencia</p>
+                <p className="text-sm text-gray-900">{selectedEnvio.referencia || '-'}</p>
               </div>
               <div>
                 <p className="text-xs uppercase text-gray-500">Catálogo</p>
                 <p className="text-sm text-gray-900">{getCatalogoNombre(selectedEnvio.catalogo) || selectedEnvio.catalogo || '-'}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-xs uppercase text-gray-500 mb-1">Transporte</p>
+                <select
+                  value={transporteDraft}
+                  onChange={(e) => setTransporteDraft(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                >
+                  <option value="">Seleccionar transporte</option>
+                  <option value="Inbound Logística">Inbound Logística</option>
+                  <option value="Revalco">Revalco</option>
+                  <option value="Saltoki">Saltoki</option>
+                  <option value="Packlink">Packlink</option>
+                </select>
+                <div className="mt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTransporteDraft(selectedEnvio.transporte || '')}
+                    className="px-3 py-1 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    disabled={savingTransporte}
+                  >
+                    Deshacer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveTransporte}
+                    className="px-4 py-1.5 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={savingTransporte}
+                  >
+                    {savingTransporte ? 'Guardando...' : 'Guardar transporte'}
+                  </button>
+                </div>
               </div>
               <div className="sm:col-span-2">
                 <p className="text-xs uppercase text-gray-500">Comentarios</p>
