@@ -683,9 +683,9 @@ export default function Envios() {
 
       {/* Modal de detalles */}
       {selectedEnvio && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedEnvio(null)}>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto" onClick={() => setSelectedEnvio(null)}>
           <div
-            className="bg-white rounded-xl max-w-xl w-full p-6 relative shadow-lg"
+            className="bg-white rounded-xl max-w-xl w-full p-6 relative shadow-lg my-8 max-h-[calc(100vh-4rem)] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <button
