@@ -594,17 +594,8 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
   const formatDateTime = (dateString?: string) => {
     if (!dateString) return '-';
     try {
-      // Parsear la fecha manteniendo la hora exacta sin conversión de zona horaria
-      let date: Date;
-      if (dateString.includes('T')) {
-        // Si ya tiene formato ISO, extraer componentes directamente para evitar conversión
-        const [datePart, timePart] = dateString.split('T');
-        const [year, month, day] = datePart.split('-').map(Number);
-        const [hours, minutes] = timePart.split(':').map(Number);
-        date = new Date(year, month - 1, day, hours, minutes);
-      } else {
-        date = new Date(dateString);
-      }
+      // Parsear la fecha ISO (viene en UTC) y convertir a hora local
+      const date = new Date(dateString);
       const day = String(date.getDate()).padStart(2, '0');
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const year = date.getFullYear();
@@ -619,12 +610,9 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
   const formatDateTimeForInput = (dateString?: string) => {
     if (!dateString) return '';
     try {
-      // Si ya está en formato ISO, extraer directamente sin conversión de zona horaria
-      if (dateString.includes('T')) {
-        return dateString.substring(0, 16); // YYYY-MM-DDTHH:MM
-      }
-      // Si es una fecha sin hora, usar el formato directo
+      // Parsear la fecha ISO (viene en UTC de Airtable)
       const date = new Date(dateString);
+      // Convertir a hora local para el input
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
@@ -1086,9 +1074,14 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
                           if (!newValue) return;
                           setSaving(true);
                           try {
-                            // Convertir YYYY-MM-DDTHH:MM a ISO manteniendo la hora exacta seleccionada
-                            // Agregamos ':00' para segundos y guardamos sin zona horaria
-                            const isoString = newValue + ':00';
+                            // Crear fecha desde el input y convertir a UTC sin cambiar la hora mostrada
+                            // El input da formato YYYY-MM-DDTHH:MM en hora local
+                            const localDate = new Date(newValue);
+                            // Obtener el offset de zona horaria en minutos y restarlo para compensar
+                            const offsetMinutes = localDate.getTimezoneOffset();
+                            // Crear nueva fecha restando el offset (si GMT+1, offset es -60, así que sumamos 60 min)
+                            const utcDate = new Date(localDate.getTime() - (offsetMinutes * 60 * 1000));
+                            const isoString = utcDate.toISOString();
                             await airtableService.updateServiceField(selectedService.id, 'Cita', isoString);
                             setServices(services.map(s => s.id === selectedService.id ? {...s, cita: isoString} : s));
                             setSelectedService({...selectedService, cita: isoString});
