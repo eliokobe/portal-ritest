@@ -177,24 +177,20 @@ async function fetchServicesByTable(params: {
 
     if (workerEmail) {
       const emailEsc = escapeFormulaString(workerEmail);
-      const emailField = pickExistingField([
-        'Email trabajador',
-        'Email Trabajador',
-        'Correo trabajador',
-        'Correo Trabajador',
-        'Email',
-        'Correo',
-      ]);
+      // Forzar el uso de "Email trabajador" (lookup field, siempre es array)
+      const emailField = 'Email trabajador';
 
-      if (emailField) {
-        if (isArrayField(emailField)) {
-          formulaParts.push(`FIND('${emailEsc}', ARRAYJOIN({${emailField}}, ','))`);
-        } else {
-          formulaParts.push(`FIND('${emailEsc}', {${emailField}})`);
-        }
-      } else {
-        console.warn(`[Airtable] No existe columna de email del trabajador en ${tableName}; se omite filtro por email.`);
-      }
+      console.log('[Airtable] Filtrando por email trabajador:', {
+        workerEmail,
+        emailEsc,
+        emailField,
+        tableName
+      });
+
+      // Email trabajador es un lookup, por lo tanto es un array
+      // Usar FIND para buscar el email en el array del lookup
+      formulaParts.push(`FIND('${emailEsc}', ARRAYJOIN({${emailField}}, ',')) > 0`);
+      console.log('[Airtable] Fórmula de filtro por email añadida:', formulaParts[formulaParts.length - 1]);
     } else if (workerId) {
       const workerIdEsc = escapeFormulaString(workerId);
       const workerField = pickExistingField([
@@ -227,6 +223,14 @@ async function fetchServicesByTable(params: {
     if (formulaParts.length > 0) {
       queryParams.filterByFormula = formulaParts.length === 1 ? formulaParts[0] : `AND(${formulaParts.join(', ')})`;
     }
+
+    console.log('[Airtable] Filtro final construido:', {
+      tableName,
+      clinic,
+      workerEmail,
+      workerId,
+      filterByFormula: queryParams.filterByFormula || 'SIN FILTRO'
+    });
 
     let records: any[] = [];
     try {
@@ -283,6 +287,7 @@ async function fetchServicesByTable(params: {
         referencia: f['Referencia'] ?? f['Reference'],
         conversationId: f['Conversation id'] ?? f['Conversation ID'] ?? f['ConversationId'],
         tramitado: f['Tramitado'] ?? false,
+        numeroSerie: f['Número de serie'] ?? f['Numero de serie'] ?? f['S/N'] ?? f['# S/N'] ?? f['Nº Serie'] ?? f['SN'],
       };
     });
 
@@ -1347,6 +1352,9 @@ export const airtableService = {
           cuadroElectrico: f['Cuadro eléctrico'] ?? f['Electrical Panel'],
           detalles: f['Detalles'] ?? f['Details'] ?? f['Descripción'],
           foto: f['Foto'] ?? f['Photo'],
+          fotoGeneral: f['Foto'],
+          fotoEtiqueta: f['Foto de la etiqueta'] ?? f['Foto de la Etiqueta'],
+          numeroSerie: f['Número de serie'] ?? f['Numero de serie'] ?? f['S/N'] ?? f['# S/N'] ?? f['Nº Serie'] ?? f['SN'],
         };
       });
     } catch (error) {

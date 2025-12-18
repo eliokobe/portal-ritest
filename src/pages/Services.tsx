@@ -43,6 +43,7 @@ interface Service {
   tramitado?: boolean;
   codigoPostal?: string;
   provincia?: string;
+  numeroSerie?: string;
 }
 
 const STATUS_OPTIONS = [
@@ -153,9 +154,18 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
       setError(null);
       try {
         console.log(`${isTramitacion ? 'Tramitaciones' : 'Services'} - Starting to load...`);
+        console.log('User info:', { email: user?.email, role: user?.role, id: user?.id });
+        
+        // Si el usuario es Técnico, filtrar por email (campo "Email trabajador" en Airtable)
+        // Para otros roles, no aplicar filtro por trabajador
+        const workerId = undefined;
+        const workerEmail = isTecnico ? user?.email : undefined;
+        
+        console.log('Filtering with:', { workerId, workerEmail, isTecnico });
+        
         const data = isTramitacion
-          ? await airtableService.getTramitaciones(user?.clinic, user?.id, user?.email, { onlyUnsynced: true })
-          : await airtableService.getServices(user?.clinic, user?.id, user?.email);
+          ? await airtableService.getTramitaciones(user?.clinic, workerId, workerEmail, { onlyUnsynced: true })
+          : await airtableService.getServices(user?.clinic, workerId, workerEmail);
         console.log(`${isTramitacion ? 'Tramitaciones' : 'Services'} - Data received:`, data.length, 'records');
         if (isMounted) {
           setServices(data);
@@ -179,7 +189,7 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
     return () => {
       isMounted = false;
     };
-  }, [user?.clinic, user?.id, user?.email]);
+  }, [user?.clinic, user?.id, user?.email, isTecnico]);
 
   useEffect(() => {
     const loadTecnicos = async () => {
@@ -988,6 +998,10 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
                   <p className="text-xs uppercase text-gray-500">Referencia</p>
                   <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.referencia)}</p>
                 </div>
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Número de serie</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.numeroSerie)}</p>
+                </div>
               </div>
               )}
               
@@ -1720,6 +1734,53 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
                       </div>
                     ) : (
                       <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{renderDetailValue(reparaciones[selectedReparacionIndex]?.detalles)}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-1">Número de serie</h3>
+                    <p className="mt-1 text-sm text-gray-900">{renderDetailValue(reparaciones[selectedReparacionIndex]?.numeroSerie)}</p>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Foto</h3>
+                    {reparaciones[selectedReparacionIndex]?.fotoGeneral && Array.isArray(reparaciones[selectedReparacionIndex].fotoGeneral) && reparaciones[selectedReparacionIndex].fotoGeneral.length > 0 ? (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {reparaciones[selectedReparacionIndex].fotoGeneral.map((attachment: AirtableAttachment, idx: number) => (
+                          <div key={idx} className="relative group">
+                            <img
+                              src={attachment.thumbnails?.large?.url || attachment.url}
+                              alt={attachment.filename}
+                              className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={() => window.open(attachment.url, '_blank')}
+                            />
+                            <p className="text-xs text-gray-500 mt-1 truncate">{attachment.filename}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">Sin fotos</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Foto de la etiqueta</h3>
+                    {reparaciones[selectedReparacionIndex]?.fotoEtiqueta && Array.isArray(reparaciones[selectedReparacionIndex].fotoEtiqueta) && reparaciones[selectedReparacionIndex].fotoEtiqueta.length > 0 ? (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {reparaciones[selectedReparacionIndex].fotoEtiqueta.map((attachment: AirtableAttachment, idx: number) => (
+                          <div key={idx} className="relative group">
+                            <img
+                              src={attachment.thumbnails?.large?.url || attachment.url}
+                              alt={attachment.filename}
+                              className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                              onClick={() => window.open(attachment.url, '_blank')}
+                            />
+                            <p className="text-xs text-gray-500 mt-1 truncate">{attachment.filename}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">Sin fotos</p>
                     )}
                   </div>
                 </div>
