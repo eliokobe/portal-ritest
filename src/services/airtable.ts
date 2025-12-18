@@ -694,6 +694,7 @@ export const airtableService = {
     codigoPostal?: string;
     provincia?: string;
     telefono?: string;
+    referencia?: string;
   }[]> {
     try {
       const records = await fetchAllServicios(AIRTABLE_ENVIOS_TABLE, { pageSize: 100 });
@@ -704,6 +705,7 @@ export const airtableService = {
         const catalogoField = f['Catálogo'] ?? f['Catalogo'];
 
         const numeroField = f['Número'] ?? f['Numero'];
+        const referenciaField = f['Referencia'] ?? f['Reference'];
 
         return {
           id: r.id,
@@ -724,6 +726,7 @@ export const airtableService = {
           codigoPostal: f['Código postal'] ?? f['Codigo postal'],
           provincia: f['Provincia'],
           telefono: f['Teléfono'] ?? f['Telefono'],
+          referencia: Array.isArray(referenciaField) ? referenciaField[0] : referenciaField,
         };
       });
     } catch (error) {

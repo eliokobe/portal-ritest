@@ -68,6 +68,8 @@ export default function Envios() {
   const [savingComment, setSavingComment] = useState(false);
   const [transporteDraft, setTransporteDraft] = useState('');
   const [savingTransporte, setSavingTransporte] = useState(false);
+  const [catalogoDraft, setCatalogoDraft] = useState('');
+  const [savingCatalogo, setSavingCatalogo] = useState(false);
   const [newEnvio, setNewEnvio] = useState<Omit<Envio, 'id'>>({
     servicio: '',
     catalogo: '',
@@ -110,7 +112,20 @@ export default function Envios() {
     // Sync draft when modal opens
     setCommentDraft(selectedEnvio?.comentarios || '');
     setTransporteDraft(selectedEnvio?.transporte || '');
+    setCatalogoDraft(selectedEnvio?.catalogo || '');
   }, [selectedEnvio?.id]);
+
+  // Bloquear scroll del body cuando el modal está abierto
+  useEffect(() => {
+    if (selectedEnvio) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [selectedEnvio]);
 
   const fetchServicios = async () => {
     try {
@@ -304,6 +319,20 @@ export default function Envios() {
       alert('Error al guardar el transporte');
     } finally {
       setSavingTransporte(false);
+    }
+  };
+
+  const handleSaveCatalogo = async () => {
+    if (!selectedEnvio) return;
+    setSavingCatalogo(true);
+    try {
+      await airtableService.updateEnvio(selectedEnvio.id, { catalogo: catalogoDraft });
+      setEnvios((prev) => prev.map((e) => (e.id === selectedEnvio.id ? { ...e, catalogo: catalogoDraft } : e)));
+      setSelectedEnvio((prev) => (prev ? { ...prev, catalogo: catalogoDraft } : prev));
+    } catch (error) {
+      alert('Error al guardar el producto');
+    } finally {
+      setSavingCatalogo(false);
     }
   };
 
@@ -733,9 +762,36 @@ export default function Envios() {
                 <p className="text-xs uppercase text-gray-500">Referencia</p>
                 <p className="text-sm text-gray-900">{selectedEnvio.referencia || '-'}</p>
               </div>
-              <div>
-                <p className="text-xs uppercase text-gray-500">Catálogo</p>
-                <p className="text-sm text-gray-900">{getCatalogoNombre(selectedEnvio.catalogo) || selectedEnvio.catalogo || '-'}</p>
+              <div className="sm:col-span-2">
+                <p className="text-xs uppercase text-gray-500 mb-1">Producto / Catálogo</p>
+                <select
+                  value={catalogoDraft}
+                  onChange={(e) => setCatalogoDraft(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                >
+                  <option value="">Seleccionar producto</option>
+                  {catalogos.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                  ))}
+                </select>
+                <div className="mt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCatalogoDraft(selectedEnvio.catalogo || '')}
+                    className="px-3 py-1 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    disabled={savingCatalogo}
+                  >
+                    Deshacer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveCatalogo}
+                    className="px-4 py-1.5 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={savingCatalogo}
+                  >
+                    {savingCatalogo ? 'Guardando...' : 'Guardar producto'}
+                  </button>
+                </div>
               </div>
               <div className="sm:col-span-2">
                 <p className="text-xs uppercase text-gray-500 mb-1">Transporte</p>
