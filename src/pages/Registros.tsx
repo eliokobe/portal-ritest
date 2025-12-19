@@ -56,16 +56,50 @@ export default function Registros() {
   const formatDateTime = (dateString?: string) => {
     if (!dateString) return '-';
     try {
+      // Airtable devuelve ISO UTC, convertimos a hora local Europe/Madrid
       const date = new Date(dateString);
-      return date.toLocaleDateString('es-ES', {
+      return date.toLocaleString('es-ES', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
+        timeZone: 'Europe/Madrid'
       });
     } catch {
-      return dateString || '-';
+      return '-';
+    }
+  };
+
+  // Convierte de ISO UTC a formato datetime-local para el input
+  const formatDateTimeForInput = (dateString?: string) => {
+    if (!dateString) return '';
+    try {
+      // Airtable devuelve ISO UTC, necesitamos convertir a hora local para el input
+      const date = new Date(dateString);
+      // Obtener componentes en zona horaria local del navegador
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    } catch {
+      return '';
+    }
+  };
+
+  // Convierte de formato datetime-local a ISO UTC para enviar a Airtable
+  const convertLocalInputToISO = (localDateTime: string): string => {
+    if (!localDateTime) return '';
+    try {
+      // El input datetime-local está en hora local del navegador
+      // Creamos un Date que interpretará esto como hora local
+      const date = new Date(localDateTime);
+      // Convertimos a ISO UTC
+      return date.toISOString();
+    } catch {
+      return localDateTime;
     }
   };
 
@@ -117,15 +151,23 @@ export default function Registros() {
     
     setSavingCita(true);
     try {
-      await airtableService.updateRegistro(registroId, { cita: newCita });
+      // Convertir el valor del input datetime-local a formato ISO UTC
+      const citaISO = convertLocalInputToISO(newCita);
+      
+      await airtableService.updateRegistro(registroId, { cita: citaISO });
       
       setRegistros(prev => 
         prev.map(registro => 
           registro.id === registroId 
-            ? { ...registro, cita: newCita }
+            ? { ...registro, cita: citaISO }
             : registro
         )
       );
+      
+      // También actualizar el registro seleccionado en el modal si está abierto
+      if (selectedRegistro?.id === registroId) {
+        setSelectedRegistro(prev => prev ? { ...prev, cita: citaISO } : null);
+      }
       
       setEditingCita(null);
     } catch (error) {
@@ -358,7 +400,7 @@ export default function Registros() {
                         </div>
                       ) : (
                         <div
-                          className="text-sm text-gray-900 cursor-pointer hover:bg-gray-100 px-2 py-1 rounded"
+                          className="text-sm formatDateTimeForInput(registro.cita)r-pointer hover:bg-gray-100 px-2 py-1 rounded"
                           onClick={() => {
                             setEditingCita(registro.id);
                             setEditCitaValue(registro.cita || '');
@@ -504,7 +546,7 @@ export default function Registros() {
                     <button
                       onClick={() => {
                         setEditingCita(selectedRegistro.id);
-                        setEditCitaValue(selectedRegistro.cita || '');
+                        setEditCitaValue(formatDateTimeForInput(selectedRegistro.cita));
                       }}
                       className="text-xs text-brand-primary hover:text-brand-green"
                     >
@@ -514,7 +556,7 @@ export default function Registros() {
                   {editingCita === selectedRegistro.id ? (
                     <div className="space-y-2">
                       <input
-                        type="text"
+                        type="datetime-local"
                         value={editCitaValue}
                         onChange={(e) => setEditCitaValue(e.target.value)}
                         className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"

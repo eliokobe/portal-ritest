@@ -604,12 +604,16 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
   const formatDateTime = (dateString?: string) => {
     if (!dateString) return '-';
     try {
-      // Extraer directamente del string ISO sin conversión de zona horaria
-      // Formato: YYYY-MM-DDTHH:MM:SS.sssZ
-      const [datePart, timePart] = dateString.split('T');
-      const [year, month, day] = datePart.split('-');
-      const [hours, minutes] = timePart.split(':');
-      return `${day}/${month}/${year} ${hours}:${minutes}`;
+      // Airtable devuelve ISO UTC, convertimos a hora local Europe/Madrid
+      const date = new Date(dateString);
+      return date.toLocaleString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Europe/Madrid'
+      });
     } catch {
       return '-';
     }
@@ -618,11 +622,15 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
   const formatDateTimeForInput = (dateString?: string) => {
     if (!dateString) return '';
     try {
-      // Extraer directamente los componentes del string ISO sin conversión
-      // Formato: YYYY-MM-DDTHH:MM:SS.sssZ
-      const [datePart, timePart] = dateString.split('T');
-      const [hours, minutes] = timePart.split(':');
-      return `${datePart}T${hours}:${minutes}`;
+      // Airtable devuelve ISO UTC, necesitamos convertir a hora local para el input
+      const date = new Date(dateString);
+      // Obtener componentes en zona horaria local del navegador
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
     } catch {
       return '';
     }
@@ -1082,9 +1090,10 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
                           if (!newValue) return;
                           setSaving(true);
                           try {
-                            // Enviar la hora exactamente como está, sin Z (sin zona horaria)
-                            // Airtable lo interpretará como hora local
-                            const isoString = newValue + ':00';
+                            // El input datetime-local está en hora local del navegador
+                            // Convertimos a ISO UTC para enviar a Airtable
+                            const date = new Date(newValue);
+                            const isoString = date.toISOString();
                             
                             await airtableService.updateServiceField(selectedService.id, 'Cita', isoString);
                             setServices(services.map(s => s.id === selectedService.id ? {...s, cita: isoString} : s));
