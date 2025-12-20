@@ -17,6 +17,7 @@ import Registros from './pages/Registros';
 import Envios from './pages/Envios';
 import Inventario from './pages/Inventario';
 import Email from './pages/Email';
+import Agenda from './pages/Agenda';
 
 const DefaultRoute = () => {
   const { user } = useAuth();
@@ -168,6 +169,16 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <Inventario />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/agenda"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Agenda />
                   </Layout>
                 </ProtectedRoute>
               }

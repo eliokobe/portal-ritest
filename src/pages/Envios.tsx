@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Package, Plus, X, ExternalLink } from 'lucide-react';
+import { Search, Package, Plus, X, ExternalLink, Phone, MessageCircle } from 'lucide-react';
 import { airtableService } from '../services/airtable';
 import { useAuth } from '../contexts/AuthContext';
 import { Envio } from '../types';
@@ -189,31 +189,6 @@ export default function Envios() {
       month: '2-digit',
       year: 'numeric',
     });
-  };
-
-  const getEstadoColor = (estado?: string) => {
-    switch (estado) {
-      case 'Envío creado':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'Listo para enviar':
-        return 'bg-blue-100 text-blue-800';
-      case 'Enviado':
-        return 'bg-indigo-100 text-indigo-800';
-      case 'Entregado':
-        return 'bg-green-200 text-green-900';
-      case 'Devuelto':
-        return 'bg-red-100 text-red-800';
-      case 'Reclamado':
-        return 'bg-orange-100 text-orange-800';
-      case 'Recogida hecha':
-        return 'bg-green-100 text-green-800';
-      case 'Pendiente recogida':
-        return 'bg-purple-100 text-purple-800';
-      case 'Recogida enviada':
-        return 'bg-teal-100 text-teal-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
   };
 
   const filteredEnvios = envios.filter(envio => {
@@ -454,7 +429,7 @@ export default function Envios() {
                       ) : (
                         <span
                           onClick={() => handleEdit(envio.id, 'estado', envio.estado || '')}
-                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full cursor-pointer hover:underline ${getEstadoColor(envio.estado)}`}
+                          className="inline-flex px-2 py-1 text-xs font-semibold rounded-full cursor-pointer hover:underline bg-gray-100 text-gray-800"
                         >
                           {envio.estado || 'Sin estado'}
                         </span>
@@ -490,7 +465,7 @@ export default function Envios() {
                       {formatDate(envio.fechaCambio)}
                     </td>
                     {/* Detalles */}
-                    <td className="px-4 py-3 text-sm text-right">
+                    <td className="px-4 py-3 text-center">
                       <button
                         type="button"
                         onClick={() => setSelectedEnvio(envio)}
@@ -717,22 +692,70 @@ export default function Envios() {
             className="bg-white rounded-xl max-w-xl w-full p-6 relative shadow-lg my-8 max-h-[calc(100vh-4rem)] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={() => setSelectedEnvio(null)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-              aria-label="Cerrar"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div className="absolute top-4 right-4 flex items-center gap-2">
+              {selectedEnvio.telefono && (
+                <>
+                  <a
+                    href={`tel:${selectedEnvio.telefono}`}
+                    className="p-2 rounded-full text-green-600 hover:bg-green-100 transition-colors"
+                    title="Llamar"
+                  >
+                    <Phone className="h-5 w-5" />
+                  </a>
+                  <a
+                    href={`https://wa.me/34${selectedEnvio.telefono.replace(/\s/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-2 rounded-full text-green-600 hover:bg-green-100 transition-colors"
+                    title="WhatsApp"
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                  </a>
+                </>
+              )}
+              <button
+                onClick={() => setSelectedEnvio(null)}
+                className="p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
+                aria-label="Cerrar"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
             <h2 className="text-xl font-bold text-gray-900 mb-4">Detalles del envío</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-xs uppercase text-gray-500">Número</p>
                 <p className="text-sm text-gray-900">{selectedEnvio.numero || '-'}</p>
               </div>
-              <div>
-                <p className="text-xs uppercase text-gray-500">Estado</p>
-                <p className="text-sm text-gray-900">{selectedEnvio.estado || '-'}</p>
+              <div className="flex flex-col">
+                <p className="text-xs uppercase text-gray-500 mb-1">Estado</p>
+                <div>
+                  <select
+                    value={selectedEnvio.estado || ''}
+                    onChange={async (e) => {
+                      const newValue = e.target.value;
+                      if (!newValue || newValue === selectedEnvio.estado) return;
+                      try {
+                        await handleSave(selectedEnvio.id, 'estado', newValue);
+                        setSelectedEnvio({...selectedEnvio, estado: newValue});
+                      } catch (error) {
+                        console.error('Error:', error);
+                      }
+                    }}
+                    className="py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 bg-gray-100 text-gray-800 inline-block"
+                    style={{ 
+                      appearance: 'none', 
+                      backgroundImage: 'none',
+                      paddingLeft: '0.75rem',
+                      paddingRight: '0.75rem'
+                    }}
+                  >
+                    <option value="">Seleccionar...</option>
+                    {ESTADO_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div>
                 <p className="text-xs uppercase text-gray-500">Cliente</p>

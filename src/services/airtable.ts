@@ -1033,7 +1033,7 @@ export const airtableService = {
   },
 
   // Actualizar campo genérico de un servicio
-  async updateServiceField(serviceId: string, field: string, value: string | string[] | boolean | null, tableName: string = AIRTABLE_SERVICES_TABLE): Promise<void> {
+  async updateServiceField(serviceId: string, field: string, value: string | string[] | boolean | number | null, tableName: string = AIRTABLE_SERVICES_TABLE): Promise<void> {
     try {
       const fieldMap: Record<string, string> = {
         estado: 'Estado',
@@ -1049,13 +1049,18 @@ export const airtableService = {
       
       const airtableField = fieldMap[field] || field;
       
+      console.log(`[Airtable] Updating field "${airtableField}" with value:`, value, `(type: ${typeof value})`);
+      
       await serviciosApi.patch(`/${tableName}/${serviceId}`, {
         fields: {
           [airtableField]: value,
         },
       });
-    } catch (error) {
+      
+      console.log(`[Airtable] Successfully updated field "${airtableField}"`);
+    } catch (error: any) {
       console.error(`Error updating service field ${field}:`, error);
+      console.error('Error details:', error?.response?.data);
       throw error;
     }
   },

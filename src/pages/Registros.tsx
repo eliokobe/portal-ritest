@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, User, ChevronDown, X, FileText, Phone, Check, Eye } from 'lucide-react';
+import { Search, User, ChevronDown, X, FileText, Phone, Check, Eye, MessageCircle } from 'lucide-react';
 import { airtableService } from '../services/airtable';
 import { Registro } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -214,25 +214,6 @@ export default function Registros() {
     setEditingComentarios(null);
   };
 
-  const getStatusColor = (status?: string) => {
-    switch (status) {
-      case '1ª Llamada':
-        return 'bg-green-50 text-green-700';
-      case '2ª Llamada':
-        return 'bg-green-100 text-green-800';
-      case 'Ilocalizable':
-        return 'bg-gray-100 text-gray-600';
-      case 'No interesado':
-        return 'bg-gray-200 text-gray-700';
-      case 'Informe':
-        return 'bg-green-200 text-green-900';
-      case 'Inglés':
-        return 'bg-green-300 text-green-950';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const filteredRegistros = registros.filter(registro => {
     const matchesSearch = !searchTerm || 
       registro.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -300,7 +281,7 @@ export default function Registros() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dirección</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cita</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Detalles</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -361,7 +342,7 @@ export default function Registros() {
                         </div>
                       ) : (
                         <span 
-                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 ${getStatusColor(registro.estado)}`}
+                          className="inline-flex px-2 py-1 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 bg-gray-100 text-gray-800"
                           onClick={() => setEditingStatus(registro.id)}
                           title="Click para cambiar estado"
                         >
@@ -412,39 +393,13 @@ export default function Registros() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        {/* Botón de ver detalles */}
-                        <button
-                          onClick={() => setSelectedRegistro(registro)}
-                          className="inline-flex items-center justify-center p-2 rounded-full text-brand-primary hover:bg-brand-primary hover:text-white transition-all"
-                          title="Ver detalles"
-                        >
-                          <Eye className="h-5 w-5" />
-                        </button>
-                        {/* Botón de formulario */}
-                        <button
-                          onClick={() => {
-                            const asesor = registro.asesor || '';
-                            const contrato = registro.contrato || '';
-                            const url = `https://ritest.fillout.com/asesoramiento?asesor=${encodeURIComponent(asesor)}&contrato=${encodeURIComponent(contrato)}`;
-                            window.open(url, '_blank');
-                          }}
-                          className="inline-flex items-center justify-center p-2 rounded-full text-green-600 hover:bg-green-600 hover:text-white transition-all"
-                          title="Abrir formulario de asesoramiento"
-                        >
-                          <FileText className="h-5 w-5" />
-                        </button>
-                        {/* Botón de llamada */}
-                        {registro.telefono && (
-                          <a
-                            href={`tel:${registro.telefono}`}
-                            className="inline-flex items-center justify-center p-2 rounded-full text-green-600 hover:bg-green-600 hover:text-white transition-all"
-                            title="Llamar al cliente"
-                          >
-                            <Phone className="h-5 w-5" />
-                          </a>
-                        )}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRegistro(registro)}
+                        className="text-brand-primary hover:text-brand-primary/80 font-medium"
+                      >
+                        Ver detalles
+                      </button>
                     </td>
                   </tr>
                 ))
@@ -460,12 +415,35 @@ export default function Registros() {
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">Detalles del Registro</h2>
-              <button
-                onClick={() => setSelectedRegistro(null)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="h-6 w-6" />
-              </button>
+              <div className="flex items-center gap-2">
+                {selectedRegistro.telefono && (
+                  <a
+                    href={`tel:${selectedRegistro.telefono}`}
+                    className="p-2 rounded-full text-green-600 hover:bg-green-100 transition-colors"
+                    title="Llamar"
+                  >
+                    <Phone className="h-5 w-5" />
+                  </a>
+                )}
+                <button
+                  onClick={() => {
+                    const asesor = selectedRegistro.asesor || '';
+                    const contrato = selectedRegistro.contrato || '';
+                    const url = `https://ritest.fillout.com/asesoramiento?asesor=${encodeURIComponent(asesor)}&contrato=${encodeURIComponent(contrato)}`;
+                    window.open(url, '_blank');
+                  }}
+                  className="p-2 rounded-full text-green-600 hover:bg-green-100 transition-colors"
+                  title="Abrir formulario de asesoramiento"
+                >
+                  <FileText className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => setSelectedRegistro(null)}
+                  className="p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -485,60 +463,41 @@ export default function Registros() {
                   <h3 className="text-xs uppercase text-gray-500">Dirección</h3>
                   <p className="text-sm text-gray-900 mt-1">{selectedRegistro.direccion || '-'}</p>
                 </div>
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-xs uppercase text-gray-500">Estado</h3>
-                    <button
-                      onClick={() => setEditingStatus(selectedRegistro.id)}
-                      className="text-xs text-brand-primary hover:text-brand-green"
+                <div className="flex flex-col">
+                  <p className="text-xs uppercase text-gray-500 mb-1">Estado</p>
+                  <div>
+                    <select
+                      value={selectedRegistro.estado || ''}
+                      onChange={async (e) => {
+                        const newValue = e.target.value;
+                        if (!newValue || newValue === selectedRegistro.estado) return;
+                        await handleSaveStatus(selectedRegistro.id, newValue);
+                      }}
+                      disabled={savingStatus}
+                      className="py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 bg-gray-100 text-gray-800 inline-block"
+                      style={{ 
+                        appearance: 'none', 
+                        backgroundImage: 'none',
+                        paddingLeft: '0.75rem',
+                        paddingRight: '0.75rem'
+                      }}
                     >
-                      Editar
-                    </button>
+                      <option value="">Seleccionar...</option>
+                      {isGestoraTecnica ? (
+                        GESTORA_TECNICA_ESTADOS.map((estado) => (
+                          <option key={estado} value={estado}>
+                            {estado}
+                          </option>
+                        ))
+                      ) : (
+                        GESTORA_OPERATIVA_ESTADOS.map((estado) => (
+                          <option key={estado} value={estado}>
+                            {estado}
+                          </option>
+                        ))
+                      )}
+                    </select>
                   </div>
-                  {editingStatus === selectedRegistro.id ? (
-                    <div className="space-y-2">
-                      <select
-                        value={selectedRegistro.estado || ''}
-                        onChange={(e) => handleSaveStatus(selectedRegistro.id, e.target.value)}
-                        disabled={savingStatus}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
-                        autoFocus
-                      >
-                        <option value="">Seleccionar estado...</option>
-                        {isGestoraTecnica ? (
-                          GESTORA_TECNICA_ESTADOS.map((estado) => (
-                            <option key={estado} value={estado}>
-                              {estado}
-                            </option>
-                          ))
-                        ) : (
-                          GESTORA_OPERATIVA_ESTADOS.map((estado) => (
-                            <option key={estado} value={estado}>
-                              {estado}
-                            </option>
-                          ))
-                        )}
-                      </select>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleSaveStatus(selectedRegistro.id, selectedRegistro.estado || '')}
-                          disabled={savingStatus}
-                          className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
-                        >
-                          Guardar
-                        </button>
-                        <button
-                          onClick={handleCancelStatusEdit}
-                          disabled={savingStatus}
-                          className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-900 mt-1">{selectedRegistro.estado || '-'}</p>
-                  )}
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">

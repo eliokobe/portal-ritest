@@ -1,5 +1,5 @@
 import React, { ChangeEvent, useEffect, useMemo, useState } from 'react';
-import { Search, Info, X, Check, XCircle, Eye, Phone, MessageCircle } from 'lucide-react';
+import { Search, Info, X, Check, XCircle, Phone, MessageCircle } from 'lucide-react';
 import { airtableService } from '../services/airtable';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -44,6 +44,7 @@ interface Service {
   codigoPostal?: string;
   provincia?: string;
   numeroSerie?: string;
+  importe?: number;
 }
 
 const STATUS_OPTIONS = [
@@ -57,6 +58,7 @@ const STATUS_OPTIONS = [
   'Pendiente técnico',
   'Pendiente de material',
   'Pendiente presupuesto',
+  'Presupuesto enviado',
   'Material enviado',
   'Finalizado',
   'Cancelado'
@@ -67,42 +69,15 @@ const renderDetailValue = (value?: string) => {
   return cleaned ? cleaned : 'Sin información';
 };
 
-const getEstadoColor = (estado?: string) => {
-  switch (estado) {
-    case 'Contactado':
-      return 'bg-blue-100 text-blue-800';
-    case 'Formulario completado':
-      return 'bg-purple-100 text-purple-800';
-    case 'Llamado':
-      return 'bg-cyan-100 text-cyan-800';
-    case 'Pendiente de asignar':
-      return 'bg-yellow-100 text-yellow-800';
-    case 'Pendiente de aceptación':
-      return 'bg-orange-100 text-orange-800';
-    case 'Aceptado':
-      return 'bg-green-100 text-green-800';
-    case 'Citado':
-      return 'bg-indigo-100 text-indigo-800';
-    case 'Pendiente técnico':
-      return 'bg-amber-100 text-amber-800';
-    case 'Pendiente de material':
-      return 'bg-red-100 text-red-800';
-    case 'Pendiente presupuesto':
-      return 'bg-pink-100 text-pink-800';
-    case 'Material enviado':
-      return 'bg-teal-100 text-teal-800';
-    case 'Finalizado':
-      return 'bg-green-200 text-green-900';
-    case 'Cancelado':
-      return 'bg-gray-200 text-gray-800';
-    default:
-      return 'bg-gray-100 text-gray-800';
-  }
-};
-
 type ServicesVariant = 'servicios' | 'tramitaciones';
 
-const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicios' }) => {
+interface ServicesProps {
+  variant?: ServicesVariant;
+  initialSelectedServiceId?: string;
+  onClose?: () => void;
+}
+
+const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelectedServiceId, onClose }) => {
   const { user } = useAuth();
   const isTramitacion = variant === 'tramitaciones';
   const isTecnico = user?.role === 'Técnico';
@@ -138,6 +113,15 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
   useEffect(() => {
     if (selectedService || selectedFormulario || selectedReparacion) {
       document.body.style.overflow = 'hidden';
+      
+      // Autoajustar altura del textarea de comentarios cuando se abre el modal
+      setTimeout(() => {
+        const textarea = document.querySelector('textarea[data-autosize="true"]') as HTMLTextAreaElement;
+        if (textarea) {
+          textarea.style.height = 'auto';
+          textarea.style.height = textarea.scrollHeight + 'px';
+        }
+      }, 0);
     } else {
       document.body.style.overflow = 'unset';
     }
@@ -190,6 +174,17 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
       isMounted = false;
     };
   }, [user?.clinic, user?.id, user?.email, isTecnico]);
+
+  // Auto-seleccionar servicio si se proporciona initialSelectedServiceId
+  useEffect(() => {
+    if (initialSelectedServiceId && services.length > 0 && !selectedService) {
+      const service = services.find(s => s.id === initialSelectedServiceId);
+      if (service) {
+        setSelectedService(service);
+        setDetailsView('detalles');
+      }
+    }
+  }, [initialSelectedServiceId, services, selectedService]);
 
   useEffect(() => {
     const loadTecnicos = async () => {
@@ -417,7 +412,12 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
     return finalFiltered;
   }, [services, searchTerm, activeTab, isTramitacion, isTecnico]);
 
-  const handleCloseModal = () => setSelectedService(null);
+  const handleCloseModal = () => {
+    setSelectedService(null);
+    if (onClose) {
+      onClose();
+    }
+  };
   const markSelected = (serviceId?: string) => {
     if (serviceId) setLastSelectedServiceId(serviceId);
   };
@@ -752,11 +752,14 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Registro</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Nombre</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{isTramitacion ? 'Estado' : 'Teléfono'}</th>
+                  {isTramitacion && (
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Importe</th>
+                  )}
                   {!isTramitacion && (
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                   )}
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{isTramitacion ? 'Tramitado' : 'Último Cambio'}</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Detalles</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -770,8 +773,88 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
                     <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">{formatDate(service.fechaRegistro)}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 w-40"><div className="max-w-[10rem] truncate">{service.nombre || '-'}</div></td>
                     <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
-                      {isTramitacion ? (service.estado || '-') : (service.telefono || '-')}
+                      {isTramitacion ? (
+                        <select
+                          value={service.estado || ''}
+                          onChange={async (e) => {
+                            const newValue = e.target.value;
+                            if (!newValue || newValue === service.estado) return;
+                            
+                            setSaving(true);
+                            try {
+                              await airtableService.updateServiceStatus(service.id, newValue);
+                              const updatedServices = services.map((s) =>
+                                s.id === service.id ? { ...s, estado: newValue } : s
+                              );
+                              setServices(updatedServices);
+                            } catch (error) {
+                              console.error('Error updating estado:', error);
+                              alert('Error al actualizar el estado');
+                            } finally {
+                              setSaving(false);
+                            }
+                          }}
+                          disabled={saving}
+                          className="py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center bg-gray-100 text-gray-800"
+                          style={{ 
+                            appearance: 'none', 
+                            backgroundImage: 'none',
+                            width: `${(service.estado || 'Sin estado').length + 4}ch`,
+                            paddingLeft: '0.75rem',
+                            paddingRight: '0.75rem'
+                          }}
+                        >
+                          <option value="">Seleccionar...</option>
+                          {STATUS_OPTIONS.map((opt: string) => (
+                            <option key={opt} value={opt}>{opt}</option>
+                          ))}
+                        </select>
+                      ) : (service.telefono || '-')}
                     </td>
+                    {isTramitacion && (
+                      <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
+                        <input
+                          type="number"
+                          step="0.01"
+                          defaultValue={service.importe || ''}
+                          onBlur={async (e) => {
+                            const inputValue = e.target.value.trim();
+                            
+                            // Si está vacío, enviar null para limpiar el campo
+                            if (inputValue === '') {
+                              if (service.importe === undefined || service.importe === null) return;
+                              setSaving(true);
+                              try {
+                                await airtableService.updateServiceField(service.id, 'Importe', null);
+                                setServices(services.map(s => s.id === service.id ? {...s, importe: undefined} : s));
+                              } catch (error: any) {
+                                console.error('Error:', error);
+                                alert('Error al guardar: ' + (error?.response?.data?.error?.message || error.message));
+                              } finally {
+                                setSaving(false);
+                              }
+                              return;
+                            }
+                            
+                            const newValue = parseFloat(inputValue);
+                            if (isNaN(newValue) || newValue === service.importe) return;
+                            setSaving(true);
+                            try {
+                              await airtableService.updateServiceField(service.id, 'Importe', newValue);
+                              setServices(services.map(s => s.id === service.id ? {...s, importe: newValue} : s));
+                            } catch (error: any) {
+                              console.error('Error:', error);
+                              alert('Error al guardar: ' + (error?.response?.data?.error?.message || error.message));
+                            } finally {
+                              setSaving(false);
+                            }
+                          }}
+                          className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                          disabled={saving}
+                          placeholder="0.00"
+                        />
+                      </td>
+                    )}
                     {!isTramitacion && (
                       <td className="px-4 py-3 whitespace-nowrap">
                         <select
@@ -795,7 +878,7 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
                             }
                           }}
                           disabled={saving}
-                          className={`py-1 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center ${getEstadoColor(service.estado)}`}
+                          className="py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center bg-gray-100 text-gray-800"
                           style={{ 
                             appearance: 'none', 
                             backgroundImage: 'none',
@@ -827,42 +910,17 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
                       <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">{formatDate(service.ultimoCambio)}</td>
                     )}
                     <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedService(service);
-                            setDetailsView('detalles');
-                            markSelected(service.id);
-                          }}
-                          className="inline-flex items-center justify-center p-2 rounded-full text-green-600 hover:bg-green-600 hover:text-white transition-all"
-                          title="Ver detalles"
-                        >
-                          <Eye className="h-5 w-5" />
-                        </button>
-                        {/* Botón de chat */}
-                        {service.conversationId && (
-                          <a
-                            href={`https://chat.ritest.es/app/accounts/1/inbox-view/conversation/${service.conversationId}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center justify-center p-2 rounded-full text-green-600 hover:bg-green-600 hover:text-white transition-all"
-                            title="Abrir chat"
-                          >
-                            <MessageCircle className="h-5 w-5" />
-                          </a>
-                        )}
-                        {/* Botón de llamar al cliente */}
-                        {service.telefono && (
-                          <a
-                            href={`tel:${service.telefono}`}
-                            className="inline-flex items-center justify-center p-2 rounded-full text-green-600 hover:bg-green-600 hover:text-white transition-all"
-                            title="Llamar al cliente"
-                          >
-                            <Phone className="h-5 w-5" />
-                          </a>
-                        )}
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedService(service);
+                          setDetailsView('detalles');
+                          markSelected(service.id);
+                        }}
+                        className="text-brand-primary hover:text-brand-primary/80 font-medium"
+                      >
+                        Ver detalles
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -881,14 +939,36 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
             className="relative w-full max-w-4xl bg-gray-50 rounded-2xl shadow-lg border border-gray-200 my-8 mx-auto"
             onClick={(event) => event.stopPropagation()}
           >
-            <button
-              type="button"
-              onClick={handleCloseModal}
-              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 focus:outline-none z-10"
-              aria-label="Cerrar detalles"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
+              {selectedService.telefono && (
+                <a
+                  href={`tel:${selectedService.telefono}`}
+                  className="p-2 rounded-full text-green-600 hover:bg-green-100 transition-colors"
+                  title="Llamar"
+                >
+                  <Phone className="h-5 w-5" />
+                </a>
+              )}
+              {selectedService.conversationId && (
+                <a
+                  href={`https://chat.ritest.es/app/accounts/1/inbox-view/conversation/${selectedService.conversationId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-full text-green-600 hover:bg-green-100 transition-colors"
+                  title="Abrir chat"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                className="p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
+                aria-label="Cerrar detalles"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
             {/* Tabs para cambiar la vista dentro del modal */}
             <div className="flex items-center gap-2 border-b border-gray-200 pb-2 pt-6 px-6">
                 <button
@@ -953,42 +1033,44 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
                   <p className="text-xs uppercase text-gray-500">Población</p>
                   <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.poblacion)}</p>
                 </div>
-                <div>
+                <div className="flex flex-col">
                   <p className="text-xs uppercase text-gray-500 mb-1">Estado</p>
-                  <select
-                    value={selectedService.estado || ''}
-                    onChange={async (e) => {
-                      const newValue = e.target.value;
-                      if (!newValue || newValue === selectedService.estado) return;
-                      setSaving(true);
-                      try {
-                        await airtableService.updateServiceStatus(selectedService.id, newValue);
-                        const updatedServices = services.map((s) =>
-                          s.id === selectedService.id ? { ...s, estado: newValue } : s
-                        );
-                        setServices(updatedServices);
-                        setSelectedService({...selectedService, estado: newValue});
-                      } catch (error) {
-                        console.error('Error updating estado:', error);
-                        alert('Error al actualizar el estado');
-                      } finally {
-                        setSaving(false);
-                      }
-                    }}
-                    disabled={saving}
-                    className={`py-1 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 w-full ${getEstadoColor(selectedService.estado)}`}
-                    style={{ 
-                      appearance: 'none', 
-                      backgroundImage: 'none',
-                      paddingLeft: '0.75rem',
-                      paddingRight: '0.75rem'
-                    }}
-                  >
-                    <option value="">Seleccionar...</option>
-                    {STATUS_OPTIONS.map((opt: string) => (
-                      <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                  </select>
+                  <div>
+                    <select
+                      value={selectedService.estado || ''}
+                      onChange={async (e) => {
+                        const newValue = e.target.value;
+                        if (!newValue || newValue === selectedService.estado) return;
+                        setSaving(true);
+                        try {
+                          await airtableService.updateServiceStatus(selectedService.id, newValue);
+                          const updatedServices = services.map((s) =>
+                            s.id === selectedService.id ? { ...s, estado: newValue } : s
+                          );
+                          setServices(updatedServices);
+                          setSelectedService({...selectedService, estado: newValue});
+                        } catch (error) {
+                          console.error('Error updating estado:', error);
+                          alert('Error al actualizar el estado');
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                      disabled={saving}
+                      className="py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 bg-gray-100 text-gray-800 inline-block"
+                      style={{ 
+                        appearance: 'none', 
+                        backgroundImage: 'none',
+                        paddingLeft: '0.75rem',
+                        paddingRight: '0.75rem'
+                      }}
+                    >
+                      <option value="">Seleccionar...</option>
+                      {STATUS_OPTIONS.map((opt: string) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div>
                   <p className="text-xs uppercase text-gray-500">Último cambio</p>
@@ -1022,7 +1104,13 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
                   <div>
                     <p className="text-xs uppercase text-gray-500 mb-1">Comentarios</p>
                     <textarea
+                      data-autosize="true"
                       defaultValue={selectedService.comentarios || ''}
+                      onInput={(e) => {
+                        const target = e.target as HTMLTextAreaElement;
+                        target.style.height = 'auto';
+                        target.style.height = target.scrollHeight + 'px';
+                      }}
                       onBlur={async (e) => {
                         const newValue = e.target.value;
                         if (newValue === selectedService.comentarios) return;
@@ -1038,8 +1126,8 @@ const Services: React.FC<{ variant?: ServicesVariant }> = ({ variant = 'servicio
                           setSaving(false);
                         }
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
-                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm resize-none overflow-hidden"
+                      style={{ minHeight: '60px' }}
                       disabled={saving}
                       placeholder="Escribe comentarios..."
                     />

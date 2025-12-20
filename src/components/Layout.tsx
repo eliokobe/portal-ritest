@@ -21,6 +21,7 @@ import {
   Package,
   Truck,
   ClipboardList,
+  Calendar,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -71,6 +72,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       ],
     },
     {
+      title: 'Asesoramiento',
+      items: [
+        { name: 'Asesoramientos', href: '/asesoramientos', icon: Lightbulb },
+      ],
+    },
+    {
       items: [
         { name: 'Recursos', href: '/recursos', icon: FileDown },
       ],
@@ -93,6 +100,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       title: 'Punto de Recarga',
       items: [
         { name: 'Panel Gráfico', href: '/panel-grafico', icon: BarChart3 },
+        { name: 'Agenda', href: '/agenda', icon: Calendar },
         { name: 'Servicios', href: '/servicios', icon: Wrench },
         { name: 'Técnicos', href: '/tecnicos', icon: Users },
         { name: 'Envíos', href: '/envios', icon: Package },
