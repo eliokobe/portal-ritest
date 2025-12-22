@@ -130,6 +130,19 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     };
   }, [selectedService, selectedFormulario, selectedReparacion]);
 
+  // Autoajustar textarea cuando se cambia a la vista de detalles
+  useEffect(() => {
+    if (detailsView === 'detalles' && selectedService) {
+      setTimeout(() => {
+        const textarea = document.querySelector('textarea[data-autosize="true"]') as HTMLTextAreaElement;
+        if (textarea) {
+          textarea.style.height = 'auto';
+          textarea.style.height = textarea.scrollHeight + 'px';
+        }
+      }, 0);
+    }
+  }, [detailsView, selectedService]);
+
   useEffect(() => {
     let isMounted = true;
 
