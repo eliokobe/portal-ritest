@@ -1263,6 +1263,8 @@ export const airtableService = {
     asesor?: string;
     expediente?: string;
     tramitado?: boolean;
+    ipartner?: string;
+    pdf?: any[];
   }[]> {
     try {
       const records = await fetchAllRegistros('Registros', { pageSize: 100 });
@@ -1282,6 +1284,8 @@ export const airtableService = {
           asesor: f['Asesor'] ?? f['Advisor'],
           expediente: f['Expediente'],
           tramitado: f['Tramitado'] ?? false,
+          ipartner: f['Ipartner'],
+          pdf: f['PDF'] || f['Pdf'] || f['pdf'] || [],
         };
       });
     } catch (error) {

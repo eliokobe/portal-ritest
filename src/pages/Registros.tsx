@@ -154,6 +154,21 @@ export default function Registros() {
     fetchRegistros();
   }, []);
 
+  // Ajustar altura del textarea de comentarios cuando se abre el modal o cambia el registro
+  useEffect(() => {
+    if (selectedRegistro) {
+      // Usar setTimeout para asegurar que el DOM esté actualizado
+      const timer = setTimeout(() => {
+        const textarea = document.querySelector('textarea[data-autosize="true"]') as HTMLTextAreaElement;
+        if (textarea) {
+          textarea.style.height = 'auto';
+          textarea.style.height = textarea.scrollHeight + 'px';
+        }
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedRegistro]);
+
   const fetchRegistros = async () => {
     try {
       const data = await airtableService.getRegistros();
@@ -291,22 +306,14 @@ export default function Registros() {
       registro.direccion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       registro.contrato?.toString().includes(searchTerm);
 
-    // Excluir estados no deseados
-    const estadosExcluidos = ['Inglés', 'Informe', 'No interesado', 'Ilocalizable'];
-    const isExcluded = registro.estado && estadosExcluidos.includes(registro.estado);
+    // Excluir registros con ciertos valores de Ipartner
+    const ipartnerExcluidos = ['No interesado', 'Ilocalizable', 'Facturado'];
+    const isIpartnerExcluded = registro.ipartner && ipartnerExcluidos.includes(registro.ipartner);
 
-    // Filtrar para Gestora Técnica
-    if (isGestoraTecnica) {
-      const matchesEstado = !registro.estado || GESTORA_TECNICA_ESTADOS.includes(registro.estado);
-      const matchesAsesor = registro.asesor === 'Milagros';
-      return matchesSearch && matchesEstado && matchesAsesor && !isExcluded;
-    }
+    // Si está Citado, debe tener PDF relleno
+    const isCitadoWithoutPdf = registro.estado === 'Citado' && (!registro.pdf || registro.pdf.length === 0);
 
-  // Filtrar para Gestora Operativa
-  if (isGestoraOperativa) {
-    const matchesEstado = !registro.estado || GESTORA_OPERATIVA_ESTADOS.includes(registro.estado);
-    return matchesSearch && matchesEstado && !isExcluded;
-  }    return matchesSearch && !isExcluded;
+    return matchesSearch && !isIpartnerExcluded && !isCitadoWithoutPdf;
   });
 
   if (loading) {
@@ -629,6 +636,29 @@ export default function Registros() {
                 </div>
               </div>
               <div>
+                <h3 className="text-xs uppercase text-gray-500 mb-2">PDF</h3>
+                {selectedRegistro.pdf && selectedRegistro.pdf.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedRegistro.pdf.map((file) => (
+                      <a
+                        key={file.id}
+                        href={file.url}
+                        download={file.filename}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-blue-600 text-sm"
+                      >
+                        <FileText className="h-4 w-4" />
+                        <span className="truncate flex-1">{file.filename}</span>
+                        <span className="text-xs text-gray-500">({(file.size || 0) > 1024 ? ((file.size || 0) / 1024).toFixed(1) + ' KB' : (file.size || 0) + ' B'})</span>
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Sin PDF adjunto</p>
+                )}
+              </div>
+              <div>
                 <h3 className="text-xs uppercase text-gray-500 mb-1">Cita</h3>
                 {editingCita === selectedRegistro.id ? (
                   <div className="space-y-2">
@@ -753,6 +783,13 @@ export default function Registros() {
                     const date = parseCitaInput(inputValue);
                     if (!date) {
                       alert('Fecha y hora inválidas');
+                      return;
+                    }
+
+                    // Verificar que el registro tenga PDF relleno si está siendo marcado como Citado
+                    const registroActual = registros.find(r => r.id === pendingEstadoChange.registroId);
+                    if (pendingEstadoChange.newEstado === 'Citado' && (!registroActual?.pdf || registroActual.pdf.length === 0)) {
+                      alert('Para marcar como Citado, el registro debe tener un PDF adjunto');
                       return;
                     }
 
