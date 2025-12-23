@@ -75,6 +75,7 @@ export interface Registro {
 export interface Envio {
   id: string;
   numero?: string;
+  numeroRecogida?: number;
   seguimiento?: string;
   servicio?: string;
   estado?: 'Envío creado' | 'Listo para enviar' | 'Enviado' | 'Entregado';

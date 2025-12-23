@@ -683,6 +683,7 @@ export const airtableService = {
   async getEnvios(): Promise<{
     id: string;
     numero?: string;
+    numeroRecogida?: number;
     seguimiento?: string;
     servicio?: string;
     estado?: string;
@@ -710,11 +711,13 @@ export const airtableService = {
         const catalogoField = f['Catálogo'] ?? f['Catalogo'];
 
         const numeroField = f['Número'] ?? f['Numero'];
+        const numeroRecogidaField = f['Número de recogida'];
         const referenciaField = f['Referencia'] ?? f['Reference'];
 
         return {
           id: r.id,
           numero: numeroField !== undefined ? String(numeroField) : undefined,
+          numeroRecogida: numeroRecogidaField !== undefined ? Number(numeroRecogidaField) : undefined,
           seguimiento: f['Seguimiento'],
           servicio: Array.isArray(servicioField) ? servicioField[0] : servicioField,
           estado: f['Estado'],
@@ -745,6 +748,7 @@ export const airtableService = {
     try {
       const fieldMap: Record<string, string> = {
         numero: 'Número',
+        numeroRecogida: 'Número de recogida',
         servicio: 'Servicio',
         estado: 'Estado',
         fechaEnvio: 'Fecha de envío',

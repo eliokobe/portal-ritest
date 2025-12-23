@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Search, User, ChevronDown, X, FileText, Phone, Check, Eye, MessageCircle } from 'lucide-react';
+import { Search, User, X, FileText, Phone, Check, Eye, MessageCircle } from 'lucide-react';
 import { airtableService } from '../services/airtable';
 import { Registro } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { getStatusColors } from '../utils/statusColors';
 
 const ESTADO_OPTIONS = [
   '1ª Llamada',
@@ -40,7 +41,6 @@ export default function Registros() {
   const [registros, setRegistros] = useState<Registro[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [editingStatus, setEditingStatus] = useState<string | null>(null);
   const [savingStatus, setSavingStatus] = useState(false);
   const [editingCita, setEditingCita] = useState<string | null>(null);
   const [editCitaValue, setEditCitaValue] = useState('');
@@ -133,17 +133,16 @@ export default function Registros() {
         )
       );
       
-      setEditingStatus(null);
+      // Actualizar también selectedRegistro si está abierto
+      if (selectedRegistro && selectedRegistro.id === registroId) {
+        setSelectedRegistro({ ...selectedRegistro, estado: newStatus });
+      }
     } catch (error) {
       console.error('Error updating status:', error);
       alert('Error al actualizar el estado');
     } finally {
       setSavingStatus(false);
     }
-  };
-
-  const handleCancelStatusEdit = () => {
-    setEditingStatus(null);
   };
 
   const handleSaveCita = async (registroId: string, newCita: string) => {
@@ -310,46 +309,44 @@ export default function Registros() {
                         {registro.direccion || '-'}
                       </div>
                     </td>
-                    <td className="px-4 py-3">{editingStatus === registro.id ? (
-                        <div className="flex items-center space-x-1">
-                          <select
-                            value={registro.estado || ''}
-                            onChange={(e) => handleSaveStatus(registro.id, e.target.value)}
-                            disabled={savingStatus}
-                            className="text-xs font-semibold rounded-full px-2 py-1 border border-gray-300 focus:ring-2 focus:ring-brand-primary focus:border-transparent disabled:opacity-50"
-                            autoFocus
-                          >
-                            <option value="">Seleccionar estado</option>
-                            {(isGestoraOperativa
-                              ? GESTORA_OPERATIVA_ESTADOS
-                              : isGestoraTecnica
-                                ? GESTORA_TECNICA_ESTADOS
-                                : ESTADO_OPTIONS
-                            ).map((status) => (
-                              <option key={status} value={status}>
-                                {status}
-                              </option>
-                            ))}
-                          </select>
-                          <button
-                            onClick={handleCancelStatusEdit}
-                            disabled={savingStatus}
-                            className="text-red-600 hover:text-red-800 disabled:opacity-50"
-                            title="Cancelar"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <span 
-                          className="inline-flex px-2 py-1 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 bg-gray-100 text-gray-800"
-                          onClick={() => setEditingStatus(registro.id)}
-                          title="Click para cambiar estado"
-                        >
-                          {registro.estado || 'Sin estado'}
-                          <ChevronDown className="h-3 w-3 ml-1" />
-                        </span>
-                      )}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <select
+                        value={registro.estado || ''}
+                        onChange={async (e) => {
+                          const newValue = e.target.value;
+                          if (!newValue || newValue === registro.estado) return;
+                          setSavingStatus(true);
+                          try {
+                            await handleSaveStatus(registro.id, newValue);
+                          } catch (error) {
+                            console.error('Error updating estado:', error);
+                            alert('Error al actualizar el estado');
+                          } finally {
+                            setSavingStatus(false);
+                          }
+                        }}
+                        disabled={savingStatus}
+                        className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center ${getStatusColors(registro.estado).bg} ${getStatusColors(registro.estado).text}`}
+                        style={{ 
+                          appearance: 'none', 
+                          backgroundImage: 'none',
+                          width: `${(registro.estado || 'Sin estado').length + 4}ch`,
+                          paddingLeft: '0.75rem',
+                          paddingRight: '0.75rem'
+                        }}
+                      >
+                        <option value="">Seleccionar...</option>
+                        {(isGestoraOperativa
+                          ? GESTORA_OPERATIVA_ESTADOS
+                          : isGestoraTecnica
+                            ? GESTORA_TECNICA_ESTADOS
+                            : ESTADO_OPTIONS
+                        ).map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-4 py-3">
                       {editingCita === registro.id ? (
@@ -474,7 +471,7 @@ export default function Registros() {
                         await handleSaveStatus(selectedRegistro.id, newValue);
                       }}
                       disabled={savingStatus}
-                      className="py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 bg-gray-100 text-gray-800 inline-block"
+                      className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block ${getStatusColors(selectedRegistro.estado).bg} ${getStatusColors(selectedRegistro.estado).text}`}
                       style={{ 
                         appearance: 'none', 
                         backgroundImage: 'none',
@@ -591,10 +588,6 @@ export default function Registros() {
                 ) : (
                   <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{selectedRegistro.comentarios || '-'}</p>
                 )}
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700">Informe</h3>
-                <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{selectedRegistro.informe || '-'}</p>
               </div>
             </div>
           </div>

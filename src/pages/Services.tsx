@@ -2,6 +2,7 @@ import React, { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { Search, Info, X, Check, XCircle, Phone, MessageCircle } from 'lucide-react';
 import { airtableService } from '../services/airtable';
 import { useAuth } from '../contexts/AuthContext';
+import { getStatusColors } from '../utils/statusColors';
 
 interface AirtableAttachment {
   id: string;
@@ -299,6 +300,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
           'Pendiente de asignar',
           'Pendiente de aceptación',
           'Aceptado',
+          'Duplicado',
         ];
         servicesWithAllowedStates = servicesWithAllowedStates.filter(
           (s) => !(s.estado && estadosExcluidosTecnico.includes(s.estado))
@@ -427,6 +429,10 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
 
   const handleCloseModal = () => {
     setSelectedService(null);
+    setFormularios([]);
+    setSelectedFormularioIndex(0);
+    setReparaciones([]);
+    setSelectedReparacionIndex(0);
     if (onClose) {
       onClose();
     }
@@ -440,17 +446,25 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     const loadInlineForm = async () => {
       if (detailsView !== 'formulario') return;
       const expediente = selectedService?.expediente;
-      if (!expediente) return;
+      if (!expediente) {
+        setFormularios([]);
+        setSelectedFormularioIndex(0);
+        return;
+      }
       try {
         // Si los formularios actuales no pertenecen al expediente seleccionado, recargar
         const sameExp = formularios.length > 0 && (formularios[0]?.Expediente === expediente);
         if (!sameExp) {
+          // Limpiar primero los formularios anteriores
+          setFormularios([]);
           const data = await airtableService.getFormularioByExpediente(expediente);
           setFormularios(data);
           setSelectedFormularioIndex(0);
         }
       } catch (e) {
         console.error('Error cargando formularios (inline):', e);
+        setFormularios([]);
+        setSelectedFormularioIndex(0);
       }
     };
     loadInlineForm();
@@ -461,16 +475,24 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     const loadInlineRep = async () => {
       if (detailsView !== 'reparaciones') return;
       const expediente = selectedService?.expediente;
-      if (!expediente) return;
+      if (!expediente) {
+        setReparaciones([]);
+        setSelectedReparacionIndex(0);
+        return;
+      }
       try {
         const sameExp = reparaciones.length > 0 && (reparaciones[0]?.expediente === expediente);
         if (!sameExp) {
+          // Limpiar primero las reparaciones anteriores
+          setReparaciones([]);
           const data = await airtableService.getReparacionesByExpediente(expediente);
           setReparaciones(data);
           setSelectedReparacionIndex(0);
         }
       } catch (e) {
         console.error('Error cargando reparaciones (inline):', e);
+        setReparaciones([]);
+        setSelectedReparacionIndex(0);
       }
     };
     loadInlineRep();
@@ -808,7 +830,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                             }
                           }}
                           disabled={saving}
-                          className="py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center bg-gray-100 text-gray-800"
+                          className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center ${getStatusColors(service.estado).bg} ${getStatusColors(service.estado).text}`}
                           style={{ 
                             appearance: 'none', 
                             backgroundImage: 'none',
@@ -891,7 +913,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                             }
                           }}
                           disabled={saving}
-                          className="py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center bg-gray-100 text-gray-800"
+                          className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center ${getStatusColors(service.estado).bg} ${getStatusColors(service.estado).text}`}
                           style={{ 
                             appearance: 'none', 
                             backgroundImage: 'none',
@@ -1070,7 +1092,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                         }
                       }}
                       disabled={saving}
-                      className="py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 bg-gray-100 text-gray-800 inline-block"
+                      className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block ${getStatusColors(selectedService.estado).bg} ${getStatusColors(selectedService.estado).text}`}
                       style={{ 
                         appearance: 'none', 
                         backgroundImage: 'none',

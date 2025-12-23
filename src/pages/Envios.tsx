@@ -3,6 +3,7 @@ import { Search, Package, Plus, X, ExternalLink, Phone, MessageCircle } from 'lu
 import { airtableService } from '../services/airtable';
 import { useAuth } from '../contexts/AuthContext';
 import { Envio } from '../types';
+import { getStatusColors } from '../utils/statusColors';
 
 // Filtros permitidos para Gestora Operativa (mismos que en Services)
 const GESTORA_OPERATIVA_FILTROS = [
@@ -70,6 +71,8 @@ export default function Envios() {
   const [savingTransporte, setSavingTransporte] = useState(false);
   const [catalogoDraft, setCatalogoDraft] = useState('');
   const [savingCatalogo, setSavingCatalogo] = useState(false);
+  const [numeroRecogidaDraft, setNumeroRecogidaDraft] = useState<string>('');
+  const [savingNumeroRecogida, setSavingNumeroRecogida] = useState(false);
   const [newEnvio, setNewEnvio] = useState<Omit<Envio, 'id'>>({
     servicio: '',
     catalogo: '',
@@ -113,6 +116,7 @@ export default function Envios() {
     setCommentDraft(selectedEnvio?.comentarios || '');
     setTransporteDraft(selectedEnvio?.transporte || '');
     setCatalogoDraft(selectedEnvio?.catalogo || '');
+    setNumeroRecogidaDraft(selectedEnvio?.numeroRecogida?.toString() || '');
   }, [selectedEnvio?.id]);
 
   // Bloquear scroll del body cuando el modal está abierto
@@ -311,6 +315,21 @@ export default function Envios() {
     }
   };
 
+  const handleSaveNumeroRecogida = async () => {
+    if (!selectedEnvio) return;
+    setSavingNumeroRecogida(true);
+    try {
+      const numeroRecogida = numeroRecogidaDraft.trim() === '' ? undefined : Number(numeroRecogidaDraft);
+      await airtableService.updateEnvio(selectedEnvio.id, { numeroRecogida });
+      setEnvios((prev) => prev.map((e) => (e.id === selectedEnvio.id ? { ...e, numeroRecogida } : e)));
+      setSelectedEnvio((prev) => (prev ? { ...prev, numeroRecogida } : prev));
+    } catch (error) {
+      alert('Error al guardar el número de recogida');
+    } finally {
+      setSavingNumeroRecogida(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -385,7 +404,14 @@ export default function Envios() {
                     {/* Seguimiento */}
                     <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">
                       {(() => {
-                        const trackingUrl = envio.seguimiento || (envio.numero ? `${TRACKING_BASE}${envio.numero}` : undefined);
+                        // Estados que redirigen a CTT Express
+                        const estadosRecogida = ['Pendiente recogida', 'Recogida enviada', 'Recogida hecha'];
+                        const usarCttExpress = estadosRecogida.includes(envio.estado || '');
+                        
+                        const trackingUrl = usarCttExpress 
+                          ? 'https://www.cttexpress.com/localizador-de-envios/'
+                          : (envio.seguimiento || (envio.numero ? `${TRACKING_BASE}${envio.numero}` : undefined));
+                        
                         if (!trackingUrl) return '-';
                         return (
                           <a
@@ -412,28 +438,36 @@ export default function Envios() {
                     </td>
                     {/* Estado */}
                     <td className="px-4 py-3 whitespace-nowrap">
-                      {editing && editing.id === envio.id && editing.field === 'estado' ? (
-                        <select
-                          value={editing.value}
-                          onChange={handleChange}
-                          onBlur={handleBlur}
-                          disabled={saving}
-                          autoFocus
-                          className="border rounded px-2 py-1 text-sm"
-                        >
-                          <option value="">Seleccionar</option>
-                          {ESTADO_OPTIONS.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span
-                          onClick={() => handleEdit(envio.id, 'estado', envio.estado || '')}
-                          className="inline-flex px-2 py-1 text-xs font-semibold rounded-full cursor-pointer hover:underline bg-gray-100 text-gray-800"
-                        >
-                          {envio.estado || 'Sin estado'}
-                        </span>
-                      )}
+                      <select
+                        value={envio.estado || ''}
+                        onChange={async (e) => {
+                          const newValue = e.target.value;
+                          if (!newValue || newValue === envio.estado) return;
+                          setSaving(true);
+                          try {
+                            await handleSave(envio.id, 'estado', newValue);
+                          } catch (error) {
+                            console.error('Error updating estado:', error);
+                            alert('Error al actualizar el estado');
+                          } finally {
+                            setSaving(false);
+                          }
+                        }}
+                        disabled={saving}
+                        className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center ${getStatusColors(envio.estado).bg} ${getStatusColors(envio.estado).text}`}
+                        style={{ 
+                          appearance: 'none', 
+                          backgroundImage: 'none',
+                          width: `${(envio.estado || 'Sin estado').length + 4}ch`,
+                          paddingLeft: '0.75rem',
+                          paddingRight: '0.75rem'
+                        }}
+                      >
+                        <option value="">Seleccionar...</option>
+                        {ESTADO_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
                     </td>
                     {/* Fecha de Envío */}
                     <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
@@ -727,7 +761,35 @@ export default function Envios() {
                 <p className="text-xs uppercase text-gray-500">Número</p>
                 <p className="text-sm text-gray-900">{selectedEnvio.numero || '-'}</p>
               </div>
-              <div className="flex flex-col">
+              <div className="sm:col-span-2">
+                <p className="text-xs uppercase text-gray-500 mb-1">Número de recogida</p>
+                <input
+                  type="number"
+                  value={numeroRecogidaDraft}
+                  onChange={(e) => setNumeroRecogidaDraft(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                  placeholder="Introduce el número de recogida"
+                />
+                <div className="mt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNumeroRecogidaDraft(selectedEnvio.numeroRecogida?.toString() || '')}
+                    className="px-3 py-1 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                    disabled={savingNumeroRecogida}
+                  >
+                    Deshacer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveNumeroRecogida}
+                    className="px-4 py-1.5 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={savingNumeroRecogida}
+                  >
+                    {savingNumeroRecogida ? 'Guardando...' : 'Guardar número'}
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-col sm:col-span-2">
                 <p className="text-xs uppercase text-gray-500 mb-1">Estado</p>
                 <div>
                   <select
@@ -742,7 +804,7 @@ export default function Envios() {
                         console.error('Error:', error);
                       }
                     }}
-                    className="py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 bg-gray-100 text-gray-800 inline-block"
+                    className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block ${getStatusColors(selectedEnvio.estado).bg} ${getStatusColors(selectedEnvio.estado).text}`}
                     style={{ 
                       appearance: 'none', 
                       backgroundImage: 'none',
