@@ -48,6 +48,7 @@ interface Service {
   importe?: number;
   accionIpartner?: string;
   ipartner?: string;
+  resolucionVisita?: string;
 }
 
 const STATUS_OPTIONS = [
@@ -73,6 +74,17 @@ const IPARTNER_OPTIONS = [
   'Finalizado',
   'Cancelado',
   'Facturado'
+];
+
+const RESOLUCION_VISITA_OPTIONS = [
+  'Ilocalizable',
+  'Resuelto por el cliente',
+  'Sin cobertura',
+  'Sin llave del cuadro',
+  'Liberación cuenta wallbox',
+  'Reset y actualización',
+  'Sin cobertura ya que supera los 3 años',
+  'Configuración del cargador'
 ];
 
 const renderDetailValue = (value?: string) => {
@@ -115,10 +127,14 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   const [appointmentAlert, setAppointmentAlert] = useState<Service | null>(null);
   const [dismissedAppointmentId, setDismissedAppointmentId] = useState<string | null>(null);
   const [lastSelectedServiceId, setLastSelectedServiceId] = useState<string | null>(null);
+  const [showResolucionModal, setShowResolucionModal] = useState(false);
+  const [pendingEstadoChange, setPendingEstadoChange] = useState<{serviceId: string, newEstado: string} | null>(null);
+  const [showCitaModal, setShowCitaModal] = useState(false);
 
   // Determinar si el usuario es Gestora Operativa
   const isGestoraOperativa = user?.role === 'Gestora Operativa';
   const isGestoraTecnica = user?.role === 'Gestora Técnica';
+  const isResponsableOrAdministrativa = user?.role === 'Responsable' || user?.role === 'Administrativa';
 
   // Bloquear scroll del body cuando el modal está abierto
   useEffect(() => {
@@ -248,12 +264,16 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   }, [services, isTramitacion, dismissedAppointmentId]);
 
   // Filtrado de servicios - mismo para todos los usuarios (como Gestor Operativa)
-  const filteredServices = useMemo<Service[]>(() => {
+  const filteredServices = useMemo(() => {
     console.log('Services - Total services before filtering:', services.length);
     
     let servicesWithAllowedStates = services;
 
-    if (isTramitacion) {
+    // Si el usuario es Responsable o Administrativa, mostrar TODOS los servicios sin filtros
+    if (isResponsableOrAdministrativa) {
+      console.log('Services - Usuario es Responsable/Administrativa: mostrando todos los servicios sin filtros');
+      servicesWithAllowedStates = services;
+    } else if (isTramitacion) {
       // Para tramitación: no aplicar el filtro estándar; usar condiciones específicas
       const estadosPermitidos = [
         'Formulario completado',
@@ -294,8 +314,8 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
       nombre: s.nombre
     })));
 
-    // Aplicar filtro por tab solo para Técnico en Servicios
-    if (!isTramitacion && isTecnico) {
+    // Aplicar filtro por tab solo para Técnico en Servicios (NO para Responsable/Administrativa)
+    if (!isTramitacion && isTecnico && !isResponsableOrAdministrativa) {
       const now = new Date();
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -437,7 +457,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
 
     console.log('Services - Final filtered services:', finalFiltered.length);
     return finalFiltered;
-  }, [services, searchTerm, activeTab, isTramitacion, isTecnico]);
+  }, [services, searchTerm, activeTab, isTramitacion, isTecnico, isResponsableOrAdministrativa]);
 
   const handleCloseModal = () => {
     setSelectedService(null);
@@ -702,9 +722,64 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
       const day = String(date.getDate()).padStart(2, '0');
       const hours = String(date.getHours()).padStart(2, '0');
       const minutes = String(date.getMinutes()).padStart(2, '0');
-      return `${year}-${month}-${day}T${hours}:${minutes}`;
+      return `${day}/${month}/${year} ${hours}:${minutes}`;
     } catch {
       return '';
+    }
+  };
+
+  const parseCitaInput = (input: string): Date | null => {
+    // Parsear formato DD/MM/YYYY hh:mm
+    const regex = /^(\d{2})\/(\d{2})\/(\d{4})\s(\d{2}):(\d{2})$/;
+    const match = input.trim().match(regex);
+    
+    if (!match) {
+      return null;
+    }
+
+    const [, day, month, year, hours, minutes] = match;
+    try {
+      const date = new Date(
+        parseInt(year),
+        parseInt(month) - 1,
+        parseInt(day),
+        parseInt(hours),
+        parseInt(minutes)
+      );
+      return date;
+    } catch {
+      return null;
+    }
+  };
+
+  const formatCitaInputWithAutoFormat = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Solo permitir números
+    let input = e.target.value.replace(/\D/g, '');
+    
+    // Auto-formatear a DD/MM/YYYY hh:mm
+    if (input.length > 0) {
+      // DD
+      if (input.length <= 2) {
+        e.target.value = input;
+      }
+      // DD/MM
+      else if (input.length <= 4) {
+        e.target.value = input.slice(0, 2) + '/' + input.slice(2);
+      }
+      // DD/MM/YYYY
+      else if (input.length <= 8) {
+        e.target.value = input.slice(0, 2) + '/' + input.slice(2, 4) + '/' + input.slice(4);
+      }
+      // DD/MM/YYYY hh
+      else if (input.length <= 10) {
+        e.target.value = input.slice(0, 2) + '/' + input.slice(2, 4) + '/' + input.slice(4, 8) + ' ' + input.slice(8);
+      }
+      // DD/MM/YYYY hh:mm
+      else {
+        e.target.value = input.slice(0, 2) + '/' + input.slice(2, 4) + '/' + input.slice(4, 8) + ' ' + input.slice(8, 10) + ':' + input.slice(10, 12);
+      }
+    } else {
+      e.target.value = '';
     }
   };
 
@@ -825,7 +900,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Nombre</th>
                   {isTramitacion ? (
                     <>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ipartner</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Importe</th>
                     </>
                   ) : (
@@ -852,36 +927,37 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                       <>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <select
-                            value={service.ipartner || ''}
+                            value={service.estado || ''}
                             onChange={async (e) => {
                               const newValue = e.target.value;
-                              if (newValue === service.ipartner) return;
+                              if (!newValue || newValue === service.estado) return;
+                              
                               setSaving(true);
                               try {
-                                await airtableService.updateServiceField(service.id, 'Ipartner', newValue || null);
+                                await airtableService.updateServiceStatus(service.id, newValue);
                                 const updatedServices = services.map((s) =>
-                                  s.id === service.id ? { ...s, ipartner: newValue || undefined } : s
+                                  s.id === service.id ? { ...s, estado: newValue } : s
                                 );
                                 setServices(updatedServices);
                               } catch (error) {
-                                console.error('Error updating ipartner:', error);
-                                alert('Error al actualizar Ipartner');
+                                console.error('Error updating estado:', error);
+                                alert('Error al actualizar el estado');
                               } finally {
                                 setSaving(false);
                               }
                             }}
                             disabled={saving}
-                            className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center ${getIpartnerColors(service.ipartner).bg} ${getIpartnerColors(service.ipartner).text}`}
+                            className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center ${getStatusColors(service.estado).bg} ${getStatusColors(service.estado).text}`}
                             style={{ 
                               appearance: 'none', 
                               backgroundImage: 'none',
-                              width: `${(service.ipartner || 'Sin estado').length + 4}ch`,
+                              width: `${(service.estado || 'Sin estado').length + 4}ch`,
                               paddingLeft: '0.75rem',
                               paddingRight: '0.75rem'
                             }}
                           >
                             <option value="">Seleccionar...</option>
-                            {IPARTNER_OPTIONS.map((opt: string) => (
+                            {STATUS_OPTIONS.map((opt: string) => (
                               <option key={opt} value={opt}>{opt}</option>
                             ))}
                           </select>
@@ -1081,10 +1157,10 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.telefono)}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-gray-500">Fecha de registro</p>
-                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(formatDate(selectedService.fechaRegistro))}</p>
+                  <p className="text-xs uppercase text-gray-500">Número de serie</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.numeroSerie)}</p>
                 </div>
-                {!isTramitacion && (
+                {!isTramitacion && !isTecnico && (
                   <>
                     <div>
                       <p className="text-xs uppercase text-gray-500">Dirección</p>
@@ -1105,47 +1181,71 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   </>
                 )}
                 <div className="flex flex-col">
-                  <p className="text-xs uppercase text-gray-500 mb-1">Ipartner</p>
+                  <p className="text-xs uppercase text-gray-500 mb-1">Estado</p>
                   <div>
                     <select
-                      value={selectedService.ipartner || ''}
+                      value={selectedService.estado || ''}
                       onChange={(e) => {
                         const newValue = e.target.value;
-                        if (newValue === selectedService.ipartner) return;
-                        setSaving(true);
-                        airtableService.updateServiceField(selectedService.id, 'Ipartner', newValue || null)
-                          .then(() => {
-                            const updatedServices = services.map((s) =>
-                              s.id === selectedService.id ? { ...s, ipartner: newValue || undefined } : s
-                            );
-                            setServices(updatedServices);
-                            setSelectedService({...selectedService, ipartner: newValue || undefined});
-                          })
-                          .catch((error) => {
-                            console.error('Error updating ipartner:', error);
-                            alert('Error al actualizar Ipartner');
-                          })
-                          .finally(() => {
-                            setSaving(false);
-                          });
+                        if (newValue === selectedService.estado) return;
+                        
+                        // Actualizar el estado inmediatamente para re-renderizar
+                        setSelectedService({...selectedService, estado: newValue});
+                        
+                        // Si el nuevo estado es Citado, mostrar modal para seleccionar cita
+                        if (newValue === 'Citado') {
+                          setShowCitaModal(true);
+                          setPendingEstadoChange({ serviceId: selectedService.id, newEstado: newValue });
+                        } else if (['Llamado', 'Finalizado', 'Cancelado'].includes(newValue)) {
+                          // Si el nuevo estado requiere resolución visita, mostrar modal
+                          setPendingEstadoChange({ serviceId: selectedService.id, newEstado: newValue });
+                          setShowResolucionModal(true);
+                        } else {
+                          // Si no requiere modal, actualizar directamente y limpiar Cita
+                          setSaving(true);
+                          airtableService.updateServiceStatus(selectedService.id, newValue)
+                            .then(() => {
+                              // Si el nuevo estado no es Citado, limpiar la Cita
+                              if (newValue !== 'Citado') {
+                                return airtableService.updateServiceField(selectedService.id, 'Cita', null);
+                              }
+                            })
+                            .then(() => {
+                              const updatedServices = services.map((s) =>
+                                s.id === selectedService.id ? { ...s, estado: newValue, cita: newValue !== 'Citado' ? undefined : s.cita } : s
+                              );
+                              setServices(updatedServices);
+                              setSelectedService({...selectedService, cita: newValue !== 'Citado' ? undefined : selectedService.cita});
+                            })
+                            .catch((error) => {
+                              console.error('Error updating estado:', error);
+                              alert('Error al actualizar el estado');
+                              // Revertir el estado si falla
+                              setSelectedService({...selectedService, estado: selectedService.estado});
+                            })
+                            .finally(() => {
+                              setSaving(false);
+                            });
+                        }
                       }}
                       disabled={saving}
-                      className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block ${getIpartnerColors(selectedService.ipartner).bg} ${getIpartnerColors(selectedService.ipartner).text}`}
+                      className={`py-1 px-2 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block text-center ${getStatusColors(selectedService.estado).bg} ${getStatusColors(selectedService.estado).text}`}
                       style={{ 
                         appearance: 'none', 
                         backgroundImage: 'none',
-                        paddingLeft: '0.75rem',
-                        paddingRight: '0.75rem'
+                        paddingLeft: '0.5rem',
+                        paddingRight: '0.5rem',
+                        minWidth: '120px'
                       }}
                     >
                       <option value="">Seleccionar...</option>
-                      {IPARTNER_OPTIONS.map((opt: string) => (
+                      {STATUS_OPTIONS.map((opt: string) => (
                         <option key={opt} value={opt}>{opt}</option>
                       ))}
                     </select>
                   </div>
                 </div>
-                {!isTramitacion && (
+                {!isTramitacion && !isTecnico && (
                   <>
                     <div>
                       <p className="text-xs uppercase text-gray-500">Último cambio</p>
@@ -1156,29 +1256,28 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                       <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.estadoEnvio)}</p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase text-gray-500">Fecha instalación</p>
-                      <p className="text-sm text-gray-900 mt-1">{renderDetailValue(formatDate(selectedService.fechaInstalacion))}</p>
+                      <p className="text-xs uppercase text-gray-500">Referencia</p>
+                      <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.referencia)}</p>
                     </div>
                   </>
                 )}
                 <div>
-                  <p className="text-xs uppercase text-gray-500">Referencia</p>
-                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.referencia)}</p>
+                  <p className="text-xs uppercase text-gray-500">Fecha instalación</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(formatDate(selectedService.fechaInstalacion))}</p>
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-gray-500">Número de serie</p>
-                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.numeroSerie)}</p>
+                  <p className="text-xs uppercase text-gray-500">Fecha de registro</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(formatDate(selectedService.fechaRegistro))}</p>
                 </div>
-                {isTramitacion && (
-                  <div>
-                    <p className="text-xs uppercase text-gray-500">Acción Ipartner</p>
-                    <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.accionIpartner)}</p>
-                  </div>
-                )}
               </div>
               )}
-              
-              {/* Fotos para Tramitación */}
+
+              {isTramitacion && (
+                <div className="w-full">
+                  <p className="text-xs uppercase text-gray-500">Acción Ipartner</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.accionIpartner)}</p>
+                </div>
+              )}
               {isTramitacion && detailsView === 'detalles' && formularios.length > 0 && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-gray-900">Fotos</h3>
@@ -1186,7 +1285,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                     {/* Foto general */}
                     {formularios[0]?.['Foto general'] && Array.isArray(formularios[0]['Foto general']) && formularios[0]['Foto general'].map((file: AirtableAttachment, idx: number) => (
                       <div key={`general-${idx}`} className="space-y-2">
-                        <p className="text-xs font-medium text-gray-600">Foto general</p>
+                        <p className="text-xs font-medium text-gray-600">Fotos antes</p>
                         {file.thumbnails?.large?.url && (
                           <img
                             src={file.thumbnails.large.url}
@@ -1246,9 +1345,48 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
               {detailsView === 'detalles' && (
                 <div className="space-y-4">
                   {!isTramitacion && (
-                    <div>
-                      <p className="text-xs uppercase text-gray-500 mb-1">Descripción</p>
-                      <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{renderDetailValue(selectedService.descripcion)}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs uppercase text-gray-500 mb-1">Descripción</p>
+                        <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{renderDetailValue(selectedService.descripcion)}</p>
+                      </div>
+                      {selectedService.estado === 'Citado' && (
+                        <div>
+                          <p className="text-xs uppercase text-gray-500 mb-1">Cita</p>
+                          <input
+                            type="text"
+                            defaultValue={formatDateTimeForInput(selectedService.cita)}
+                            onChange={formatCitaInputWithAutoFormat}
+                            maxLength={16}
+                            placeholder="DD/MM/YYYY hh:mm"
+                            onBlur={async (e) => {
+                              const newValue = e.target.value;
+                              if (newValue === formatDateTimeForInput(selectedService.cita) || !newValue) return;
+                              
+                              const date = parseCitaInput(newValue);
+                              if (!date) {
+                                alert('Fecha y hora inválidas');
+                                return;
+                              }
+
+                              setSaving(true);
+                              try {
+                                const isoString = date.toISOString();
+                                await airtableService.updateServiceField(selectedService.id, 'Cita', isoString);
+                                setServices(services.map(s => s.id === selectedService.id ? {...s, cita: isoString} : s));
+                                setSelectedService({...selectedService, cita: isoString});
+                              } catch (error) {
+                                console.error('Error:', error);
+                                alert('Error al guardar');
+                              } finally {
+                                setSaving(false);
+                              }
+                            }}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                            disabled={saving}
+                          />
+                        </div>
+                      )}
                     </div>
                   )}
                   {!isTramitacion && (
@@ -1284,73 +1422,10 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                       />
                     </div>
                   )}
-                  {/* Motivo cancelación - oculto para Gestora Operativa y Tramitación */}
-                  {!isGestoraOperativa && !isTramitacion && (
-                    <div>
-                      <p className="text-xs uppercase text-gray-500 mb-1">Motivo cancelación</p>
-                      <select
-                        value={selectedService.motivoCancelacion || ''}
-                        onChange={async (e) => {
-                          const newValue = e.target.value;
-                          if (newValue === selectedService.motivoCancelacion) return;
-                          setSaving(true);
-                          try {
-                            await airtableService.updateServiceField(selectedService.id, 'Motivo cancelación', newValue);
-                            setServices(services.map(s => s.id === selectedService.id ? {...s, motivoCancelacion: newValue} : s));
-                            setSelectedService({...selectedService, motivoCancelacion: newValue});
-                          } catch (error) {
-                            console.error('Error:', error);
-                            alert('Error al guardar');
-                          } finally {
-                            setSaving(false);
-                          }
-                        }}
-                        disabled={saving}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm cursor-pointer"
-                      >
-                        <option value="">Sin especificar</option>
-                        <option value="Ilocalizable">Ilocalizable</option>
-                        <option value="Resuelto por el cliente">Resuelto por el cliente</option>
-                        <option value="Sin cobertura">Sin cobertura</option>
-                        <option value="Sin llave del cuadro">Sin llave del cuadro</option>
-                      </select>
-                    </div>
-                  )}
-                  {/* Primera fila: Cita y Cita técnico */}
-                  {!isTramitacion && (
+                  {/* Cita técnico y Técnico - oculto para técnicos */}
+                  {!isTramitacion && !isTecnico && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Cita - editable */}
-                      <div>
-                        <p className="text-xs uppercase text-gray-500 mb-1">Cita</p>
-                        <input
-                          type="datetime-local"
-                          defaultValue={formatDateTimeForInput(selectedService.cita)}
-                        onBlur={async (e) => {
-                          const newValue = e.target.value;
-                          if (newValue === formatDateTimeForInput(selectedService.cita)) return;
-                          if (!newValue) return;
-                          setSaving(true);
-                          try {
-                            // El input datetime-local está en hora local del navegador
-                            // Convertimos a ISO UTC para enviar a Airtable
-                            const date = new Date(newValue);
-                            const isoString = date.toISOString();
-                            
-                            await airtableService.updateServiceField(selectedService.id, 'Cita', isoString);
-                            setServices(services.map(s => s.id === selectedService.id ? {...s, cita: isoString} : s));
-                            setSelectedService({...selectedService, cita: isoString});
-                          } catch (error) {
-                            console.error('Error:', error);
-                            alert('Error al guardar');
-                          } finally {
-                            setSaving(false);
-                          }
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
-                        disabled={saving}
-                      />
-                    </div>
-                      {/* Cita técnico - siempre visible, solo lectura */}
+                      {/* Cita técnico - solo lectura */}
                       <div>
                         <p className="text-xs uppercase text-gray-500 mb-1">Cita técnico</p>
                         <p className="mt-1 text-sm text-gray-900">{renderDetailValue(formatDateTime(selectedService.citaTecnico))}</p>
@@ -1358,8 +1433,8 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                     </div>
                   )}
 
-                  {/* Segunda fila: Técnico y Nota técnico */}
-                  {!isTramitacion && (
+                  {/* Segunda fila: Técnico y Nota técnico - oculto para técnicos */}
+                  {!isTramitacion && !isTecnico && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <p className="text-xs uppercase text-gray-500 mb-1">Técnico</p>
@@ -1996,7 +2071,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Foto</h3>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Fotos después</h3>
                     {reparaciones[selectedReparacionIndex]?.fotoGeneral && Array.isArray(reparaciones[selectedReparacionIndex].fotoGeneral) && reparaciones[selectedReparacionIndex].fotoGeneral.length > 0 ? (
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         {reparaciones[selectedReparacionIndex].fotoGeneral.map((attachment: AirtableAttachment, idx: number) => (
@@ -2038,6 +2113,222 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para seleccionar Resolución Visita */}
+      {showResolucionModal && pendingEstadoChange && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => {
+            setShowResolucionModal(false);
+            setPendingEstadoChange(null);
+          }}
+        >
+          <div
+            className="relative w-full max-w-md bg-white rounded-2xl shadow-lg border border-gray-200 p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setShowResolucionModal(false);
+                setPendingEstadoChange(null);
+              }}
+              className="absolute top-4 right-4 p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
+              aria-label="Cerrar"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Seleccionar Resolución de Visita</h2>
+
+            <div className="space-y-3">
+              {RESOLUCION_VISITA_OPTIONS.map((opcion) => (
+                <button
+                  key={opcion}
+                  onClick={async () => {
+                    setSaving(true);
+                    try {
+                      // Actualizar el estado
+                      await airtableService.updateServiceStatus(
+                        pendingEstadoChange.serviceId,
+                        pendingEstadoChange.newEstado
+                      );
+                      
+                      // Actualizar la resolución visita
+                      await airtableService.updateServiceField(
+                        pendingEstadoChange.serviceId,
+                        'Resolución visita',
+                        opcion
+                      );
+
+                      // Limpiar la Cita cuando se cambia a Llamado, Finalizado o Cancelado
+                      await airtableService.updateServiceField(
+                        pendingEstadoChange.serviceId,
+                        'Cita',
+                        null
+                      );
+
+                      // Actualizar el estado local
+                      const updatedServices = services.map((s) =>
+                        s.id === pendingEstadoChange.serviceId
+                          ? { ...s, estado: pendingEstadoChange.newEstado, resolucionVisita: opcion, cita: undefined }
+                          : s
+                      );
+                      setServices(updatedServices);
+
+                      // Actualizar el servicio seleccionado
+                      if (selectedService && selectedService.id === pendingEstadoChange.serviceId) {
+                        setSelectedService({
+                          ...selectedService,
+                          estado: pendingEstadoChange.newEstado,
+                          resolucionVisita: opcion,
+                          cita: undefined
+                        });
+                      }
+
+                      // Cerrar el modal
+                      setShowResolucionModal(false);
+                      setPendingEstadoChange(null);
+                    } catch (error) {
+                      console.error('Error:', error);
+                      alert('Error al guardar');
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  disabled={saving}
+                  className="w-full px-4 py-3 text-left border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm text-gray-900 font-medium"
+                >
+                  {opcion}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para seleccionar Cita */}
+      {showCitaModal && pendingEstadoChange && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => {
+            setShowCitaModal(false);
+            setPendingEstadoChange(null);
+          }}
+        >
+          <div
+            className="relative w-full max-w-md bg-white rounded-2xl shadow-lg border border-gray-200 p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setShowCitaModal(false);
+                setPendingEstadoChange(null);
+              }}
+              className="absolute top-4 right-4 p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
+              aria-label="Cerrar"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Seleccionar Fecha y Hora de Cita</h2>
+
+            <div className="space-y-4">
+              <div>
+                <input
+                  type="text"
+                  id="citaInput"
+                  placeholder="DD/MM/YYYY hh:mm"
+                  onChange={formatCitaInputWithAutoFormat}
+                  defaultValue={formatDateTimeForInput(selectedService?.cita)}
+                  maxLength={16}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                  disabled={saving}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    const citaInput = document.getElementById('citaInput') as HTMLInputElement;
+                    const inputValue = citaInput?.value;
+                    
+                    if (!inputValue || inputValue.length < 16) {
+                      alert('Por favor completa la fecha y hora en formato DD/MM/YYYY hh:mm');
+                      return;
+                    }
+
+                    const date = parseCitaInput(inputValue);
+                    if (!date) {
+                      alert('Fecha y hora inválidas');
+                      return;
+                    }
+
+                    setSaving(true);
+                    try {
+                      const isoString = date.toISOString();
+
+                      // Actualizar el estado
+                      await airtableService.updateServiceStatus(
+                        pendingEstadoChange.serviceId,
+                        pendingEstadoChange.newEstado
+                      );
+
+                      // Actualizar la cita
+                      await airtableService.updateServiceField(
+                        pendingEstadoChange.serviceId,
+                        'Cita',
+                        isoString
+                      );
+
+                      // Actualizar el estado local
+                      const updatedServices = services.map((s) =>
+                        s.id === pendingEstadoChange.serviceId
+                          ? { ...s, estado: pendingEstadoChange.newEstado, cita: isoString }
+                          : s
+                      );
+                      setServices(updatedServices);
+
+                      // Actualizar el servicio seleccionado
+                      if (selectedService && selectedService.id === pendingEstadoChange.serviceId) {
+                        setSelectedService({
+                          ...selectedService,
+                          estado: pendingEstadoChange.newEstado,
+                          cita: isoString
+                        });
+                      }
+
+                      // Cerrar el modal
+                      setShowCitaModal(false);
+                      setPendingEstadoChange(null);
+                    } catch (error) {
+                      console.error('Error:', error);
+                      alert('Error al guardar');
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-green transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                >
+                  Guardar
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCitaModal(false);
+                    setPendingEstadoChange(null);
+                  }}
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           </div>
         </div>

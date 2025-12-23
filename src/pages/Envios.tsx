@@ -717,7 +717,14 @@ export default function Envios() {
                   id="catalogo"
                   value={newEnvio.catalogo || ''}
                   onChange={(e) => setNewEnvio((prev) => ({ ...prev, catalogo: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                  className={`py-1 px-2 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center inline-block ${getStatusColors('Producto').bg} ${getStatusColors('Producto').text}`}
+                  style={{
+                    appearance: 'none',
+                    backgroundImage: 'none',
+                    paddingLeft: '0.5rem',
+                    paddingRight: '0.5rem',
+                    minWidth: '120px'
+                  }}
                 >
                   <option value="">Seleccionar producto</option>
                   {catalogos.map((c) => (
@@ -795,29 +802,32 @@ export default function Envios() {
                 <p className="text-xs uppercase text-gray-500 mb-1">Número de recogida</p>
                 <input
                   type="number"
-                  value={numeroRecogidaDraft}
-                  onChange={(e) => setNumeroRecogidaDraft(e.target.value)}
+                  value={selectedEnvio.numeroRecogida || ''}
+                  onChange={(e) => {
+                    setSelectedEnvio((prev) => (prev ? { ...prev, numeroRecogida: e.target.value === '' ? undefined : Number(e.target.value) } : prev));
+                  }}
+                  onBlur={(e) => {
+                    const newValue = e.target.value === '' ? undefined : Number(e.target.value);
+                    if (newValue === selectedEnvio.numeroRecogida) return;
+                    setSavingNumeroRecogida(true);
+                    airtableService.updateEnvio(selectedEnvio.id, { numeroRecogida: newValue })
+                      .then(() => {
+                        setEnvios((prev) => prev.map((e) => (e.id === selectedEnvio.id ? { ...e, numeroRecogida: newValue } : e)));
+                        setSelectedEnvio((prev) => (prev ? { ...prev, numeroRecogida: newValue } : prev));
+                        setNumeroRecogidaDraft(newValue ? String(newValue) : '');
+                      })
+                      .catch((error) => {
+                        console.error('Error updating numeroRecogida:', error);
+                        alert('Error al actualizar el número de recogida');
+                      })
+                      .finally(() => {
+                        setSavingNumeroRecogida(false);
+                      });
+                  }}
+                  disabled={savingNumeroRecogida}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
                   placeholder="Introduce el número de recogida"
                 />
-                <div className="mt-2 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setNumeroRecogidaDraft(selectedEnvio.numeroRecogida?.toString() || '')}
-                    className="px-3 py-1 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-                    disabled={savingNumeroRecogida}
-                  >
-                    Deshacer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveNumeroRecogida}
-                    className="px-4 py-1.5 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={savingNumeroRecogida}
-                  >
-                    {savingNumeroRecogida ? 'Guardando...' : 'Guardar número'}
-                  </button>
-                </div>
               </div>
               <div className="flex flex-col sm:col-span-2">
                 <p className="text-xs uppercase text-gray-500 mb-1">Estado</p>
@@ -845,12 +855,13 @@ export default function Envios() {
                           setSaving(false);
                         });
                     }}
-                    className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block ${getStatusColors(selectedEnvio.estado).bg} ${getStatusColors(selectedEnvio.estado).text}`}
+                    className={`py-1 px-2 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block text-center ${getStatusColors(selectedEnvio.estado).bg} ${getStatusColors(selectedEnvio.estado).text}`}
                     style={{ 
                       appearance: 'none', 
                       backgroundImage: 'none',
-                      paddingLeft: '0.75rem',
-                      paddingRight: '0.75rem'
+                      paddingLeft: '0.5rem',
+                      paddingRight: '0.5rem',
+                      minWidth: '120px'
                     }}
                   >
                     <option value="">Seleccionar...</option>
@@ -888,96 +899,120 @@ export default function Envios() {
                 <p className="text-xs uppercase text-gray-500">Referencia</p>
                 <p className="text-sm text-gray-900">{selectedEnvio.referencia || '-'}</p>
               </div>
-              <div className="sm:col-span-2">
+              <div className="flex flex-col sm:col-span-2">
                 <p className="text-xs uppercase text-gray-500 mb-1">Producto / Catálogo</p>
-                <select
-                  value={catalogoDraft}
-                  onChange={(e) => setCatalogoDraft(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
-                >
-                  <option value="">Seleccionar producto</option>
-                  {catalogos.map((c) => (
-                    <option key={c.id} value={c.id}>{c.nombre}</option>
-                  ))}
-                </select>
-                <div className="mt-2 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCatalogoDraft(selectedEnvio.catalogo || '')}
-                    className="px-3 py-1 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                <div>
+                  <select
+                    value={selectedEnvio.catalogo || ''}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      if (newValue === selectedEnvio.catalogo) return;
+                      setSavingCatalogo(true);
+                      airtableService.updateEnvio(selectedEnvio.id, { catalogo: newValue })
+                        .then(() => {
+                          setEnvios((prev) => prev.map((e) => (e.id === selectedEnvio.id ? { ...e, catalogo: newValue } : e)));
+                          setSelectedEnvio((prev) => (prev ? { ...prev, catalogo: newValue } : prev));
+                          setCatalogoDraft(newValue);
+                        })
+                        .catch((error) => {
+                          console.error('Error updating catalogo:', error);
+                          alert('Error al actualizar el producto');
+                        })
+                        .finally(() => {
+                          setSavingCatalogo(false);
+                        });
+                    }}
                     disabled={savingCatalogo}
+                    className={`py-1 px-2 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center inline-block ${getStatusColors('Producto').bg} ${getStatusColors('Producto').text}`}
+                    style={{ 
+                      appearance: 'none', 
+                      backgroundImage: 'none',
+                      paddingLeft: '0.5rem',
+                      paddingRight: '0.5rem',
+                      minWidth: '120px'
+                    }}
                   >
-                    Deshacer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveCatalogo}
-                    className="px-4 py-1.5 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={savingCatalogo}
-                  >
-                    {savingCatalogo ? 'Guardando...' : 'Guardar producto'}
-                  </button>
+                    <option value="">Seleccionar producto</option>
+                    {catalogos.map((c) => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
-              <div className="sm:col-span-2">
+              <div className="flex flex-col sm:col-span-2">
                 <p className="text-xs uppercase text-gray-500 mb-1">Transporte</p>
-                <select
-                  value={transporteDraft}
-                  onChange={(e) => setTransporteDraft(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
-                >
-                  <option value="">Seleccionar transporte</option>
-                  <option value="Inbound Logística">Inbound Logística</option>
-                  <option value="Revalco">Revalco</option>
-                  <option value="Saltoki">Saltoki</option>
-                  <option value="Packlink">Packlink</option>
-                </select>
-                <div className="mt-2 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setTransporteDraft(selectedEnvio.transporte || '')}
-                    className="px-3 py-1 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                <div>
+                  <select
+                    value={selectedEnvio.transporte || ''}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      if (newValue === selectedEnvio.transporte) return;
+                      setSavingTransporte(true);
+                      airtableService.updateEnvio(selectedEnvio.id, { transporte: newValue })
+                        .then(() => {
+                          setEnvios((prev) => prev.map((e) => (e.id === selectedEnvio.id ? { ...e, transporte: newValue } : e)));
+                          setSelectedEnvio((prev) => (prev ? { ...prev, transporte: newValue } : prev));
+                          setTransporteDraft(newValue);
+                        })
+                        .catch((error) => {
+                          console.error('Error updating transporte:', error);
+                          alert('Error al actualizar el transporte');
+                        })
+                        .finally(() => {
+                          setSavingTransporte(false);
+                        });
+                    }}
                     disabled={savingTransporte}
+                    className={`py-1 px-2 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center inline-block ${getStatusColors('Transporte').bg} ${getStatusColors('Transporte').text}`}
+                    style={{ 
+                      appearance: 'none', 
+                      backgroundImage: 'none',
+                      paddingLeft: '0.5rem',
+                      paddingRight: '0.5rem',
+                      minWidth: '120px'
+                    }}
                   >
-                    Deshacer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveTransporte}
-                    className="px-4 py-1.5 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={savingTransporte}
-                  >
-                    {savingTransporte ? 'Guardando...' : 'Guardar transporte'}
-                  </button>
+                    <option value="">Seleccionar transporte</option>
+                    <option value="Inbound Logística">Inbound Logística</option>
+                    <option value="Revalco">Revalco</option>
+                    <option value="Saltoki">Saltoki</option>
+                    <option value="Packlink">Packlink</option>
+                  </select>
                 </div>
               </div>
               <div className="sm:col-span-2">
-                <p className="text-xs uppercase text-gray-500">Comentarios</p>
+                <p className="text-xs uppercase text-gray-500 mb-1">Comentarios</p>
                 <textarea
-                  value={commentDraft}
-                  onChange={(e) => setCommentDraft(e.target.value)}
-                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
-                  rows={4}
+                  value={selectedEnvio.comentarios || ''}
+                  onChange={(e) => {
+                    const newValue = e.target.value;
+                    setSelectedEnvio((prev) => (prev ? { ...prev, comentarios: newValue } : prev));
+                    // Auto-resize textarea
+                    e.target.style.height = 'auto';
+                    e.target.style.height = Math.max(e.target.scrollHeight, 100) + 'px';
+                  }}
+                  onBlur={(e) => {
+                    const newValue = e.target.value;
+                    if (newValue === selectedEnvio.comentarios) return;
+                    setSavingComment(true);
+                    airtableService.updateEnvio(selectedEnvio.id, { comentarios: newValue })
+                      .then(() => {
+                        setEnvios((prev) => prev.map((e) => (e.id === selectedEnvio.id ? { ...e, comentarios: newValue } : e)));
+                        setSelectedEnvio((prev) => (prev ? { ...prev, comentarios: newValue } : prev));
+                      })
+                      .catch((error) => {
+                        console.error('Error updating comentarios:', error);
+                        alert('Error al actualizar los comentarios');
+                      })
+                      .finally(() => {
+                        setSavingComment(false);
+                      });
+                  }}
+                  disabled={savingComment}
+                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm resize-none overflow-hidden"
                   placeholder="Añade comentarios"
+                  style={{ minHeight: '100px' }}
                 />
-                <div className="mt-2 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCommentDraft(selectedEnvio.comentarios || '')}
-                    className="px-3 py-1 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-                    disabled={savingComment}
-                  >
-                    Deshacer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveComment}
-                    className="px-4 py-1.5 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={savingComment}
-                  >
-                    {savingComment ? 'Guardando...' : 'Guardar comentarios'}
-                  </button>
-                </div>
               </div>
             </div>
           </div>

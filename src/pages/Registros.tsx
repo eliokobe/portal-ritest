@@ -60,6 +60,8 @@ export default function Registros() {
   const [editComentariosValue, setEditComentariosValue] = useState('');
   const [savingComentarios, setSavingComentarios] = useState(false);
   const [updatingTramitado, setUpdatingTramitado] = useState<string | null>(null);
+  const [showCitaModal, setShowCitaModal] = useState(false);
+  const [pendingEstadoChange, setPendingEstadoChange] = useState<{registroId: string, newEstado: string} | null>(null);
 
   const isGestoraTecnica = user?.role === 'Gestora Técnica';
   const isGestoraOperativa = user?.role === 'Gestora Operativa';
@@ -83,24 +85,6 @@ export default function Registros() {
   };
 
   // Convierte de ISO UTC a formato datetime-local para el input
-  const formatDateTimeForInput = (dateString?: string) => {
-    if (!dateString) return '';
-    try {
-      // Airtable devuelve ISO UTC, necesitamos convertir a hora local para el input
-      const date = new Date(dateString);
-      // Obtener componentes en zona horaria local del navegador
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const hours = String(date.getHours()).padStart(2, '0');
-      const minutes = String(date.getMinutes()).padStart(2, '0');
-      return `${year}-${month}-${day}T${hours}:${minutes}`;
-    } catch {
-      return '';
-    }
-  };
-
-  // Convierte de formato datetime-local a ISO UTC para enviar a Airtable
   const convertLocalInputToISO = (localDateTime: string): string => {
     if (!localDateTime) return '';
     try {
@@ -111,6 +95,58 @@ export default function Registros() {
       return date.toISOString();
     } catch {
       return localDateTime;
+    }
+  };
+
+  // Formatea entrada DD/MM/YYYY hh:mm a ISO para airtable
+  const formatCitaInputWithAutoFormat = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    let value = input.value;
+    
+    // Solo permitir números, /, : 
+    value = value.replace(/[^\d/:]/g, '');
+    
+    // Auto-formatear
+    if (value.length === 2 && !value.includes('/')) {
+      value = value + '/';
+    } else if (value.length === 5 && (value.match(/\//g) || []).length === 1) {
+      value = value + '/';
+    } else if (value.length === 10 && (value.match(/\//g) || []).length === 2) {
+      value = value + ' ';
+    } else if (value.length === 13 && (value.match(/\//g) || []).length === 2) {
+      value = value + ':';
+    }
+    
+    input.value = value;
+  };
+
+  // Parsea DD/MM/YYYY hh:mm a Date
+  const parseCitaInput = (input: string): Date | null => {
+    const regex = /(\d{2})\/(\d{2})\/(\d{4})\s(\d{2}):(\d{2})/;
+    const match = input.match(regex);
+    
+    if (!match) return null;
+    
+    const [, day, month, year, hours, minutes] = match;
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(minutes));
+    
+    if (isNaN(date.getTime())) return null;
+    return date;
+  };
+
+  // Formatea Date a DD/MM/YYYY hh:mm
+  const formatDateTimeForInput = (dateString?: string): string => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${day}/${month}/${year} ${hours}:${minutes}`;
+    } catch {
+      return '';
     }
   };
 
@@ -177,8 +213,15 @@ export default function Registros() {
     
     setSavingCita(true);
     try {
-      // Convertir el valor del input datetime-local a formato ISO UTC
-      const citaISO = convertLocalInputToISO(newCita);
+      // Parsear el formato DD/MM/YYYY hh:mm y convertir a ISO
+      const date = parseCitaInput(newCita);
+      if (!date) {
+        alert('Fecha y hora inválidas');
+        setSavingCita(false);
+        return;
+      }
+      
+      const citaISO = date.toISOString();
       
       await airtableService.updateRegistro(registroId, { cita: citaISO });
       
@@ -342,14 +385,21 @@ export default function Registros() {
                         onChange={async (e) => {
                           const newValue = e.target.value;
                           if (!newValue || newValue === registro.estado) return;
-                          setSavingStatus(true);
-                          try {
-                            await handleSaveStatus(registro.id, newValue);
-                          } catch (error) {
-                            console.error('Error updating estado:', error);
-                            alert('Error al actualizar el estado');
-                          } finally {
-                            setSavingStatus(false);
+                          
+                          // Si el nuevo estado es Citado, mostrar modal para seleccionar cita
+                          if (newValue === 'Citado') {
+                            setShowCitaModal(true);
+                            setPendingEstadoChange({ registroId: registro.id, newEstado: newValue });
+                          } else {
+                            setSavingStatus(true);
+                            try {
+                              await handleSaveStatus(registro.id, newValue);
+                            } catch (error) {
+                              console.error('Error updating estado:', error);
+                              alert('Error al actualizar el estado');
+                            } finally {
+                              setSavingStatus(false);
+                            }
                           }
                         }}
                         disabled={savingStatus}
@@ -490,6 +540,10 @@ export default function Registros() {
                   <h3 className="text-xs uppercase text-gray-500">Dirección</h3>
                   <p className="text-sm text-gray-900 mt-1">{selectedRegistro.direccion || '-'}</p>
                 </div>
+                <div>
+                  <h3 className="text-xs uppercase text-gray-500">Email</h3>
+                  <p className="text-sm text-gray-900 mt-1">{selectedRegistro.email || '-'}</p>
+                </div>
                 <div className="flex flex-col">
                   <p className="text-xs uppercase text-gray-500 mb-1">Estado</p>
                   <div>
@@ -498,15 +552,23 @@ export default function Registros() {
                       onChange={async (e) => {
                         const newValue = e.target.value;
                         if (!newValue || newValue === selectedRegistro.estado) return;
-                        await handleSaveStatus(selectedRegistro.id, newValue);
+                        
+                        // Si el nuevo estado es Citado, mostrar modal para seleccionar cita
+                        if (newValue === 'Citado') {
+                          setShowCitaModal(true);
+                          setPendingEstadoChange({ registroId: selectedRegistro.id, newEstado: newValue });
+                        } else {
+                          await handleSaveStatus(selectedRegistro.id, newValue);
+                        }
                       }}
                       disabled={savingStatus}
-                      className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block ${getStatusColors(selectedRegistro.estado).bg} ${getStatusColors(selectedRegistro.estado).text}`}
+                      className={`py-1 px-2 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block text-center ${getStatusColors(selectedRegistro.estado).bg} ${getStatusColors(selectedRegistro.estado).text}`}
                       style={{ 
                         appearance: 'none', 
                         backgroundImage: 'none',
-                        paddingLeft: '0.75rem',
-                        paddingRight: '0.75rem'
+                        paddingLeft: '0.5rem',
+                        paddingRight: '0.5rem',
+                        minWidth: '120px'
                       }}
                     >
                       <option value="">Seleccionar...</option>
@@ -527,88 +589,78 @@ export default function Registros() {
                   </div>
                 </div>
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-xs uppercase text-gray-500">Cita</h3>
-                    <button
-                      onClick={() => {
-                        setEditingCita(selectedRegistro.id);
-                        setEditCitaValue(formatDateTimeForInput(selectedRegistro.cita));
-                      }}
-                      className="text-xs text-brand-primary hover:text-brand-green"
-                    >
-                      Editar
-                    </button>
-                  </div>
-                  {editingCita === selectedRegistro.id ? (
-                    <div className="space-y-2">
-                      <input
-                        type="datetime-local"
-                        value={editCitaValue}
-                        onChange={(e) => setEditCitaValue(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
-                        disabled={savingCita}
-                        autoFocus
-                      />
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleSaveCita(selectedRegistro.id, editCitaValue)}
-                          disabled={savingCita}
-                          className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
-                        >
-                          Guardar
-                        </button>
-                        <button
-                          onClick={handleCancelCitaEdit}
-                          disabled={savingCita}
-                          className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-900 mt-1">{formatDateTime(selectedRegistro.cita)}</p>
-                  )}
-                </div>
-                <div>
-                  <h3 className="text-xs uppercase text-gray-500">Email</h3>
-                  <p className="text-sm text-gray-900 mt-1">{selectedRegistro.email || '-'}</p>
+                  <h3 className="text-xs uppercase text-gray-500 mb-1">Ipartner</h3>
+                  <select
+                    value={selectedRegistro.ipartner || ''}
+                    onChange={async (e) => {
+                      const newValue = e.target.value;
+                      if (!newValue || newValue === selectedRegistro.ipartner) return;
+                      try {
+                        await airtableService.updateRegistro(selectedRegistro.id, { ipartner: newValue });
+                        setRegistros(prev => 
+                          prev.map(r => 
+                            r.id === selectedRegistro.id 
+                              ? { ...r, ipartner: newValue }
+                              : r
+                          )
+                        );
+                        setSelectedRegistro({ ...selectedRegistro, ipartner: newValue });
+                      } catch (error) {
+                        console.error('Error updating ipartner:', error);
+                        alert('Error al actualizar ipartner');
+                      }
+                    }}
+                    className={`py-1 px-2 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center ${getStatusColors(selectedRegistro.ipartner).bg} ${getStatusColors(selectedRegistro.ipartner).text}`}
+                    style={{ 
+                      appearance: 'none', 
+                      backgroundImage: 'none',
+                      paddingLeft: '0.5rem',
+                      paddingRight: '0.5rem',
+                      minWidth: '120px'
+                    }}
+                  >
+                    <option value="">Seleccionar...</option>
+                    {IPARTNER_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className="text-sm font-semibold text-gray-700">Comentarios</h3>
-                  <button
-                    onClick={() => {
-                      setEditingComentarios(selectedRegistro.id);
-                      setEditComentariosValue(selectedRegistro.comentarios || '');
-                    }}
-                    className="text-xs text-brand-primary hover:text-brand-green"
-                  >
-                    Editar
-                  </button>
-                </div>
-                {editingComentarios === selectedRegistro.id ? (
+                <h3 className="text-xs uppercase text-gray-500 mb-1">Cita</h3>
+                {editingCita === selectedRegistro.id ? (
                   <div className="space-y-2">
-                    <textarea
-                      value={editComentariosValue}
-                      onChange={(e) => setEditComentariosValue(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
-                      rows={4}
-                      disabled={savingComentarios}
-                      autoFocus
+                    <input
+                      type="text"
+                      id="citaInputEdit"
+                      placeholder="DD/MM/YYYY hh:mm"
+                      onChange={formatCitaInputWithAutoFormat}
+                      defaultValue={formatDateTimeForInput(selectedRegistro.cita)}
+                      maxLength={16}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                      disabled={savingCita}
                     />
                     <div className="flex gap-2">
                       <button
-                        onClick={() => handleSaveComentarios(selectedRegistro.id, editComentariosValue)}
-                        disabled={savingComentarios}
+                        onClick={() => {
+                          const input = document.getElementById('citaInputEdit') as HTMLInputElement;
+                          const value = input?.value || '';
+                          if (value.length < 16) {
+                            alert('Por favor completa la fecha y hora en formato DD/MM/YYYY hh:mm');
+                            return;
+                          }
+                          handleSaveCita(selectedRegistro.id, value);
+                        }}
+                        disabled={savingCita}
                         className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
                       >
                         Guardar
                       </button>
                       <button
-                        onClick={handleCancelComentariosEdit}
-                        disabled={savingComentarios}
+                        onClick={handleCancelCitaEdit}
+                        disabled={savingCita}
                         className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300"
                       >
                         Cancelar
@@ -616,8 +668,146 @@ export default function Registros() {
                     </div>
                   </div>
                 ) : (
-                  <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{selectedRegistro.comentarios || '-'}</p>
+                  <p className="text-sm text-gray-900 mt-1">{formatDateTime(selectedRegistro.cita)}</p>
                 )}
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="text-sm font-semibold text-gray-700">Comentarios</h3>
+                </div>
+                <textarea
+                  data-autosize="true"
+                  defaultValue={selectedRegistro.comentarios || ''}
+                  onInput={(e) => {
+                    const target = e.target as HTMLTextAreaElement;
+                    target.style.height = 'auto';
+                    target.style.height = target.scrollHeight + 'px';
+                  }}
+                  onBlur={async (e) => {
+                    const newValue = e.target.value;
+                    if (newValue === selectedRegistro.comentarios) return;
+                    await handleSaveComentarios(selectedRegistro.id, newValue);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm resize-none overflow-hidden"
+                  style={{ minHeight: '60px' }}
+                  disabled={savingComentarios}
+                  placeholder="Escribe comentarios..."
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para seleccionar Cita */}
+      {showCitaModal && pendingEstadoChange && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => {
+            setShowCitaModal(false);
+            setPendingEstadoChange(null);
+          }}
+        >
+          <div
+            className="relative w-full max-w-md bg-white rounded-2xl shadow-lg border border-gray-200 p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setShowCitaModal(false);
+                setPendingEstadoChange(null);
+              }}
+              className="absolute top-4 right-4 p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
+              aria-label="Cerrar"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Seleccionar Fecha y Hora de Cita</h2>
+
+            <div className="space-y-4">
+              <div>
+                <input
+                  type="text"
+                  id="citaInputModal"
+                  placeholder="DD/MM/YYYY hh:mm"
+                  onChange={formatCitaInputWithAutoFormat}
+                  maxLength={16}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                  disabled={savingCita}
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    const citaInput = document.getElementById('citaInputModal') as HTMLInputElement;
+                    const inputValue = citaInput?.value;
+                    
+                    if (!inputValue || inputValue.length < 16) {
+                      alert('Por favor completa la fecha y hora en formato DD/MM/YYYY hh:mm');
+                      return;
+                    }
+
+                    const date = parseCitaInput(inputValue);
+                    if (!date) {
+                      alert('Fecha y hora inválidas');
+                      return;
+                    }
+
+                    setSavingCita(true);
+                    try {
+                      const isoString = date.toISOString();
+
+                      // Actualizar el estado
+                      await airtableService.updateRegistro(
+                        pendingEstadoChange.registroId,
+                        { estado: pendingEstadoChange.newEstado, cita: isoString }
+                      );
+
+                      // Actualizar el estado local
+                      const updatedRegistros = registros.map((r) =>
+                        r.id === pendingEstadoChange.registroId
+                          ? { ...r, estado: pendingEstadoChange.newEstado, cita: isoString }
+                          : r
+                      );
+                      setRegistros(updatedRegistros);
+
+                      // Actualizar el registro seleccionado
+                      if (selectedRegistro && selectedRegistro.id === pendingEstadoChange.registroId) {
+                        setSelectedRegistro({
+                          ...selectedRegistro,
+                          estado: pendingEstadoChange.newEstado,
+                          cita: isoString
+                        });
+                      }
+
+                      // Cerrar el modal
+                      setShowCitaModal(false);
+                      setPendingEstadoChange(null);
+                    } catch (error) {
+                      console.error('Error:', error);
+                      alert('Error al guardar');
+                    } finally {
+                      setSavingCita(false);
+                    }
+                  }}
+                  disabled={savingCita}
+                  className="flex-1 px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-green transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                >
+                  Guardar
+                </button>
+                <button
+                  onClick={() => {
+                    setShowCitaModal(false);
+                    setPendingEstadoChange(null);
+                  }}
+                  disabled={savingCita}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                >
+                  Cancelar
+                </button>
               </div>
             </div>
           </div>
