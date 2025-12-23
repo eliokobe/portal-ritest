@@ -269,7 +269,8 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
         const estadoOk = s.estado && estadosPermitidos.includes(s.estado);
         const tramitadoOk = !s.tramitado;
         const accionIpartnerOk = !!s.accionIpartner && s.accionIpartner.trim() !== '';
-        return !!estadoOk && tramitadoOk && accionIpartnerOk;
+        const ipartnerOk = !s.ipartner || (s.ipartner !== 'Cancelado' && s.ipartner !== 'Finalizado');
+        return !!estadoOk && tramitadoOk && accionIpartnerOk && ipartnerOk;
       });
     } else {
       // Para servicios: mostrar todo salvo Finalizado/Cancelado
