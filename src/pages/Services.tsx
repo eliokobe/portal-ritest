@@ -1109,23 +1109,25 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   <div>
                     <select
                       value={selectedService.ipartner || ''}
-                      onChange={async (e) => {
+                      onChange={(e) => {
                         const newValue = e.target.value;
-                        if (!newValue || newValue === selectedService.ipartner) return;
+                        if (newValue === selectedService.ipartner) return;
                         setSaving(true);
-                        try {
-                          await airtableService.updateService(selectedService.id, { ipartner: newValue });
-                          const updatedServices = services.map((s) =>
-                            s.id === selectedService.id ? { ...s, ipartner: newValue } : s
-                          );
-                          setServices(updatedServices);
-                          setSelectedService({...selectedService, ipartner: newValue});
-                        } catch (error) {
-                          console.error('Error updating ipartner:', error);
-                          alert('Error al actualizar ipartner');
-                        } finally {
-                          setSaving(false);
-                        }
+                        airtableService.updateServiceField(selectedService.id, 'Ipartner', newValue || null)
+                          .then(() => {
+                            const updatedServices = services.map((s) =>
+                              s.id === selectedService.id ? { ...s, ipartner: newValue || undefined } : s
+                            );
+                            setServices(updatedServices);
+                            setSelectedService({...selectedService, ipartner: newValue || undefined});
+                          })
+                          .catch((error) => {
+                            console.error('Error updating ipartner:', error);
+                            alert('Error al actualizar Ipartner');
+                          })
+                          .finally(() => {
+                            setSaving(false);
+                          });
                       }}
                       disabled={saving}
                       className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block ${getIpartnerColors(selectedService.ipartner).bg} ${getIpartnerColors(selectedService.ipartner).text}`}
