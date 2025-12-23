@@ -38,6 +38,14 @@ const GESTORA_TECNICA_ESTADOS = [
   'Citado'
 ];
 
+// Opciones para Ipartner
+const IPARTNER_OPTIONS = [
+  'Citado',
+  'Finalizado',
+  'Cancelado',
+  'Facturado'
+];
+
 export default function Registros() {
   const { user } = useAuth();
   const [registros, setRegistros] = useState<Registro[]>([]);
@@ -298,7 +306,7 @@ export default function Registros() {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teléfono</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dirección</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cita</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ipartner</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Detalles</th>
               </tr>
             </thead>
@@ -367,46 +375,45 @@ export default function Registros() {
                         ))}
                       </select>
                     </td>
-                    <td className="px-4 py-3">
-                      {editingCita === registro.id ? (
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="datetime-local"
-                            value={editCitaValue}
-                            onChange={(e) => setEditCitaValue(e.target.value)}
-                            className="text-sm px-2 py-1 border rounded focus:ring-1 focus:ring-brand-primary disabled:opacity-50"
-                            disabled={savingCita}
-                            autoFocus
-                          />
-                          <button
-                            onClick={() => handleSaveCita(registro.id, editCitaValue)}
-                            disabled={savingCita}
-                            className="text-green-600 hover:text-green-800 disabled:opacity-50 flex-shrink-0"
-                            title="Guardar"
-                          >
-                            <Check className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={handleCancelCitaEdit}
-                            disabled={savingCita}
-                            className="text-red-600 hover:text-red-800 disabled:opacity-50 flex-shrink-0"
-                            title="Cancelar"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div
-                          className="text-sm formatDateTimeForInput(registro.cita)r-pointer hover:bg-gray-100 px-2 py-1 rounded"
-                          onClick={() => {
-                            setEditingCita(registro.id);
-                            setEditCitaValue(registro.cita || '');
-                          }}
-                          title="Click para editar"
-                        >
-                          {formatDateTime(registro.cita)}
-                        </div>
-                      )}
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <select
+                        value={registro.ipartner || ''}
+                        onChange={async (e) => {
+                          const newValue = e.target.value;
+                          if (!newValue || newValue === registro.ipartner) return;
+                          try {
+                            await airtableService.updateRegistro(registro.id, { ipartner: newValue });
+                            setRegistros(prev => 
+                              prev.map(r => 
+                                r.id === registro.id 
+                                  ? { ...r, ipartner: newValue }
+                                  : r
+                              )
+                            );
+                            if (selectedRegistro && selectedRegistro.id === registro.id) {
+                              setSelectedRegistro({ ...selectedRegistro, ipartner: newValue });
+                            }
+                          } catch (error) {
+                            console.error('Error updating ipartner:', error);
+                            alert('Error al actualizar ipartner');
+                          }
+                        }}
+                        className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center ${getStatusColors(registro.ipartner).bg} ${getStatusColors(registro.ipartner).text}`}
+                        style={{ 
+                          appearance: 'none', 
+                          backgroundImage: 'none',
+                          width: `${(registro.ipartner || 'Seleccionar').length + 4}ch`,
+                          paddingLeft: '0.75rem',
+                          paddingRight: '0.75rem'
+                        }}
+                      >
+                        <option value="">Seleccionar...</option>
+                        {IPARTNER_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button
@@ -474,18 +481,6 @@ export default function Registros() {
                 <div>
                   <h3 className="text-xs uppercase text-gray-500">Nombre</h3>
                   <p className="text-sm text-gray-900 mt-1">{selectedRegistro.nombre || '-'}</p>
-                </div>
-                <div className="flex flex-col">
-                  <h3 className="text-xs uppercase text-gray-500 mb-1">Tramitación</h3>
-                  <button
-                    type="button"
-                    onClick={() => handleMarkTramitado(selectedRegistro.id)}
-                    disabled={updatingTramitado === selectedRegistro.id}
-                    className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-gray-300 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed self-start"
-                    title="Marcar como tramitado"
-                  >
-                    <Check className="h-4 w-4" />
-                  </button>
                 </div>
                 <div>
                   <h3 className="text-xs uppercase text-gray-500">Teléfono</h3>

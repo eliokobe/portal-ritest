@@ -72,6 +72,7 @@ export interface Registro {
   informe?: string;
   expediente?: string;
   tramitado?: boolean;
+  ipartner?: string;
 }
 
 export interface Envio {
@@ -94,6 +95,7 @@ export interface Envio {
   codigoPostal?: string;
   provincia?: string;
   telefono?: string;
+  conversationId?: string;
 }
 
 export interface DashboardStats {

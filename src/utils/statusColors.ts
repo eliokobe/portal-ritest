@@ -33,6 +33,19 @@ export const getStatusColors = (estado: string | undefined): { bg: string; text:
     return { bg: 'bg-green-100', text: 'text-green-800' };
   }
 
+  // Estados de ipartner
+  if (estadoLower === 'finalizado') {
+    return { bg: 'bg-emerald-100', text: 'text-emerald-800' };
+  }
+  
+  if (estadoLower === 'cancelado') {
+    return { bg: 'bg-red-100', text: 'text-red-800' };
+  }
+  
+  if (estadoLower === 'facturado') {
+    return { bg: 'bg-indigo-100', text: 'text-indigo-800' };
+  }
+
   // Estados de progreso inicial
   if (estadoLower.includes('sin contactar') || estadoLower.includes('contactado')) {
     return { bg: 'bg-blue-100', text: 'text-blue-800' };
@@ -111,6 +124,36 @@ export const getStatusColors = (estado: string | undefined): { bg: string; text:
   // Cancelado
   if (estadoLower.includes('cancelado')) {
     return { bg: 'bg-red-100', text: 'text-red-800' };
+  }
+
+  // Default
+  return { bg: 'bg-gray-100', text: 'text-gray-800' };
+};
+
+// Función para obtener colores de estados Ipartner
+export const getIpartnerColors = (ipartner: string | undefined): { bg: string; text: string } => {
+  if (!ipartner) return { bg: 'bg-gray-100', text: 'text-gray-800' };
+
+  const ipartnerLower = ipartner.toLowerCase();
+
+  if (ipartnerLower === 'citado') {
+    return { bg: 'bg-blue-100', text: 'text-blue-800' };
+  }
+  
+  if (ipartnerLower === 'cita confirmada') {
+    return { bg: 'bg-green-100', text: 'text-green-800' };
+  }
+  
+  if (ipartnerLower === 'finalizado') {
+    return { bg: 'bg-emerald-100', text: 'text-emerald-800' };
+  }
+  
+  if (ipartnerLower === 'cancelado') {
+    return { bg: 'bg-red-100', text: 'text-red-800' };
+  }
+  
+  if (ipartnerLower === 'facturado') {
+    return { bg: 'bg-purple-100', text: 'text-purple-800' };
   }
 
   // Default

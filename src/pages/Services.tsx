@@ -2,7 +2,7 @@ import React, { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { Search, Info, X, Check, XCircle, Phone, MessageCircle } from 'lucide-react';
 import { airtableService } from '../services/airtable';
 import { useAuth } from '../contexts/AuthContext';
-import { getStatusColors } from '../utils/statusColors';
+import { getStatusColors, getIpartnerColors } from '../utils/statusColors';
 
 interface AirtableAttachment {
   id: string;
@@ -46,6 +46,8 @@ interface Service {
   provincia?: string;
   numeroSerie?: string;
   importe?: number;
+  accionIpartner?: string;
+  ipartner?: string;
 }
 
 const STATUS_OPTIONS = [
@@ -63,6 +65,14 @@ const STATUS_OPTIONS = [
   'Material enviado',
   'Finalizado',
   'Cancelado'
+];
+
+const IPARTNER_OPTIONS = [
+  'Citado',
+  'Cita confirmada',
+  'Finalizado',
+  'Cancelado',
+  'Facturado'
 ];
 
 const renderDetailValue = (value?: string) => {
@@ -258,7 +268,8 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
       servicesWithAllowedStates = servicesWithAllowedStates.filter((s) => {
         const estadoOk = s.estado && estadosPermitidos.includes(s.estado);
         const tramitadoOk = !s.tramitado;
-        return !!estadoOk && tramitadoOk;
+        const accionIpartnerOk = !!s.accionIpartner && s.accionIpartner.trim() !== '';
+        return !!estadoOk && tramitadoOk && accionIpartnerOk;
       });
     } else {
       // Para servicios: mostrar todo salvo Finalizado/Cancelado
@@ -444,6 +455,31 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   // Cargar datos de formulario cuando se selecciona la vista en el modal de detalles
   useEffect(() => {
     const loadInlineForm = async () => {
+      // Para tramitación, cargar siempre en la vista de detalles
+      if (isTramitacion && detailsView === 'detalles') {
+        const expediente = selectedService?.expediente;
+        if (!expediente) {
+          setFormularios([]);
+          setSelectedFormularioIndex(0);
+          return;
+        }
+        try {
+          const sameExp = formularios.length > 0 && (formularios[0]?.Expediente === expediente);
+          if (!sameExp) {
+            setFormularios([]);
+            const data = await airtableService.getFormularioByExpediente(expediente);
+            setFormularios(data);
+            setSelectedFormularioIndex(0);
+          }
+        } catch (e) {
+          console.error('Error cargando formularios (inline):', e);
+          setFormularios([]);
+          setSelectedFormularioIndex(0);
+        }
+        return;
+      }
+      
+      // Para servicios, solo cargar cuando esté en la vista de formulario
       if (detailsView !== 'formulario') return;
       const expediente = selectedService?.expediente;
       if (!expediente) {
@@ -786,14 +822,18 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expediente</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Registro</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Nombre</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{isTramitacion ? 'Estado' : 'Teléfono'}</th>
-                  {isTramitacion && (
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Importe</th>
+                  {isTramitacion ? (
+                    <>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ipartner</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Importe</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Teléfono</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                    </>
                   )}
-                  {!isTramitacion && (
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                  )}
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{isTramitacion ? 'Tramitado' : 'Último Cambio'}</th>
+                  {!isTramitacion && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Último Cambio</th>}
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Detalles</th>
                 </tr>
               </thead>
@@ -807,47 +847,45 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                     <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{service.expediente || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">{formatDate(service.fechaRegistro)}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 w-40"><div className="max-w-[10rem] truncate">{service.nombre || '-'}</div></td>
-                    <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
-                      {isTramitacion ? (
-                        <select
-                          value={service.estado || ''}
-                          onChange={async (e) => {
-                            const newValue = e.target.value;
-                            if (!newValue || newValue === service.estado) return;
-                            
-                            setSaving(true);
-                            try {
-                              await airtableService.updateServiceStatus(service.id, newValue);
-                              const updatedServices = services.map((s) =>
-                                s.id === service.id ? { ...s, estado: newValue } : s
-                              );
-                              setServices(updatedServices);
-                            } catch (error) {
-                              console.error('Error updating estado:', error);
-                              alert('Error al actualizar el estado');
-                            } finally {
-                              setSaving(false);
-                            }
-                          }}
-                          disabled={saving}
-                          className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center ${getStatusColors(service.estado).bg} ${getStatusColors(service.estado).text}`}
-                          style={{ 
-                            appearance: 'none', 
-                            backgroundImage: 'none',
-                            width: `${(service.estado || 'Sin estado').length + 4}ch`,
-                            paddingLeft: '0.75rem',
-                            paddingRight: '0.75rem'
-                          }}
-                        >
-                          <option value="">Seleccionar...</option>
-                          {STATUS_OPTIONS.map((opt: string) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      ) : (service.telefono || '-')}
-                    </td>
-                    {isTramitacion && (
-                      <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
+                    {isTramitacion ? (
+                      <>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <select
+                            value={service.ipartner || ''}
+                            onChange={async (e) => {
+                              const newValue = e.target.value;
+                              if (newValue === service.ipartner) return;
+                              setSaving(true);
+                              try {
+                                await airtableService.updateServiceField(service.id, 'Ipartner', newValue || null);
+                                const updatedServices = services.map((s) =>
+                                  s.id === service.id ? { ...s, ipartner: newValue || undefined } : s
+                                );
+                                setServices(updatedServices);
+                              } catch (error) {
+                                console.error('Error updating ipartner:', error);
+                                alert('Error al actualizar Ipartner');
+                              } finally {
+                                setSaving(false);
+                              }
+                            }}
+                            disabled={saving}
+                            className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center ${getIpartnerColors(service.ipartner).bg} ${getIpartnerColors(service.ipartner).text}`}
+                            style={{ 
+                              appearance: 'none', 
+                              backgroundImage: 'none',
+                              width: `${(service.ipartner || 'Sin estado').length + 4}ch`,
+                              paddingLeft: '0.75rem',
+                              paddingRight: '0.75rem'
+                            }}
+                          >
+                            <option value="">Seleccionar...</option>
+                            {IPARTNER_OPTIONS.map((opt: string) => (
+                              <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
                         <input
                           type="number"
                           step="0.01"
@@ -889,9 +927,11 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                           placeholder="0.00"
                         />
                       </td>
-                    )}
-                    {!isTramitacion && (
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">{service.telefono || '-'}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
                         <select
                           value={service.estado || ''}
                           onChange={async (e) => {
@@ -928,20 +968,9 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                           ))}
                         </select>
                       </td>
+                      </>
                     )}
-                    {isTramitacion ? (
-                      <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
-                        <button
-                          type="button"
-                          onClick={() => handleMarkSynced(service.id)}
-                          disabled={updatingId === service.id}
-                          className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-gray-300 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                          title="Marcar como tramitado"
-                        >
-                          <Check className="h-4 w-4" />
-                        </button>
-                      </td>
-                    ) : (
+                    {!isTramitacion && (
                       <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">{formatDate(service.ultimoCambio)}</td>
                     )}
                     <td className="px-4 py-3 text-center">
@@ -1005,28 +1034,30 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
               </button>
             </div>
             {/* Tabs para cambiar la vista dentro del modal */}
-            <div className="flex items-center gap-2 border-b border-gray-200 pb-2 pt-6 px-6">
-                <button
-                  className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'detalles' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-                  onClick={() => setDetailsView('detalles')}
-                >
-                  Detalles
-                </button>
-                <button
-                  className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'formulario' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-                  onClick={() => setDetailsView('formulario')}
-                >
-                  Formulario
-                </button>
-                {!isGestoraTecnica && (
+            {!isTramitacion && (
+              <div className="flex items-center gap-2 border-b border-gray-200 pb-2 pt-6 px-6">
                   <button
-                    className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'reparaciones' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-                    onClick={() => setDetailsView('reparaciones')}
+                    className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'detalles' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                    onClick={() => setDetailsView('detalles')}
                   >
-                    Reparaciones
+                    Detalles
                   </button>
-                )}
-              </div>
+                  <button
+                    className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'formulario' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                    onClick={() => setDetailsView('formulario')}
+                  >
+                    Formulario
+                  </button>
+                  {!isGestoraTecnica && (
+                    <button
+                      className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'reparaciones' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                      onClick={() => setDetailsView('reparaciones')}
+                    >
+                      Reparaciones
+                    </button>
+                  )}
+                </div>
+            )}
             
             <div className="p-6 space-y-6 bg-white rounded-b-2xl">
               {detailsView === 'detalles' && (
@@ -1052,47 +1083,51 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   <p className="text-xs uppercase text-gray-500">Fecha de registro</p>
                   <p className="text-sm text-gray-900 mt-1">{renderDetailValue(formatDate(selectedService.fechaRegistro))}</p>
                 </div>
-                <div>
-                  <p className="text-xs uppercase text-gray-500">Dirección</p>
-                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.direccion)}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase text-gray-500">Código postal</p>
-                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.codigoPostal)}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase text-gray-500">Provincia</p>
-                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.provincia)}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase text-gray-500">Población</p>
-                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.poblacion)}</p>
-                </div>
+                {!isTramitacion && (
+                  <>
+                    <div>
+                      <p className="text-xs uppercase text-gray-500">Dirección</p>
+                      <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.direccion)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-gray-500">Código postal</p>
+                      <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.codigoPostal)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-gray-500">Provincia</p>
+                      <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.provincia)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-gray-500">Población</p>
+                      <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.poblacion)}</p>
+                    </div>
+                  </>
+                )}
                 <div className="flex flex-col">
-                  <p className="text-xs uppercase text-gray-500 mb-1">Estado</p>
+                  <p className="text-xs uppercase text-gray-500 mb-1">Ipartner</p>
                   <div>
                     <select
-                      value={selectedService.estado || ''}
+                      value={selectedService.ipartner || ''}
                       onChange={async (e) => {
                         const newValue = e.target.value;
-                        if (!newValue || newValue === selectedService.estado) return;
+                        if (!newValue || newValue === selectedService.ipartner) return;
                         setSaving(true);
                         try {
-                          await airtableService.updateServiceStatus(selectedService.id, newValue);
+                          await airtableService.updateService(selectedService.id, { ipartner: newValue });
                           const updatedServices = services.map((s) =>
-                            s.id === selectedService.id ? { ...s, estado: newValue } : s
+                            s.id === selectedService.id ? { ...s, ipartner: newValue } : s
                           );
                           setServices(updatedServices);
-                          setSelectedService({...selectedService, estado: newValue});
+                          setSelectedService({...selectedService, ipartner: newValue});
                         } catch (error) {
-                          console.error('Error updating estado:', error);
-                          alert('Error al actualizar el estado');
+                          console.error('Error updating ipartner:', error);
+                          alert('Error al actualizar ipartner');
                         } finally {
                           setSaving(false);
                         }
                       }}
                       disabled={saving}
-                      className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block ${getStatusColors(selectedService.estado).bg} ${getStatusColors(selectedService.estado).text}`}
+                      className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block ${getIpartnerColors(selectedService.ipartner).bg} ${getIpartnerColors(selectedService.ipartner).text}`}
                       style={{ 
                         appearance: 'none', 
                         backgroundImage: 'none',
@@ -1101,24 +1136,28 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                       }}
                     >
                       <option value="">Seleccionar...</option>
-                      {STATUS_OPTIONS.map((opt: string) => (
+                      {IPARTNER_OPTIONS.map((opt: string) => (
                         <option key={opt} value={opt}>{opt}</option>
                       ))}
                     </select>
                   </div>
                 </div>
-                <div>
-                  <p className="text-xs uppercase text-gray-500">Último cambio</p>
-                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(formatDate(selectedService.ultimoCambio))}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase text-gray-500">Estado envío</p>
-                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.estadoEnvio)}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase text-gray-500">Fecha instalación</p>
-                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(formatDate(selectedService.fechaInstalacion))}</p>
-                </div>
+                {!isTramitacion && (
+                  <>
+                    <div>
+                      <p className="text-xs uppercase text-gray-500">Último cambio</p>
+                      <p className="text-sm text-gray-900 mt-1">{renderDetailValue(formatDate(selectedService.ultimoCambio))}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-gray-500">Estado envío</p>
+                      <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.estadoEnvio)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase text-gray-500">Fecha instalación</p>
+                      <p className="text-sm text-gray-900 mt-1">{renderDetailValue(formatDate(selectedService.fechaInstalacion))}</p>
+                    </div>
+                  </>
+                )}
                 <div>
                   <p className="text-xs uppercase text-gray-500">Referencia</p>
                   <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.referencia)}</p>
@@ -1127,48 +1166,123 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   <p className="text-xs uppercase text-gray-500">Número de serie</p>
                   <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.numeroSerie)}</p>
                 </div>
+                {isTramitacion && (
+                  <div>
+                    <p className="text-xs uppercase text-gray-500">Acción Ipartner</p>
+                    <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.accionIpartner)}</p>
+                  </div>
+                )}
               </div>
+              )}
+              
+              {/* Fotos para Tramitación */}
+              {isTramitacion && detailsView === 'detalles' && formularios.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Fotos</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {/* Foto general */}
+                    {formularios[0]?.['Foto general'] && Array.isArray(formularios[0]['Foto general']) && formularios[0]['Foto general'].map((file: AirtableAttachment, idx: number) => (
+                      <div key={`general-${idx}`} className="space-y-2">
+                        <p className="text-xs font-medium text-gray-600">Foto general</p>
+                        {file.thumbnails?.large?.url && (
+                          <img
+                            src={file.thumbnails.large.url}
+                            alt="Foto general"
+                            className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => window.open(file.url, '_blank')}
+                          />
+                        )}
+                      </div>
+                    ))}
+                    {/* Foto etiqueta */}
+                    {formularios[0]?.['Foto etiqueta'] && Array.isArray(formularios[0]['Foto etiqueta']) && formularios[0]['Foto etiqueta'].map((file: AirtableAttachment, idx: number) => (
+                      <div key={`etiqueta-${idx}`} className="space-y-2">
+                        <p className="text-xs font-medium text-gray-600">Foto etiqueta</p>
+                        {file.thumbnails?.large?.url && (
+                          <img
+                            src={file.thumbnails.large.url}
+                            alt="Foto etiqueta"
+                            className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => window.open(file.url, '_blank')}
+                          />
+                        )}
+                      </div>
+                    ))}
+                    {/* Foto roto */}
+                    {formularios[0]?.['Foto roto'] && Array.isArray(formularios[0]['Foto roto']) && formularios[0]['Foto roto'].map((file: AirtableAttachment, idx: number) => (
+                      <div key={`roto-${idx}`} className="space-y-2">
+                        <p className="text-xs font-medium text-gray-600">Foto roto</p>
+                        {file.thumbnails?.large?.url && (
+                          <img
+                            src={file.thumbnails.large.url}
+                            alt="Foto roto"
+                            className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => window.open(file.url, '_blank')}
+                          />
+                        )}
+                      </div>
+                    ))}
+                    {/* Foto cuadro */}
+                    {formularios[0]?.['Foto cuadro'] && Array.isArray(formularios[0]['Foto cuadro']) && formularios[0]['Foto cuadro'].map((file: AirtableAttachment, idx: number) => (
+                      <div key={`cuadro-${idx}`} className="space-y-2">
+                        <p className="text-xs font-medium text-gray-600">Foto cuadro</p>
+                        {file.thumbnails?.large?.url && (
+                          <img
+                            src={file.thumbnails.large.url}
+                            alt="Foto cuadro"
+                            className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => window.open(file.url, '_blank')}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
               
               {detailsView === 'detalles' && (
                 <div className="space-y-4">
-                  <div>
-                    <p className="text-xs uppercase text-gray-500 mb-1">Descripción</p>
-                    <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{renderDetailValue(selectedService.descripcion)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase text-gray-500 mb-1">Comentarios</p>
-                    <textarea
-                      data-autosize="true"
-                      defaultValue={selectedService.comentarios || ''}
-                      onInput={(e) => {
-                        const target = e.target as HTMLTextAreaElement;
-                        target.style.height = 'auto';
-                        target.style.height = target.scrollHeight + 'px';
-                      }}
-                      onBlur={async (e) => {
-                        const newValue = e.target.value;
-                        if (newValue === selectedService.comentarios) return;
-                        setSaving(true);
-                        try {
-                          await airtableService.updateServiceComments(selectedService.id, newValue);
-                          setServices(services.map(s => s.id === selectedService.id ? {...s, comentarios: newValue} : s));
-                          setSelectedService({...selectedService, comentarios: newValue});
-                        } catch (error) {
-                          console.error('Error:', error);
-                          alert('Error al guardar');
-                        } finally {
-                          setSaving(false);
-                        }
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm resize-none overflow-hidden"
-                      style={{ minHeight: '60px' }}
-                      disabled={saving}
-                      placeholder="Escribe comentarios..."
-                    />
-                  </div>
-                  {/* Motivo cancelación - oculto para Gestora Operativa */}
-                  {!isGestoraOperativa && (
+                  {!isTramitacion && (
+                    <div>
+                      <p className="text-xs uppercase text-gray-500 mb-1">Descripción</p>
+                      <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{renderDetailValue(selectedService.descripcion)}</p>
+                    </div>
+                  )}
+                  {!isTramitacion && (
+                    <div>
+                      <p className="text-xs uppercase text-gray-500 mb-1">Comentarios</p>
+                      <textarea
+                        data-autosize="true"
+                        defaultValue={selectedService.comentarios || ''}
+                        onInput={(e) => {
+                          const target = e.target as HTMLTextAreaElement;
+                          target.style.height = 'auto';
+                          target.style.height = target.scrollHeight + 'px';
+                        }}
+                        onBlur={async (e) => {
+                          const newValue = e.target.value;
+                          if (newValue === selectedService.comentarios) return;
+                          setSaving(true);
+                          try {
+                            await airtableService.updateServiceComments(selectedService.id, newValue);
+                            setServices(services.map(s => s.id === selectedService.id ? {...s, comentarios: newValue} : s));
+                            setSelectedService({...selectedService, comentarios: newValue});
+                          } catch (error) {
+                            console.error('Error:', error);
+                            alert('Error al guardar');
+                          } finally {
+                            setSaving(false);
+                          }
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm resize-none overflow-hidden"
+                        style={{ minHeight: '60px' }}
+                        disabled={saving}
+                        placeholder="Escribe comentarios..."
+                      />
+                    </div>
+                  )}
+                  {/* Motivo cancelación - oculto para Gestora Operativa y Tramitación */}
+                  {!isGestoraOperativa && !isTramitacion && (
                     <div>
                       <p className="text-xs uppercase text-gray-500 mb-1">Motivo cancelación</p>
                       <select
@@ -1200,13 +1314,14 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                     </div>
                   )}
                   {/* Primera fila: Cita y Cita técnico */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Cita - editable */}
-                    <div>
-                      <p className="text-xs uppercase text-gray-500 mb-1">Cita</p>
-                      <input
-                        type="datetime-local"
-                        defaultValue={formatDateTimeForInput(selectedService.cita)}
+                  {!isTramitacion && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Cita - editable */}
+                      <div>
+                        <p className="text-xs uppercase text-gray-500 mb-1">Cita</p>
+                        <input
+                          type="datetime-local"
+                          defaultValue={formatDateTimeForInput(selectedService.cita)}
                         onBlur={async (e) => {
                           const newValue = e.target.value;
                           if (newValue === formatDateTimeForInput(selectedService.cita)) return;
@@ -1232,28 +1347,31 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                         disabled={saving}
                       />
                     </div>
-                    {/* Cita técnico - siempre visible, solo lectura */}
-                    <div>
-                      <p className="text-xs uppercase text-gray-500 mb-1">Cita técnico</p>
-                      <p className="mt-1 text-sm text-gray-900">{renderDetailValue(formatDateTime(selectedService.citaTecnico))}</p>
+                      {/* Cita técnico - siempre visible, solo lectura */}
+                      <div>
+                        <p className="text-xs uppercase text-gray-500 mb-1">Cita técnico</p>
+                        <p className="mt-1 text-sm text-gray-900">{renderDetailValue(formatDateTime(selectedService.citaTecnico))}</p>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Segunda fila: Técnico y Nota técnico */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs uppercase text-gray-500 mb-1">Técnico</p>
-                      <p className="mt-1 text-sm text-gray-900">
-                        {selectedService.trabajadorId && selectedService.trabajadorId.length > 0
-                          ? tecnicos.find(t => t.id === selectedService.trabajadorId?.[0])?.nombre || 'Sin información'
-                          : 'Sin información'}
-                      </p>
+                  {!isTramitacion && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs uppercase text-gray-500 mb-1">Técnico</p>
+                        <p className="mt-1 text-sm text-gray-900">
+                          {selectedService.trabajadorId && selectedService.trabajadorId.length > 0
+                            ? tecnicos.find(t => t.id === selectedService.trabajadorId?.[0])?.nombre || 'Sin información'
+                            : 'Sin información'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase text-gray-500 mb-1">Nota técnico</p>
+                        <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{renderDetailValue(selectedService.notaTecnico)}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs uppercase text-gray-500 mb-1">Nota técnico</p>
-                      <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{renderDetailValue(selectedService.notaTecnico)}</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
 
