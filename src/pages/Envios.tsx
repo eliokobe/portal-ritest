@@ -36,6 +36,7 @@ interface Servicio {
   poblacion?: string;
   codigoPostal?: string;
   provincia?: string;
+  conversationId?: string;
 }
 
 interface CatalogoItem {
@@ -53,6 +54,7 @@ interface ServicioInfo {
   poblacion?: string;
   codigoPostal?: string;
   provincia?: string;
+  conversationId?: string;
 }
 
 export default function Envios() {
@@ -167,6 +169,7 @@ export default function Envios() {
         poblacion: s.poblacion,
         codigoPostal: s.codigoPostal,
         provincia: s.provincia,
+        conversationId: s.conversationId,
       })));
     } catch (error) {
       setServicios([]);
@@ -269,6 +272,23 @@ export default function Envios() {
       alert('Error al guardar el cambio');
     } finally {
       setEditing(null);
+      setSaving(false);
+    }
+  };
+
+  const handleSave = async (id: string, field: keyof Envio, value: string) => {
+    setSaving(true);
+    try {
+      await airtableService.updateEnvio(id, { [field]: value });
+      setEnvios((prev) =>
+        prev.map((envio) =>
+          envio.id === id ? { ...envio, [field]: value } : envio
+        )
+      );
+    } catch (error) {
+      alert('Error al guardar el cambio');
+      throw error;
+    } finally {
       setSaving(false);
     }
   };
@@ -440,18 +460,25 @@ export default function Envios() {
                     <td className="px-4 py-3 whitespace-nowrap">
                       <select
                         value={envio.estado || ''}
-                        onChange={async (e) => {
+                        onChange={(e) => {
                           const newValue = e.target.value;
                           if (!newValue || newValue === envio.estado) return;
                           setSaving(true);
-                          try {
-                            await handleSave(envio.id, 'estado', newValue);
-                          } catch (error) {
-                            console.error('Error updating estado:', error);
-                            alert('Error al actualizar el estado');
-                          } finally {
-                            setSaving(false);
-                          }
+                          airtableService.updateEnvio(envio.id, { estado: newValue })
+                            .then(() => {
+                              setEnvios((prev) =>
+                                prev.map((e) =>
+                                  e.id === envio.id ? { ...e, estado: newValue } : e
+                                )
+                              );
+                            })
+                            .catch((error) => {
+                              console.error('Error updating estado:', error);
+                              alert('Error al actualizar el estado');
+                            })
+                            .finally(() => {
+                              setSaving(false);
+                            });
                         }}
                         disabled={saving}
                         className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center ${getStatusColors(envio.estado).bg} ${getStatusColors(envio.estado).text}`}
@@ -728,25 +755,28 @@ export default function Envios() {
           >
             <div className="absolute top-4 right-4 flex items-center gap-2">
               {selectedEnvio.telefono && (
-                <>
+                <a
+                  href={`tel:${selectedEnvio.telefono}`}
+                  className="p-2 rounded-full text-green-600 hover:bg-green-100 transition-colors"
+                  title="Llamar"
+                >
+                  <Phone className="h-5 w-5" />
+                </a>
+              )}
+              {(() => {
+                const servicioRelacionado = serviciosInfo.find(s => s.id === selectedEnvio.servicio);
+                return servicioRelacionado?.conversationId ? (
                   <a
-                    href={`tel:${selectedEnvio.telefono}`}
-                    className="p-2 rounded-full text-green-600 hover:bg-green-100 transition-colors"
-                    title="Llamar"
-                  >
-                    <Phone className="h-5 w-5" />
-                  </a>
-                  <a
-                    href={`https://wa.me/34${selectedEnvio.telefono.replace(/\s/g, '')}`}
+                    href={`https://chat.ritest.es/app/accounts/1/inbox-view/conversation/${servicioRelacionado.conversationId}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2 rounded-full text-green-600 hover:bg-green-100 transition-colors"
-                    title="WhatsApp"
+                    title="Abrir chat"
                   >
                     <MessageCircle className="h-5 w-5" />
                   </a>
-                </>
-              )}
+                ) : null;
+              })()}
               <button
                 onClick={() => setSelectedEnvio(null)}
                 className="p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
@@ -794,15 +824,26 @@ export default function Envios() {
                 <div>
                   <select
                     value={selectedEnvio.estado || ''}
-                    onChange={async (e) => {
+                    onChange={(e) => {
                       const newValue = e.target.value;
                       if (!newValue || newValue === selectedEnvio.estado) return;
-                      try {
-                        await handleSave(selectedEnvio.id, 'estado', newValue);
-                        setSelectedEnvio({...selectedEnvio, estado: newValue});
-                      } catch (error) {
-                        console.error('Error:', error);
-                      }
+                      setSaving(true);
+                      airtableService.updateEnvio(selectedEnvio.id, { estado: newValue })
+                        .then(() => {
+                          setEnvios((prev) =>
+                            prev.map((envioItem) =>
+                              envioItem.id === selectedEnvio.id ? { ...envioItem, estado: newValue } : envioItem
+                            )
+                          );
+                          setSelectedEnvio({...selectedEnvio, estado: newValue});
+                        })
+                        .catch((error) => {
+                          console.error('Error updating estado:', error);
+                          alert('Error al actualizar el estado');
+                        })
+                        .finally(() => {
+                          setSaving(false);
+                        });
                     }}
                     className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block ${getStatusColors(selectedEnvio.estado).bg} ${getStatusColors(selectedEnvio.estado).text}`}
                     style={{ 
