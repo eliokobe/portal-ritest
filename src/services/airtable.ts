@@ -143,6 +143,10 @@ type ServicioListado = {
   referencia?: string;
   conversationId?: string;
   tramitado?: boolean;
+  numeroSerie?: string;
+  importe?: number;
+  accionIpartner?: string;
+  ipartner?: string;
 };
 
 async function fetchServicesByTable(params: {
@@ -213,8 +217,14 @@ async function fetchServicesByTable(params: {
 
     if (onlyUnsynced) {
       // Para tramitaciones usamos campo "Tramitado" (checkbox) pendiente
+      console.log('[Airtable] onlyUnsynced activado, verificando campo Tramitado...', {
+        hasTramitadoField: serviciosFieldNames.has('Tramitado'),
+        allFields: Array.from(serviciosFieldNames),
+        sampleTramitadoValue: (sampleFields as any)?.['Tramitado']
+      });
       if (serviciosFieldNames.has('Tramitado')) {
         formulaParts.push('OR({Tramitado}=BLANK(), {Tramitado}=FALSE())');
+        console.log('[Airtable] Filtro Tramitado añadido: OR({Tramitado}=BLANK(), {Tramitado}=FALSE())');
       } else {
         console.warn(`[Airtable] La tabla ${tableName} no tiene campo "Tramitado"; no se aplicará filtro de sincronización.`);
       }
@@ -288,7 +298,22 @@ async function fetchServicesByTable(params: {
         conversationId: f['Conversation id'] ?? f['Conversation ID'] ?? f['ConversationId'],
         tramitado: f['Tramitado'] ?? false,
         numeroSerie: f['Número de serie'] ?? f['Numero de serie'] ?? f['S/N'] ?? f['# S/N'] ?? f['Nº Serie'] ?? f['SN'],
+        importe: f['Importe'],
+        accionIpartner: f['Acción Ipartner'] ?? f['Accion Ipartner'],
+        ipartner: f['Ipartner'],
       };
+    });
+
+    console.log('[Airtable] Registros recuperados y mapeados:', {
+      tableName,
+      totalRecords: mappedRecords.length,
+      sampleRecord: mappedRecords[0] ? {
+        expediente: mappedRecords[0].expediente,
+        estado: mappedRecords[0].estado,
+        tramitado: mappedRecords[0].tramitado,
+        accionIpartner: mappedRecords[0].accionIpartner,
+        ipartner: mappedRecords[0].ipartner
+      } : 'No hay registros'
     });
 
     return mappedRecords;
