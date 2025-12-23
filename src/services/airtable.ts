@@ -1236,6 +1236,8 @@ export const airtableService = {
     comentarios?: string;
     informe?: string;
     asesor?: string;
+    expediente?: string;
+    tramitado?: boolean;
   }[]> {
     try {
       const records = await fetchAllRegistros('Registros', { pageSize: 100 });
@@ -1253,6 +1255,8 @@ export const airtableService = {
           comentarios: f['Comentarios'],
           informe: f['Informe'],
           asesor: f['Asesor'] ?? f['Advisor'],
+          expediente: f['Expediente'],
+          tramitado: f['Tramitado'] ?? false,
         };
       });
     } catch (error) {
@@ -1262,7 +1266,7 @@ export const airtableService = {
   },
 
   // Actualizar registro
-  async updateRegistro(registroId: string, updates: { estado?: string; cita?: string; comentarios?: string }): Promise<void> {
+  async updateRegistro(registroId: string, updates: { estado?: string; cita?: string; comentarios?: string; tramitado?: boolean }): Promise<void> {
     try {
       const fields: Record<string, any> = {};
       
@@ -1276,6 +1280,10 @@ export const airtableService = {
       
       if (updates.comentarios !== undefined) {
         fields['Comentarios'] = updates.comentarios;
+      }
+      
+      if (updates.tramitado !== undefined) {
+        fields['Tramitado'] = updates.tramitado;
       }
       
       await registrosApi.patch(`/Registros/${registroId}`, { fields });

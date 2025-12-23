@@ -11,7 +11,8 @@ const ESTADO_OPTIONS = [
   'Ilocalizable',
   'No interesado',
   'Informe',
-  'Inglés'
+  'Inglés',
+  'Citado'
 ];
 
 // Estados para Gestora Operativa (sin Citado)
@@ -21,7 +22,8 @@ const GESTORA_OPERATIVA_ESTADOS = [
   'Ilocalizable',
   'No interesado',
   'Informe',
-  'Inglés'
+  'Inglés',
+  'Citado'
 ];
 
 // Estados permitidos para filtrar en Gestora Técnica
@@ -49,6 +51,7 @@ export default function Registros() {
   const [editingComentarios, setEditingComentarios] = useState<string | null>(null);
   const [editComentariosValue, setEditComentariosValue] = useState('');
   const [savingComentarios, setSavingComentarios] = useState(false);
+  const [updatingTramitado, setUpdatingTramitado] = useState<string | null>(null);
 
   const isGestoraTecnica = user?.role === 'Gestora Técnica';
   const isGestoraOperativa = user?.role === 'Gestora Operativa';
@@ -142,6 +145,22 @@ export default function Registros() {
       alert('Error al actualizar el estado');
     } finally {
       setSavingStatus(false);
+    }
+  };
+
+  const handleMarkTramitado = async (registroId: string) => {
+    if (updatingTramitado) return;
+    setUpdatingTramitado(registroId);
+    try {
+      await airtableService.updateRegistro(registroId, { tramitado: true });
+      setRegistros((prev) => prev.filter((r) => r.id !== registroId));
+      if (selectedRegistro && selectedRegistro.id === registroId) {
+        setSelectedRegistro(null);
+      }
+    } catch (err: any) {
+      alert(err?.message || 'No se pudo marcar como tramitado');
+    } finally {
+      setUpdatingTramitado(null);
     }
   };
 
@@ -449,8 +468,24 @@ export default function Registros() {
                   <p className="text-sm text-gray-900 mt-1">{selectedRegistro.contrato || '-'}</p>
                 </div>
                 <div>
+                  <h3 className="text-xs uppercase text-gray-500">Expediente</h3>
+                  <p className="text-sm text-gray-900 mt-1">{selectedRegistro.expediente || '-'}</p>
+                </div>
+                <div>
                   <h3 className="text-xs uppercase text-gray-500">Nombre</h3>
                   <p className="text-sm text-gray-900 mt-1">{selectedRegistro.nombre || '-'}</p>
+                </div>
+                <div className="flex flex-col">
+                  <h3 className="text-xs uppercase text-gray-500 mb-1">Tramitación</h3>
+                  <button
+                    type="button"
+                    onClick={() => handleMarkTramitado(selectedRegistro.id)}
+                    disabled={updatingTramitado === selectedRegistro.id}
+                    className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-gray-300 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed self-start"
+                    title="Marcar como tramitado"
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
                 </div>
                 <div>
                   <h3 className="text-xs uppercase text-gray-500">Teléfono</h3>

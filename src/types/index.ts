@@ -70,6 +70,8 @@ export interface Registro {
   cita?: string;
   comentarios?: string;
   informe?: string;
+  expediente?: string;
+  tramitado?: boolean;
 }
 
 export interface Envio {
