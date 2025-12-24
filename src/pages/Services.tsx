@@ -269,28 +269,23 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     
     let servicesWithAllowedStates = services;
 
-    // Si el usuario es Responsable o Administrativa, mostrar TODOS los servicios sin filtros
-    if (isResponsableOrAdministrativa) {
+    // Si el usuario es Responsable o Administrativa, mostrar TODOS los servicios sin filtros SOLO en Servicios (no en Tramitaciones)
+    if (isResponsableOrAdministrativa && !isTramitacion) {
       console.log('Services - Usuario es Responsable/Administrativa: mostrando todos los servicios sin filtros');
       servicesWithAllowedStates = services;
     } else if (isTramitacion) {
-      // Para tramitación: no aplicar el filtro estándar; usar condiciones específicas
-      const estadosPermitidos = [
-        'Formulario completado',
-        'Llamado',
-        'Pendiente de asignar',
-        'Pendiente presupuesto',
-        'Citado',
-        'Material enviado',
-        'Cancelado',
-        'Finalizado',
-      ];
+      // Para tramitación: filtrar según condiciones específicas (aplica a TODOS los usuarios)
       servicesWithAllowedStates = servicesWithAllowedStates.filter((s) => {
-        const estadoOk = s.estado && estadosPermitidos.includes(s.estado);
+        // 1. Tramitado está vacío
         const tramitadoOk = !s.tramitado;
+        
+        // 2. Acción Ipartner no está vacío
         const accionIpartnerOk = !!s.accionIpartner && s.accionIpartner.trim() !== '';
-        const ipartnerOk = !s.ipartner || (s.ipartner !== 'Cancelado' && s.ipartner !== 'Finalizado');
-        return !!estadoOk && tramitadoOk && accionIpartnerOk && ipartnerOk;
+        
+        // 3. Ipartner no es Cancelado Y NO (Facturado con Importe = 0)
+        const ipartnerOk = s.ipartner !== 'Cancelado' && !(s.ipartner === 'Facturado' && (s.importe === 0 || s.importe === null || s.importe === undefined));
+        
+        return tramitadoOk && accionIpartnerOk && ipartnerOk;
       });
     } else {
       // Para servicios: mostrar todo salvo Finalizado/Cancelado
@@ -900,7 +895,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Nombre</th>
                   {isTramitacion ? (
                     <>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ipartner</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Importe</th>
                     </>
                   ) : (
@@ -927,37 +922,37 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                       <>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <select
-                            value={service.estado || ''}
+                            value={service.ipartner || ''}
                             onChange={async (e) => {
                               const newValue = e.target.value;
-                              if (!newValue || newValue === service.estado) return;
+                              if (!newValue || newValue === service.ipartner) return;
                               
                               setSaving(true);
                               try {
-                                await airtableService.updateServiceStatus(service.id, newValue);
+                                await airtableService.updateServiceField(service.id, 'Ipartner', newValue);
                                 const updatedServices = services.map((s) =>
-                                  s.id === service.id ? { ...s, estado: newValue } : s
+                                  s.id === service.id ? { ...s, ipartner: newValue } : s
                                 );
                                 setServices(updatedServices);
                               } catch (error) {
-                                console.error('Error updating estado:', error);
-                                alert('Error al actualizar el estado');
+                                console.error('Error updating ipartner:', error);
+                                alert('Error al actualizar ipartner');
                               } finally {
                                 setSaving(false);
                               }
                             }}
                             disabled={saving}
-                            className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center ${getStatusColors(service.estado).bg} ${getStatusColors(service.estado).text}`}
+                            className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center ${getIpartnerColors(service.ipartner).bg} ${getIpartnerColors(service.ipartner).text}`}
                             style={{ 
                               appearance: 'none', 
                               backgroundImage: 'none',
-                              width: `${(service.estado || 'Sin estado').length + 4}ch`,
+                              width: `${(service.ipartner || 'Seleccionar').length + 4}ch`,
                               paddingLeft: '0.75rem',
                               paddingRight: '0.75rem'
                             }}
                           >
                             <option value="">Seleccionar...</option>
-                            {STATUS_OPTIONS.map((opt: string) => (
+                            {IPARTNER_OPTIONS.map((opt: string) => (
                               <option key={opt} value={opt}>{opt}</option>
                             ))}
                           </select>
@@ -1180,71 +1175,115 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                     </div>
                   </>
                 )}
-                <div className="flex flex-col">
-                  <p className="text-xs uppercase text-gray-500 mb-1">Estado</p>
-                  <div>
-                    <select
-                      value={selectedService.estado || ''}
-                      onChange={(e) => {
-                        const newValue = e.target.value;
-                        if (newValue === selectedService.estado) return;
-                        
-                        // Actualizar el estado inmediatamente para re-renderizar
-                        setSelectedService({...selectedService, estado: newValue});
-                        
-                        // Si el nuevo estado es Citado, mostrar modal para seleccionar cita
-                        if (newValue === 'Citado') {
-                          setShowCitaModal(true);
-                          setPendingEstadoChange({ serviceId: selectedService.id, newEstado: newValue });
-                        } else if (['Llamado', 'Finalizado', 'Cancelado'].includes(newValue)) {
-                          // Si el nuevo estado requiere resolución visita, mostrar modal
-                          setPendingEstadoChange({ serviceId: selectedService.id, newEstado: newValue });
-                          setShowResolucionModal(true);
-                        } else {
-                          // Si no requiere modal, actualizar directamente y limpiar Cita
-                          setSaving(true);
-                          airtableService.updateServiceStatus(selectedService.id, newValue)
-                            .then(() => {
-                              // Si el nuevo estado no es Citado, limpiar la Cita
-                              if (newValue !== 'Citado') {
-                                return airtableService.updateServiceField(selectedService.id, 'Cita', null);
-                              }
-                            })
-                            .then(() => {
-                              const updatedServices = services.map((s) =>
-                                s.id === selectedService.id ? { ...s, estado: newValue, cita: newValue !== 'Citado' ? undefined : s.cita } : s
-                              );
-                              setServices(updatedServices);
-                              setSelectedService({...selectedService, cita: newValue !== 'Citado' ? undefined : selectedService.cita});
-                            })
-                            .catch((error) => {
-                              console.error('Error updating estado:', error);
-                              alert('Error al actualizar el estado');
-                              // Revertir el estado si falla
-                              setSelectedService({...selectedService, estado: selectedService.estado});
-                            })
-                            .finally(() => {
-                              setSaving(false);
-                            });
-                        }
-                      }}
-                      disabled={saving}
-                      className={`py-1 px-2 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block text-center ${getStatusColors(selectedService.estado).bg} ${getStatusColors(selectedService.estado).text}`}
-                      style={{ 
-                        appearance: 'none', 
-                        backgroundImage: 'none',
-                        paddingLeft: '0.5rem',
-                        paddingRight: '0.5rem',
-                        minWidth: '120px'
-                      }}
-                    >
-                      <option value="">Seleccionar...</option>
-                      {STATUS_OPTIONS.map((opt: string) => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
+                {!isTramitacion && (
+                  <div className="flex flex-col">
+                    <p className="text-xs uppercase text-gray-500 mb-1">Estado</p>
+                    <div>
+                      <select
+                        value={selectedService.estado || ''}
+                        onChange={(e) => {
+                          const newValue = e.target.value;
+                          if (newValue === selectedService.estado) return;
+                          
+                          // Actualizar el estado inmediatamente para re-renderizar
+                          setSelectedService({...selectedService, estado: newValue});
+                          
+                          // Si el nuevo estado es Citado, mostrar modal para seleccionar cita
+                          if (newValue === 'Citado') {
+                            setShowCitaModal(true);
+                            setPendingEstadoChange({ serviceId: selectedService.id, newEstado: newValue });
+                          } else if (['Llamado', 'Finalizado', 'Cancelado'].includes(newValue)) {
+                            // Si el nuevo estado requiere resolución visita, mostrar modal
+                            setPendingEstadoChange({ serviceId: selectedService.id, newEstado: newValue });
+                            setShowResolucionModal(true);
+                          } else {
+                            // Si no requiere modal, actualizar directamente y limpiar Cita
+                            setSaving(true);
+                            airtableService.updateServiceStatus(selectedService.id, newValue)
+                              .then(() => {
+                                // Si el nuevo estado no es Citado, limpiar la Cita
+                                if (newValue !== 'Citado') {
+                                  return airtableService.updateServiceField(selectedService.id, 'Cita', null);
+                                }
+                              })
+                              .then(() => {
+                                const updatedServices = services.map((s) =>
+                                  s.id === selectedService.id ? { ...s, estado: newValue, cita: newValue !== 'Citado' ? undefined : s.cita } : s
+                                );
+                                setServices(updatedServices);
+                                setSelectedService({...selectedService, cita: newValue !== 'Citado' ? undefined : selectedService.cita});
+                              })
+                              .catch((error) => {
+                                console.error('Error updating estado:', error);
+                                alert('Error al actualizar el estado');
+                                // Revertir el estado si falla
+                                setSelectedService({...selectedService, estado: selectedService.estado});
+                              })
+                              .finally(() => {
+                                setSaving(false);
+                              });
+                          }
+                        }}
+                        disabled={saving}
+                        className={`py-1 px-2 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block text-center ${getStatusColors(selectedService.estado).bg} ${getStatusColors(selectedService.estado).text}`}
+                        style={{ 
+                          appearance: 'none', 
+                          backgroundImage: 'none',
+                          paddingLeft: '0.5rem',
+                          paddingRight: '0.5rem',
+                          minWidth: '120px'
+                        }}
+                      >
+                        <option value="">Seleccionar...</option>
+                        {STATUS_OPTIONS.map((opt: string) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
-                </div>
+                )}
+                {isTramitacion && (
+                  <div className="flex flex-col">
+                    <p className="text-xs uppercase text-gray-500 mb-1">Ipartner</p>
+                    <div>
+                      <select
+                        value={selectedService.ipartner || ''}
+                        onChange={async (e) => {
+                          const newValue = e.target.value;
+                          if (!newValue || newValue === selectedService.ipartner) return;
+                          setSaving(true);
+                          try {
+                            await airtableService.updateServiceField(selectedService.id, 'Ipartner', newValue);
+                            const updatedServices = services.map(s => 
+                              s.id === selectedService.id ? {...s, ipartner: newValue} : s
+                            );
+                            setServices(updatedServices);
+                            setSelectedService({...selectedService, ipartner: newValue});
+                          } catch (error) {
+                            console.error('Error updating ipartner:', error);
+                            alert('Error al actualizar Ipartner');
+                          } finally {
+                            setSaving(false);
+                          }
+                        }}
+                        disabled={saving}
+                        className={`py-1 px-2 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block text-center ${getIpartnerColors(selectedService.ipartner).bg} ${getIpartnerColors(selectedService.ipartner).text}`}
+                        style={{ 
+                          appearance: 'none', 
+                          backgroundImage: 'none',
+                          paddingLeft: '0.5rem',
+                          paddingRight: '0.5rem',
+                          minWidth: '120px'
+                        }}
+                      >
+                        <option value="">Seleccionar...</option>
+                        {IPARTNER_OPTIONS.map((opt: string) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
                 {!isTramitacion && !isTecnico && (
                   <>
                     <div>

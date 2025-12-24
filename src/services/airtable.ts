@@ -1295,7 +1295,7 @@ export const airtableService = {
   },
 
   // Actualizar registro
-  async updateRegistro(registroId: string, updates: { estado?: string; cita?: string; comentarios?: string; tramitado?: boolean }): Promise<void> {
+  async updateRegistro(registroId: string, updates: { estado?: string; cita?: string; comentarios?: string; tramitado?: boolean; ipartner?: string }): Promise<void> {
     try {
       const fields: Record<string, any> = {};
       
@@ -1313,6 +1313,10 @@ export const airtableService = {
       
       if (updates.tramitado !== undefined) {
         fields['Tramitado'] = updates.tramitado;
+      }
+      
+      if (updates.ipartner !== undefined) {
+        fields['Ipartner'] = updates.ipartner;
       }
       
       await registrosApi.patch(`/Registros/${registroId}`, { fields });

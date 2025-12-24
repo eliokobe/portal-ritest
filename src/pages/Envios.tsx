@@ -983,13 +983,12 @@ export default function Envios() {
               <div className="sm:col-span-2">
                 <p className="text-xs uppercase text-gray-500 mb-1">Comentarios</p>
                 <textarea
-                  value={selectedEnvio.comentarios || ''}
-                  onChange={(e) => {
-                    const newValue = e.target.value;
-                    setSelectedEnvio((prev) => (prev ? { ...prev, comentarios: newValue } : prev));
+                  defaultValue={selectedEnvio.comentarios || ''}
+                  onInput={(e) => {
                     // Auto-resize textarea
-                    e.target.style.height = 'auto';
-                    e.target.style.height = Math.max(e.target.scrollHeight, 100) + 'px';
+                    const target = e.target as HTMLTextAreaElement;
+                    target.style.height = 'auto';
+                    target.style.height = Math.max(target.scrollHeight, 100) + 'px';
                   }}
                   onBlur={(e) => {
                     const newValue = e.target.value;
