@@ -91,6 +91,12 @@ const RESOLUCION_FINALIZADO_OPTIONS = [
   'Configuración del cargador'
 ];
 
+const RESOLUCION_PRESUPUESTO_OPTIONS = [
+  'Incidencia solucionada pero el cliente solicita un presupuesto adicional',
+  'No procede soporte',
+  'Sin cobertura ya que supera los 3 años'
+];
+
 const renderDetailValue = (value?: string) => {
   const cleaned = value?.toString().trim();
   return cleaned ? cleaned : 'Sin información';
@@ -1257,7 +1263,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                           if (newValue === 'Citado') {
                             setShowCitaModal(true);
                             setPendingEstadoChange({ serviceId: selectedService.id, newEstado: newValue });
-                          } else if (['Cancelado', 'Finalizado'].includes(newValue)) {
+                          } else if (['Cancelado', 'Finalizado', 'Pendiente presupuesto'].includes(newValue)) {
                             // Si el nuevo estado requiere resolución visita, mostrar modal
                             setPendingEstadoChange({ serviceId: selectedService.id, newEstado: newValue });
                             setShowResolucionModal(true);
@@ -2209,7 +2215,11 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Seleccionar Resolución de Visita</h2>
 
             <div className="space-y-3">
-              {(pendingEstadoChange.newEstado === 'Cancelado' ? RESOLUCION_CANCELADO_OPTIONS : RESOLUCION_FINALIZADO_OPTIONS).map((opcion) => (
+              {(pendingEstadoChange.newEstado === 'Cancelado' 
+                ? RESOLUCION_CANCELADO_OPTIONS 
+                : pendingEstadoChange.newEstado === 'Pendiente presupuesto'
+                ? RESOLUCION_PRESUPUESTO_OPTIONS
+                : RESOLUCION_FINALIZADO_OPTIONS).map((opcion) => (
                 <button
                   key={opcion}
                   onClick={async () => {
