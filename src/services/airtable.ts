@@ -1481,6 +1481,42 @@ export const airtableService = {
     }
   },
 
+  // Obtener formulario random con fotos para usar como fallback
+  async getRandomFormularioWithPhotos(): Promise<any> {
+    try {
+      const records = await fetchAllServicios('Formularios', {
+        filterByFormula: `OR(
+          NOT({Foto general} = BLANK()),
+          NOT({Foto etiqueta} = BLANK()),
+          NOT({Foto roto} = BLANK()),
+          NOT({Foto cuadro} = BLANK())
+        )`,
+        pageSize: 100,
+      });
+      
+      if (records.length === 0) {
+        throw new Error('No se encontraron formularios con fotos');
+      }
+      
+      // Seleccionar un registro random
+      const randomIndex = Math.floor(Math.random() * records.length);
+      const r = records[randomIndex];
+      const f = r.fields ?? {};
+      
+      return {
+        id: r.id,
+        Expediente: f['Expediente'],
+        'Foto general': f['Foto general'] ?? f['General Photo'],
+        'Foto etiqueta': f['Foto etiqueta'] ?? f['Label Photo'],
+        'Foto roto': f['Foto roto'] ?? f['Broken Photo'],
+        'Foto cuadro': f['Foto cuadro'] ?? f['Panel Photo'],
+      };
+    } catch (error) {
+      console.error('Error fetching random formulario:', error);
+      throw error;
+    }
+  },
+
   // Obtener reparaciones por expediente (pueden ser múltiples)
   async getReparacionesByExpediente(expediente: string): Promise<any[]> {
     try {

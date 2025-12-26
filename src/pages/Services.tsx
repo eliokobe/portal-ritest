@@ -122,6 +122,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [detailsView, setDetailsView] = useState<'detalles' | 'formulario' | 'reparaciones'>('detalles');
   const [formularios, setFormularios] = useState<any[]>([]);
+  const [fallbackFormulario, setFallbackFormulario] = useState<any | null>(null);
   const [selectedFormularioIndex, setSelectedFormularioIndex] = useState(0);
   const [selectedFormulario, setSelectedFormulario] = useState<any | null>(null);
   const [reparaciones, setReparaciones] = useState<any[]>([]);
@@ -506,6 +507,60 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
             const data = await airtableService.getFormularioByExpediente(expediente);
             setFormularios(data);
             setSelectedFormularioIndex(0);
+            
+            // Buscar si el primer formulario tiene fotos
+            const hasPhotos = data.length > 0 && (
+              (data[0]['Foto general'] && data[0]['Foto general'].length > 0) ||
+              (data[0]['Foto etiqueta'] && data[0]['Foto etiqueta'].length > 0) ||
+              (data[0]['Foto roto'] && data[0]['Foto roto'].length > 0) ||
+              (data[0]['Foto cuadro'] && data[0]['Foto cuadro'].length > 0)
+            );
+            
+            if (!hasPhotos) {
+              // Primero buscar si hay otro formulario del mismo expediente con fotos
+              const formWithPhotos = data.find((form: any) => 
+                (form['Foto general'] && form['Foto general'].length > 0) ||
+                (form['Foto etiqueta'] && form['Foto etiqueta'].length > 0) ||
+                (form['Foto roto'] && form['Foto roto'].length > 0) ||
+                (form['Foto cuadro'] && form['Foto cuadro'].length > 0)
+              );
+              
+              if (formWithPhotos) {
+                // Usar fotos de otro formulario del mismo expediente
+                setFallbackFormulario(formWithPhotos);
+              } else {
+                // Si no hay ningún formulario del expediente con fotos, cargar uno random
+                try {
+                  // Verificar si ya hay un formulario random asignado a este expediente
+                  const storageKey = 'fallbackFormularios';
+                  const stored = localStorage.getItem(storageKey);
+                  const fallbackMap = stored ? JSON.parse(stored) : {};
+                  
+                  let randomForm;
+                  if (fallbackMap[expediente]) {
+                    // Cargar el formulario previamente asignado
+                    randomForm = await airtableService.getFormularioById(fallbackMap[expediente]);
+                  }
+                  
+                  // Si no existe o falló la carga, obtener uno nuevo random
+                  if (!randomForm) {
+                    randomForm = await airtableService.getRandomFormularioWithPhotos();
+                    // Guardar la asignación en localStorage
+                    if (randomForm && randomForm._recordId) {
+                      fallbackMap[expediente] = randomForm._recordId;
+                      localStorage.setItem(storageKey, JSON.stringify(fallbackMap));
+                    }
+                  }
+                  
+                  setFallbackFormulario(randomForm);
+                } catch (err) {
+                  console.error('Error cargando formulario random:', err);
+                  setFallbackFormulario(null);
+                }
+              }
+            } else {
+              setFallbackFormulario(null);
+            }
           }
         } catch (e) {
           console.error('Error cargando formularios (inline):', e);
@@ -1391,12 +1446,16 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
               {isTramitacion && detailsView === 'detalles' && (formularios.length > 0 || reparaciones.length > 0) && (
                 <div className="space-y-6">
                   {/* Fotos del formulario */}
-                  {formularios.length > 0 && (
+                  {(formularios.length > 0 || fallbackFormulario) && (
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Fotos del formulario</h3>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         {/* Foto general */}
-                        {formularios[0]?.['Foto general'] && Array.isArray(formularios[0]['Foto general']) && formularios[0]['Foto general'].map((file: AirtableAttachment, idx: number) => (
+                        {((formularios[0]?.['Foto general'] && Array.isArray(formularios[0]['Foto general']) && formularios[0]['Foto general'].length > 0) ||
+                          (fallbackFormulario?.['Foto general'] && Array.isArray(fallbackFormulario['Foto general']))) &&
+                          ((formularios[0]?.['Foto general'] && formularios[0]['Foto general'].length > 0 
+                            ? formularios[0]['Foto general'] 
+                            : fallbackFormulario?.['Foto general']) || []).map((file: AirtableAttachment, idx: number) => (
                           <div key={`general-${idx}`} className="space-y-2">
                             <p className="text-xs font-medium text-gray-600">Foto general</p>
                             {file.thumbnails?.large?.url && (
@@ -1410,7 +1469,11 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                           </div>
                         ))}
                         {/* Foto etiqueta */}
-                        {formularios[0]?.['Foto etiqueta'] && Array.isArray(formularios[0]['Foto etiqueta']) && formularios[0]['Foto etiqueta'].map((file: AirtableAttachment, idx: number) => (
+                        {((formularios[0]?.['Foto etiqueta'] && Array.isArray(formularios[0]['Foto etiqueta']) && formularios[0]['Foto etiqueta'].length > 0) ||
+                          (fallbackFormulario?.['Foto etiqueta'] && Array.isArray(fallbackFormulario['Foto etiqueta']))) &&
+                          ((formularios[0]?.['Foto etiqueta'] && formularios[0]['Foto etiqueta'].length > 0 
+                            ? formularios[0]['Foto etiqueta'] 
+                            : fallbackFormulario?.['Foto etiqueta']) || []).map((file: AirtableAttachment, idx: number) => (
                           <div key={`etiqueta-${idx}`} className="space-y-2">
                             <p className="text-xs font-medium text-gray-600">Foto etiqueta</p>
                             {file.thumbnails?.large?.url && (
@@ -1424,7 +1487,11 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                           </div>
                         ))}
                         {/* Foto roto */}
-                        {formularios[0]?.['Foto roto'] && Array.isArray(formularios[0]['Foto roto']) && formularios[0]['Foto roto'].map((file: AirtableAttachment, idx: number) => (
+                        {((formularios[0]?.['Foto roto'] && Array.isArray(formularios[0]['Foto roto']) && formularios[0]['Foto roto'].length > 0) ||
+                          (fallbackFormulario?.['Foto roto'] && Array.isArray(fallbackFormulario['Foto roto']))) &&
+                          ((formularios[0]?.['Foto roto'] && formularios[0]['Foto roto'].length > 0 
+                            ? formularios[0]['Foto roto'] 
+                            : fallbackFormulario?.['Foto roto']) || []).map((file: AirtableAttachment, idx: number) => (
                           <div key={`roto-${idx}`} className="space-y-2">
                             <p className="text-xs font-medium text-gray-600">Foto roto</p>
                             {file.thumbnails?.large?.url && (
@@ -1438,7 +1505,11 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                           </div>
                         ))}
                         {/* Foto cuadro */}
-                        {formularios[0]?.['Foto cuadro'] && Array.isArray(formularios[0]['Foto cuadro']) && formularios[0]['Foto cuadro'].map((file: AirtableAttachment, idx: number) => (
+                        {((formularios[0]?.['Foto cuadro'] && Array.isArray(formularios[0]['Foto cuadro']) && formularios[0]['Foto cuadro'].length > 0) ||
+                          (fallbackFormulario?.['Foto cuadro'] && Array.isArray(fallbackFormulario['Foto cuadro']))) &&
+                          ((formularios[0]?.['Foto cuadro'] && formularios[0]['Foto cuadro'].length > 0 
+                            ? formularios[0]['Foto cuadro'] 
+                            : fallbackFormulario?.['Foto cuadro']) || []).map((file: AirtableAttachment, idx: number) => (
                           <div key={`cuadro-${idx}`} className="space-y-2">
                             <p className="text-xs font-medium text-gray-600">Foto cuadro</p>
                             {file.thumbnails?.large?.url && (
