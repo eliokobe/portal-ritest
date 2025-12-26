@@ -86,6 +86,7 @@ export interface Registro {
   expediente?: string;
   tramitado?: boolean;
   ipartner?: string;
+  fechaIpartner?: string; // ISO string with datetime
   pdf?: AirtableAttachment[];
 }
 

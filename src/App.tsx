@@ -76,11 +76,14 @@ function App() {
             <Route
               path="/servicios"
               element={
-                <ProtectedRoute>
+                <RoleProtectedRoute
+                  allowedRoles={["Técnico", "Gestora Operativa", "Gestora Técnica", "Responsable", "Asesora energética"]}
+                  redirectTo="/panel-grafico"
+                >
                   <Layout>
                     <Services />
                   </Layout>
-                </ProtectedRoute>
+                </RoleProtectedRoute>
               }
             />
             <Route
@@ -96,7 +99,7 @@ function App() {
             <Route
               path="/tecnicos"
               element={
-                <RoleProtectedRoute allowedRoles={["Responsable"]}>
+                <RoleProtectedRoute allowedRoles={["Responsable"]} redirectTo="/panel-grafico">
                   <Layout>
                     <Technicians />
                   </Layout>

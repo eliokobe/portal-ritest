@@ -280,16 +280,17 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     } else if (isTramitacion) {
       // Para tramitación: filtrar según condiciones específicas (aplica a TODOS los usuarios)
       servicesWithAllowedStates = servicesWithAllowedStates.filter((s) => {
-        // 1. Tramitado está vacío
-        const tramitadoOk = !s.tramitado;
+        // Condición 1: Registros pendientes de tramitar
+        const isPendiente = !s.tramitado &&
+          !!s.accionIpartner && s.accionIpartner.trim() !== '' &&
+          s.ipartner !== 'Cancelado' && s.ipartner !== 'Finalizado';
         
-        // 2. Acción Ipartner no está vacío
-        const accionIpartnerOk = !!s.accionIpartner && s.accionIpartner.trim() !== '';
+        // Condición 2: Estado = Finalizado, Ipartner no es Cancelado, Importe = 0
+        const isFinalized = s.estado === 'Finalizado' && 
+          s.ipartner !== 'Cancelado' &&
+          (s.importe === 0 || s.importe === null || s.importe === undefined);
         
-        // 3. Ipartner no es Cancelado Y NO (Facturado con Importe = 0)
-        const ipartnerOk = s.ipartner !== 'Cancelado' && !(s.ipartner === 'Facturado' && (s.importe === 0 || s.importe === null || s.importe === undefined));
-        
-        return tramitadoOk && accionIpartnerOk && ipartnerOk;
+        return isPendiente || isFinalized;
       });
     } else {
       // Para servicios: mostrar todo salvo Finalizado/Cancelado
@@ -339,6 +340,15 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
         // Además, excluir "Citado" si tiene "Cita técnico" rellena
         servicesWithAllowedStates = servicesWithAllowedStates.filter(
           (s) => !(s.estado === 'Citado' && !!s.citaTecnico)
+        );
+        // Excluir servicios que tienen la columna "Técnico" rellena
+        servicesWithAllowedStates = servicesWithAllowedStates.filter(
+          (s) => {
+            if (!s.tecnico) return true;
+            if (typeof s.tecnico === 'string') return s.tecnico.trim() === '';
+            if (Array.isArray(s.tecnico)) return s.tecnico.length === 0;
+            return true;
+          }
         );
       }
 

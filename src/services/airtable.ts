@@ -406,7 +406,7 @@ export const airtableService = {
   },
 
   // Obtener estadísticas del dashboard para Técnico
-  async getTechnicianDashboardStats(userId?: string): Promise<{
+  async getTechnicianDashboardStats(userId?: string, userEmail?: string): Promise<{
     assignedByDay: { date: string; count: number }[];
     resolvedByDay: { date: string; count: number }[];
   }> {
@@ -415,12 +415,16 @@ export const airtableService = {
       const now = new Date();
       const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
       
-      // Preparar mapa de días (últimos 14 días)
+      // Preparar mapa de días (últimos 14 días, solo días laborables: lunes a viernes)
       const dayKey = (d: Date) => d.toISOString().split('T')[0];
       const last14Keys: string[] = [];
       for (let i = 13; i >= 0; i--) {
         const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-        last14Keys.push(dayKey(d));
+        const dayOfWeek = d.getDay(); // 0 = Domingo, 6 = Sábado
+        // Solo agregar si es día laborable (lunes=1 a viernes=5)
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+          last14Keys.push(dayKey(d));
+        }
       }
       const assignedMap = new Map(last14Keys.map(k => [k, 0]));
       const resolvedMap = new Map(last14Keys.map(k => [k, 0]));
@@ -432,11 +436,24 @@ export const airtableService = {
         const fechaRegistro = f['Fecha de registro'];
         const ultimoCambio = f['Último cambio'];
         const estado = f['Estado'];
+        const tecnico = f['Técnico'];
+        const emailTrabajador = f['Email trabajador'];
         
-        // Servicios asignados (últimas 2 semanas por fecha de registro)
+        // Servicios asignados (últimas 2 semanas por fecha de registro, donde Email trabajador contiene el email del usuario)
         if (fechaRegistro) {
           const regDate = new Date(fechaRegistro);
-          if (regDate >= fourteenDaysAgo && regDate <= now) {
+          
+          // Verificar que Email trabajador contenga el email del usuario
+          let hasUserEmail = false;
+          if (userEmail && emailTrabajador) {
+            if (typeof emailTrabajador === 'string') {
+              hasUserEmail = emailTrabajador.includes(userEmail);
+            } else if (Array.isArray(emailTrabajador)) {
+              hasUserEmail = emailTrabajador.some((email: string) => email && email.includes(userEmail));
+            }
+          }
+          
+          if (hasUserEmail && regDate >= fourteenDaysAgo && regDate <= now) {
             const key = dayKey(regDate);
             if (assignedMap.has(key)) {
               assignedMap.set(key, assignedMap.get(key)! + 1);
@@ -444,10 +461,27 @@ export const airtableService = {
           }
         }
         
-        // Incidencias resueltas (estado Finalizado, últimas 2 semanas por último cambio)
+        // Incidencias resueltas: Estado = Finalizado, Técnico vacío, Email trabajador contiene el email del usuario, últimas 2 semanas
         if (estado === 'Finalizado' && ultimoCambio) {
           const resDate = new Date(ultimoCambio);
-          if (resDate >= fourteenDaysAgo && resDate <= now) {
+          
+          // Verificar que Técnico esté vacío
+          const isTecnicoEmpty = !tecnico || 
+            (typeof tecnico === 'string' && tecnico.trim() === '') || 
+            (Array.isArray(tecnico) && tecnico.length === 0);
+          
+          // Verificar que Email trabajador contenga el email del usuario
+          let hasUserEmail = false;
+          if (userEmail && emailTrabajador) {
+            if (typeof emailTrabajador === 'string') {
+              hasUserEmail = emailTrabajador.includes(userEmail);
+            } else if (Array.isArray(emailTrabajador)) {
+              hasUserEmail = emailTrabajador.some((email: string) => email && email.includes(userEmail));
+            }
+          }
+          
+          // Solo contar si cumple todas las condiciones Y está en el rango de 2 semanas
+          if (isTecnicoEmpty && hasUserEmail && resDate >= fourteenDaysAgo && resDate <= now) {
             const key = dayKey(resDate);
             if (resolvedMap.has(key)) {
               resolvedMap.set(key, resolvedMap.get(key)! + 1);
@@ -486,15 +520,6 @@ export const airtableService = {
     try {
       const records = await fetchAllServicios(AIRTABLE_SERVICES_TABLE, { pageSize: 100 });
       const today = new Date().toISOString().split('T')[0];
-      const estadosPermitidos = [
-        'Formulario completado',
-        'Llamado',
-        'Pendiente presupuesto',
-        'Citado',
-        'Material enviado',
-        'Cancelado',
-        'Finalizado',
-      ];
       
       let unsynchronizedCount = 0;
       let synchronizedTodayCount = 0;
@@ -503,12 +528,22 @@ export const airtableService = {
         const f = r.fields ?? {};
         const tramitado = f['Tramitado'];
         const fechaSincronizacion = f['Fecha sincronización'] ?? f['Fecha sincronizacion'];
+        const accionIpartner = f['Acción Ipartner'];
+        const ipartner = f['Ipartner'];
+        const importe = f['Importe'];
         const estado = f['Estado'];
-        const estadoOk = estado && estadosPermitidos.includes(estado);
-        if (!estadoOk) return;
         
-        // Pendientes de tramitar (Tramitado vacío/false)
-        if (!tramitado || tramitado === false) {
+        // Condición 1: Registros pendientes de tramitar
+        const isPendiente = !tramitado &&
+          accionIpartner && (typeof accionIpartner === 'string' ? accionIpartner.trim() !== '' : accionIpartner.length > 0) &&
+          ipartner !== 'Cancelado' && ipartner !== 'Finalizado';
+        
+        // Condición 2: Estado = Finalizado, Ipartner no es Cancelado, Importe = 0
+        const isFinalized = estado === 'Finalizado' && 
+          ipartner !== 'Cancelado' &&
+          (importe === 0 || importe === null || importe === undefined);
+        
+        if (isPendiente || isFinalized) {
           unsynchronizedCount++;
         }
         
@@ -1264,6 +1299,7 @@ export const airtableService = {
     expediente?: string;
     tramitado?: boolean;
     ipartner?: string;
+    fechaIpartner?: string;
     pdf?: any[];
   }[]> {
     try {
@@ -1285,6 +1321,7 @@ export const airtableService = {
           expediente: f['Expediente'],
           tramitado: f['Tramitado'] ?? false,
           ipartner: f['Ipartner'],
+          fechaIpartner: f['Fecha Ipartner'],
           pdf: f['PDF'] || f['Pdf'] || f['pdf'] || [],
         };
       });
@@ -1337,6 +1374,73 @@ export const airtableService = {
     } catch (error) {
       console.error('Error updating call status:', error);
       throw error;
+    }
+  },
+
+  // Obtener estadísticas de Asesoramientos
+  async getAsesoramientosStats(): Promise<{
+    totalRegistros: number;
+    informesToday: number;
+  }> {
+    try {
+      const records = await fetchAllRegistros('Registros', { pageSize: 100 });
+      const today = new Date().toISOString().split('T')[0];
+      
+      let totalRegistros = 0;
+      let informesToday = 0;
+      
+      records.forEach((r: any) => {
+        const f = r.fields ?? {};
+        const estado = f['Estado'];
+        const ipartner = f['Ipartner'];
+        const fechaIpartner = f['Fecha Ipartner'];
+        const pdf = f['PDF'] || f['Pdf'] || f['pdf'] || [];
+        const tramitado = f['Tramitado'] ?? false;
+        
+        // Filtrar registros con la misma lógica que en Registros.tsx
+        const ipartnerExcluidos = ['No interesado', 'Ilocalizable', 'Facturado', 'Cancelado'];
+        const isIpartnerExcluded = ipartner && ipartnerExcluidos.includes(ipartner);
+        const isCitadoWithoutPdf = estado === 'Citado' && (!pdf || pdf.length === 0);
+        
+        // Excluir si: Estado=Informe, Ipartner=Citado, Fecha Ipartner hace menos de una semana, y PDF vacío
+        const isInformeWithRecentCitedIpartnerAndNoPdf = 
+          estado === 'Informe' && 
+          ipartner === 'Citado' && 
+          (!pdf || pdf.length === 0) &&
+          fechaIpartner &&
+          (() => {
+            const fecha = new Date(fechaIpartner);
+            const now = new Date();
+            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            return fecha > sevenDaysAgo;
+          })();
+        
+        const shouldShow = !isIpartnerExcluded && !isCitadoWithoutPdf && !isInformeWithRecentCitedIpartnerAndNoPdf;
+        
+        // Contar registros válidos
+        if (shouldShow && !tramitado) {
+          totalRegistros++;
+        }
+        
+        // Contar informes de hoy (Estado = "Informe" y Fecha = hoy)
+        if (estado === 'Informe' && f['Fecha']) {
+          const fechaRegistro = new Date(f['Fecha']).toISOString().split('T')[0];
+          if (fechaRegistro === today) {
+            informesToday++;
+          }
+        }
+      });
+      
+      return {
+        totalRegistros,
+        informesToday,
+      };
+    } catch (error) {
+      console.error('Error fetching asesoramientos stats:', error);
+      return {
+        totalRegistros: 0,
+        informesToday: 0,
+      };
     }
   },
 

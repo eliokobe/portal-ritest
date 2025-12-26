@@ -64,7 +64,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       title: 'Punto de Recarga',
       items: [
         { name: 'Panel Gráfico', href: '/panel-grafico', icon: BarChart3 },
-        { name: 'Servicios', href: '/servicios', icon: Wrench },
         { name: 'Tramitación', href: '/tramitacion', icon: ClipboardList },
         { name: 'Técnicos', href: '/tecnicos', icon: Users },
         { name: 'Envíos', href: '/envios', icon: Package },

@@ -6,9 +6,10 @@ import LoadingScreen from './LoadingScreen';
 interface RoleProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles: string[];
+  redirectTo?: string;
 }
 
-const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({ children, allowedRoles }) => {
+const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({ children, allowedRoles, redirectTo = '/panel-grafico' }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -20,7 +21,7 @@ const RoleProtectedRoute: React.FC<RoleProtectedRouteProps> = ({ children, allow
   }
 
   if (!user.role || !allowedRoles.includes(user.role)) {
-    return <Navigate to="/servicios" replace />;
+    return <Navigate to={redirectTo} replace />;
   }
 
   return <>{children}</>;

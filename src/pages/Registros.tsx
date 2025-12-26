@@ -307,13 +307,26 @@ export default function Registros() {
       registro.contrato?.toString().includes(searchTerm);
 
     // Excluir registros con ciertos valores de Ipartner
-    const ipartnerExcluidos = ['No interesado', 'Ilocalizable', 'Facturado'];
+    const ipartnerExcluidos = ['No interesado', 'Ilocalizable', 'Facturado', 'Cancelado'];
     const isIpartnerExcluded = registro.ipartner && ipartnerExcluidos.includes(registro.ipartner);
 
     // Si está Citado, debe tener PDF relleno
     const isCitadoWithoutPdf = registro.estado === 'Citado' && (!registro.pdf || registro.pdf.length === 0);
 
-    return matchesSearch && !isIpartnerExcluded && !isCitadoWithoutPdf;
+    // Excluir si: Estado=Informe, Ipartner=Citado, Fecha Ipartner hace menos de una semana, y PDF vacío
+    const isInformeWithRecentCitedIpartnerAndNoPdf = 
+      registro.estado === 'Informe' && 
+      registro.ipartner === 'Citado' && 
+      (!registro.pdf || registro.pdf.length === 0) &&
+      registro.fechaIpartner &&
+      (() => {
+        const fechaIpartner = new Date(registro.fechaIpartner);
+        const now = new Date();
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        return fechaIpartner > sevenDaysAgo;
+      })();
+
+    return matchesSearch && !isIpartnerExcluded && !isCitadoWithoutPdf && !isInformeWithRecentCitedIpartnerAndNoPdf;
   });
 
   if (loading) {

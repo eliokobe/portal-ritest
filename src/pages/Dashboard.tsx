@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Wrench, CheckCircle, AlertCircle, CheckSquare } from 'lucide-react';
+import { Wrench, CheckCircle, AlertCircle, CheckSquare, ClipboardList } from 'lucide-react';
 import { DashboardStats } from '../types';
 import { airtableService } from '../services/airtable';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,6 +10,7 @@ const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [adminStats, setAdminStats] = useState<{ unsynchronizedCount: number; synchronizedTodayCount: number } | null>(null);
   const [techStats, setTechStats] = useState<{ assignedByDay: { date: string; count: number }[]; resolvedByDay: { date: string; count: number }[] } | null>(null);
+  const [asesoramientosStats, setAsesoramientosStats] = useState<{ totalRegistros: number; informesToday: number } | null>(null);
   const [loading, setLoading] = useState(true);
   
   const isAdministrativa = user?.role === 'Administrativa';
@@ -19,10 +20,14 @@ const Dashboard: React.FC = () => {
     const fetchStats = async () => {
       try {
         if (isAdministrativa) {
-          const data = await airtableService.getAdminDashboardStats();
-          setAdminStats(data);
+          const [adminData, asesoData] = await Promise.all([
+            airtableService.getAdminDashboardStats(),
+            airtableService.getAsesoramientosStats()
+          ]);
+          setAdminStats(adminData);
+          setAsesoramientosStats(asesoData);
         } else if (isTecnico) {
-          const data = await airtableService.getTechnicianDashboardStats(user?.id);
+          const data = await airtableService.getTechnicianDashboardStats(user?.id, user?.email);
           setTechStats(data);
         } else {
           const data = await airtableService.getDashboardStats();
@@ -36,7 +41,7 @@ const Dashboard: React.FC = () => {
     };
 
     fetchStats();
-  }, [isAdministrativa, isTecnico, user?.id]);
+  }, [isAdministrativa, isTecnico, user?.id, user?.email]);
 
   if (loading) {
     return (
@@ -46,7 +51,7 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  if (!stats && !adminStats && !techStats) {
+  if (!stats && !adminStats && !techStats && !asesoramientosStats) {
     return (
       <div className="text-center py-12">
         <p className="text-gray-500">Error al cargar las estadísticas</p>
@@ -54,7 +59,107 @@ const Dashboard: React.FC = () => {
     );
   }
   
-  // Dashboard para Técnico
+  // Dashboard para Administrativa (con Asesoramientos)
+  if (isAdministrativa && adminStats && asesoramientosStats) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Panel Gráfico</h1>
+          <p className="text-gray-600 mt-2">Estado de sincronización y estadísticas de asesoramientos</p>
+        </div>
+
+        {/* Tarjetas de resumen para Administrativa */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pendientes de tramitar</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{adminStats.unsynchronizedCount}</p>
+              </div>
+              <div className="bg-red-500 p-3 rounded-lg">
+                <AlertCircle className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Tramitados hoy</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{adminStats.synchronizedTodayCount}</p>
+              </div>
+              <div className="bg-green-500 p-3 rounded-lg">
+                <CheckSquare className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Registros en Asesoramientos</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{asesoramientosStats.totalRegistros}</p>
+              </div>
+              <div className="bg-blue-500 p-3 rounded-lg">
+                <ClipboardList className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Informes realizados hoy</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{asesoramientosStats.informesToday}</p>
+              </div>
+              <div className="bg-green-600 p-3 rounded-lg">
+                <CheckSquare className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Dashboard para Administrativa (solo tramitaciones)
+  if (isAdministrativa && adminStats) {
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Panel Gráfico</h1>
+          <p className="text-gray-600 mt-2">Estado de sincronización de servicios</p>
+        </div>
+
+        {/* Tarjetas de resumen para Administrativa */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Pendientes de tramitar</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{adminStats.unsynchronizedCount}</p>
+              </div>
+              <div className="bg-red-500 p-3 rounded-lg">
+                <AlertCircle className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Tramitados hoy</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{adminStats.synchronizedTodayCount}</p>
+              </div>
+              <div className="bg-green-500 p-3 rounded-lg">
+                <CheckSquare className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (isTecnico && techStats) {
     return (
       <div className="space-y-8">
