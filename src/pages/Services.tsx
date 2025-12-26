@@ -76,14 +76,18 @@ const IPARTNER_OPTIONS = [
   'Facturado'
 ];
 
-const RESOLUCION_VISITA_OPTIONS = [
+const RESOLUCION_CANCELADO_OPTIONS = [
   'Ilocalizable',
   'Resuelto por el cliente',
-  'Sin cobertura',
+  'No procede soporte',
   'Sin llave del cuadro',
+  'Sin cobertura ya que supera los 3 años',
+  'Interviene la empresa instaladora'
+];
+
+const RESOLUCION_FINALIZADO_OPTIONS = [
   'Liberación cuenta wallbox',
   'Reset y actualización',
-  'Sin cobertura ya que supera los 3 años',
   'Configuración del cargador'
 ];
 
@@ -549,6 +553,48 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     };
     loadInlineRep();
   }, [detailsView, selectedService?.id]);
+
+  // Cargar formularios y reparaciones cuando se abre modal de tramitaciones
+  useEffect(() => {
+    if (!isTramitacion || !selectedService) return;
+    
+    const expediente = selectedService.expediente;
+    if (!expediente) {
+      setFormularios([]);
+      setReparaciones([]);
+      return;
+    }
+
+    const loadDatos = async () => {
+      try {
+        // Cargar formularios
+        const sameExpForm = formularios.length > 0 && (formularios[0]?.Expediente === expediente);
+        if (!sameExpForm) {
+          const dataForm = await airtableService.getFormularioByExpediente(expediente);
+          setFormularios(dataForm);
+          setSelectedFormularioIndex(0);
+        }
+      } catch (e) {
+        console.error('Error cargando formularios para tramitaciones:', e);
+        setFormularios([]);
+      }
+
+      try {
+        // Cargar reparaciones
+        const sameExpRep = reparaciones.length > 0 && (reparaciones[0]?.expediente === expediente);
+        if (!sameExpRep) {
+          const dataRep = await airtableService.getReparacionesByExpediente(expediente);
+          setReparaciones(dataRep);
+          setSelectedReparacionIndex(0);
+        }
+      } catch (e) {
+        console.error('Error cargando reparaciones para tramitaciones:', e);
+        setReparaciones([]);
+      }
+    };
+
+    loadDatos();
+  }, [selectedService?.id, isTramitacion]);
 
   // Al cerrar modales, asegurar scroll hacia el servicio seleccionado
   useEffect(() => {
@@ -1130,6 +1176,17 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   )}
                 </div>
             )}
+            {/* Tabs para tramitaciones */}
+            {isTramitacion && (
+              <div className="flex items-center gap-2 border-b border-gray-200 pb-2 pt-6 px-6">
+                  <button
+                    className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'detalles' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                    onClick={() => setDetailsView('detalles')}
+                  >
+                    Detalles
+                  </button>
+                </div>
+            )}
             
             <div className="p-6 space-y-6 bg-white rounded-b-2xl">
               {detailsView === 'detalles' && (
@@ -1183,16 +1240,14 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                         value={selectedService.estado || ''}
                         onChange={(e) => {
                           const newValue = e.target.value;
-                          if (newValue === selectedService.estado) return;
-                          
-                          // Actualizar el estado inmediatamente para re-renderizar
-                          setSelectedService({...selectedService, estado: newValue});
+                          const oldValue = selectedService.estado;
+                          if (newValue === oldValue) return;
                           
                           // Si el nuevo estado es Citado, mostrar modal para seleccionar cita
                           if (newValue === 'Citado') {
                             setShowCitaModal(true);
                             setPendingEstadoChange({ serviceId: selectedService.id, newEstado: newValue });
-                          } else if (['Llamado', 'Finalizado', 'Cancelado'].includes(newValue)) {
+                          } else if (['Cancelado', 'Finalizado'].includes(newValue)) {
                             // Si el nuevo estado requiere resolución visita, mostrar modal
                             setPendingEstadoChange({ serviceId: selectedService.id, newEstado: newValue });
                             setShowResolucionModal(true);
@@ -1211,13 +1266,13 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                                   s.id === selectedService.id ? { ...s, estado: newValue, cita: newValue !== 'Citado' ? undefined : s.cita } : s
                                 );
                                 setServices(updatedServices);
-                                setSelectedService({...selectedService, cita: newValue !== 'Citado' ? undefined : selectedService.cita});
+                                setSelectedService({...selectedService, estado: newValue, cita: newValue !== 'Citado' ? undefined : selectedService.cita});
                               })
                               .catch((error) => {
                                 console.error('Error updating estado:', error);
                                 alert('Error al actualizar el estado');
                                 // Revertir el estado si falla
-                                setSelectedService({...selectedService, estado: selectedService.estado});
+                                setSelectedService({...selectedService, estado: oldValue});
                               })
                               .finally(() => {
                                 setSaving(false);
@@ -1317,67 +1372,109 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.accionIpartner)}</p>
                 </div>
               )}
-              {isTramitacion && detailsView === 'detalles' && formularios.length > 0 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Fotos</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {/* Foto general */}
-                    {formularios[0]?.['Foto general'] && Array.isArray(formularios[0]['Foto general']) && formularios[0]['Foto general'].map((file: AirtableAttachment, idx: number) => (
-                      <div key={`general-${idx}`} className="space-y-2">
-                        <p className="text-xs font-medium text-gray-600">Fotos antes</p>
-                        {file.thumbnails?.large?.url && (
-                          <img
-                            src={file.thumbnails.large.url}
-                            alt="Foto general"
-                            className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={() => window.open(file.url, '_blank')}
-                          />
-                        )}
+              {isTramitacion && detailsView === 'detalles' && (formularios.length > 0 || reparaciones.length > 0) && (
+                <div className="space-y-6">
+                  {/* Fotos del formulario */}
+                  {formularios.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Fotos del formulario</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {/* Foto general */}
+                        {formularios[0]?.['Foto general'] && Array.isArray(formularios[0]['Foto general']) && formularios[0]['Foto general'].map((file: AirtableAttachment, idx: number) => (
+                          <div key={`general-${idx}`} className="space-y-2">
+                            <p className="text-xs font-medium text-gray-600">Foto general</p>
+                            {file.thumbnails?.large?.url && (
+                              <img
+                                src={file.thumbnails.large.url}
+                                alt="Foto general"
+                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => window.open(file.url, '_blank')}
+                              />
+                            )}
+                          </div>
+                        ))}
+                        {/* Foto etiqueta */}
+                        {formularios[0]?.['Foto etiqueta'] && Array.isArray(formularios[0]['Foto etiqueta']) && formularios[0]['Foto etiqueta'].map((file: AirtableAttachment, idx: number) => (
+                          <div key={`etiqueta-${idx}`} className="space-y-2">
+                            <p className="text-xs font-medium text-gray-600">Foto etiqueta</p>
+                            {file.thumbnails?.large?.url && (
+                              <img
+                                src={file.thumbnails.large.url}
+                                alt="Foto etiqueta"
+                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => window.open(file.url, '_blank')}
+                              />
+                            )}
+                          </div>
+                        ))}
+                        {/* Foto roto */}
+                        {formularios[0]?.['Foto roto'] && Array.isArray(formularios[0]['Foto roto']) && formularios[0]['Foto roto'].map((file: AirtableAttachment, idx: number) => (
+                          <div key={`roto-${idx}`} className="space-y-2">
+                            <p className="text-xs font-medium text-gray-600">Foto roto</p>
+                            {file.thumbnails?.large?.url && (
+                              <img
+                                src={file.thumbnails.large.url}
+                                alt="Foto roto"
+                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => window.open(file.url, '_blank')}
+                              />
+                            )}
+                          </div>
+                        ))}
+                        {/* Foto cuadro */}
+                        {formularios[0]?.['Foto cuadro'] && Array.isArray(formularios[0]['Foto cuadro']) && formularios[0]['Foto cuadro'].map((file: AirtableAttachment, idx: number) => (
+                          <div key={`cuadro-${idx}`} className="space-y-2">
+                            <p className="text-xs font-medium text-gray-600">Foto cuadro</p>
+                            {file.thumbnails?.large?.url && (
+                              <img
+                                src={file.thumbnails.large.url}
+                                alt="Foto cuadro"
+                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => window.open(file.url, '_blank')}
+                              />
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                    {/* Foto etiqueta */}
-                    {formularios[0]?.['Foto etiqueta'] && Array.isArray(formularios[0]['Foto etiqueta']) && formularios[0]['Foto etiqueta'].map((file: AirtableAttachment, idx: number) => (
-                      <div key={`etiqueta-${idx}`} className="space-y-2">
-                        <p className="text-xs font-medium text-gray-600">Foto etiqueta</p>
-                        {file.thumbnails?.large?.url && (
-                          <img
-                            src={file.thumbnails.large.url}
-                            alt="Foto etiqueta"
-                            className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={() => window.open(file.url, '_blank')}
-                          />
-                        )}
+                    </div>
+                  )}
+
+                  {/* Fotos de la reparación */}
+                  {reparaciones.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Fotos de la reparación</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {/* Foto */}
+                        {reparaciones[0]?.['Foto'] && Array.isArray(reparaciones[0]['Foto']) && reparaciones[0]['Foto'].map((file: AirtableAttachment, idx: number) => (
+                          <div key={`foto-${idx}`} className="space-y-2">
+                            <p className="text-xs font-medium text-gray-600">Foto</p>
+                            {file.thumbnails?.large?.url && (
+                              <img
+                                src={file.thumbnails.large.url}
+                                alt="Foto reparación"
+                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => window.open(file.url, '_blank')}
+                              />
+                            )}
+                          </div>
+                        ))}
+                        {/* Foto de la etiqueta */}
+                        {reparaciones[0]?.['Foto de la etiqueta'] && Array.isArray(reparaciones[0]['Foto de la etiqueta']) && reparaciones[0]['Foto de la etiqueta'].map((file: AirtableAttachment, idx: number) => (
+                          <div key={`foto-etiqueta-${idx}`} className="space-y-2">
+                            <p className="text-xs font-medium text-gray-600">Foto de la etiqueta</p>
+                            {file.thumbnails?.large?.url && (
+                              <img
+                                src={file.thumbnails.large.url}
+                                alt="Foto de la etiqueta"
+                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => window.open(file.url, '_blank')}
+                              />
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                    {/* Foto roto */}
-                    {formularios[0]?.['Foto roto'] && Array.isArray(formularios[0]['Foto roto']) && formularios[0]['Foto roto'].map((file: AirtableAttachment, idx: number) => (
-                      <div key={`roto-${idx}`} className="space-y-2">
-                        <p className="text-xs font-medium text-gray-600">Foto roto</p>
-                        {file.thumbnails?.large?.url && (
-                          <img
-                            src={file.thumbnails.large.url}
-                            alt="Foto roto"
-                            className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={() => window.open(file.url, '_blank')}
-                          />
-                        )}
-                      </div>
-                    ))}
-                    {/* Foto cuadro */}
-                    {formularios[0]?.['Foto cuadro'] && Array.isArray(formularios[0]['Foto cuadro']) && formularios[0]['Foto cuadro'].map((file: AirtableAttachment, idx: number) => (
-                      <div key={`cuadro-${idx}`} className="space-y-2">
-                        <p className="text-xs font-medium text-gray-600">Foto cuadro</p>
-                        {file.thumbnails?.large?.url && (
-                          <img
-                            src={file.thumbnails.large.url}
-                            alt="Foto cuadro"
-                            className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
-                            onClick={() => window.open(file.url, '_blank')}
-                          />
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -1642,63 +1739,8 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                       )}
                     </div>
 
-                    {/* Archivos adjuntos */}
-                    <div className="border-t pt-4">
-                      <h3 className="text-sm font-semibold text-gray-700 mb-3">Archivos adjuntos</h3>
-                      <div className="space-y-2">
-                        {formularios[selectedFormularioIndex]?.['Archivo 1'] && Array.isArray(formularios[selectedFormularioIndex]['Archivo 1']) && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-600">Archivo 1:</span>
-                            {formularios[selectedFormularioIndex]['Archivo 1'].map((file: AirtableAttachment, idx: number) => (
-                              <a
-                                key={idx}
-                                href={file.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-blue-600 hover:underline"
-                              >
-                                {file.filename || 'Descargar'}
-                              </a>
-                            ))}
-                          </div>
-                        )}
-                        {formularios[selectedFormularioIndex]?.['Archivo 2'] && Array.isArray(formularios[selectedFormularioIndex]['Archivo 2']) && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-600">Archivo 2:</span>
-                            {formularios[selectedFormularioIndex]['Archivo 2'].map((file: AirtableAttachment, idx: number) => (
-                              <a
-                                key={idx}
-                                href={file.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-blue-600 hover:underline"
-                              >
-                                {file.filename || 'Descargar'}
-                              </a>
-                            ))}
-                          </div>
-                        )}
-                        {formularios[selectedFormularioIndex]?.['Archivo 3'] && Array.isArray(formularios[selectedFormularioIndex]['Archivo 3']) && (
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-600">Archivo 3:</span>
-                            {formularios[selectedFormularioIndex]['Archivo 3'].map((file: AirtableAttachment, idx: number) => (
-                              <a
-                                key={idx}
-                                href={file.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-blue-600 hover:underline"
-                              >
-                                {file.filename || 'Descargar'}
-                              </a>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
                     {/* Fotos */}
-                    <div className="border-t pt-4">
+                    <div>
                       <h3 className="text-sm font-semibold text-gray-700 mb-3">Fotos</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Foto general */}
@@ -1706,7 +1748,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="text-xs font-medium text-gray-600">Foto general</h4>
                             {formularios[selectedFormularioIndex]?.id && (
-                              <label className="cursor-pointer text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                              <label className="cursor-pointer text-xs bg-brand-primary text-white px-3 py-1 rounded hover:bg-brand-primary/80 transition-colors flex items-center gap-1">
                                 <input
                                   type="file"
                                   accept="image/*"
@@ -1722,19 +1764,12 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                             <div className="space-y-2">
                               {formularios[selectedFormularioIndex]['Foto general'].map((file: AirtableAttachment, idx: number) => (
                                 <div key={idx} className="space-y-1">
-                                  <a
-                                    href={file.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm text-blue-600 hover:underline block"
-                                  >
-                                    Descargar
-                                  </a>
                                   {file.thumbnails?.large?.url && (
                                     <img
                                       src={file.thumbnails.large.url}
                                       alt="Foto general"
-                                      className="w-full h-auto object-cover rounded border"
+                                      className="w-full h-auto object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                                      onClick={() => window.open(file.url, '_blank')}
                                     />
                                   )}
                                 </div>
@@ -1750,7 +1785,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="text-xs font-medium text-gray-600">Foto etiqueta</h4>
                             {formularios[selectedFormularioIndex]?.id && (
-                              <label className="cursor-pointer text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                              <label className="cursor-pointer text-xs bg-brand-primary text-white px-3 py-1 rounded hover:bg-brand-primary/80 transition-colors flex items-center gap-1">
                                 <input
                                   type="file"
                                   accept="image/*"
@@ -1766,19 +1801,12 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                             <div className="space-y-2">
                               {formularios[selectedFormularioIndex]['Foto etiqueta'].map((file: AirtableAttachment, idx: number) => (
                                 <div key={idx} className="space-y-1">
-                                  <a
-                                    href={file.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm text-blue-600 hover:underline block"
-                                  >
-                                    Descargar
-                                  </a>
                                   {file.thumbnails?.large?.url && (
                                     <img
                                       src={file.thumbnails.large.url}
                                       alt="Foto etiqueta"
-                                      className="w-full h-auto object-cover rounded border"
+                                      className="w-full h-auto object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                                      onClick={() => window.open(file.url, '_blank')}
                                     />
                                   )}
                                 </div>
@@ -1794,7 +1822,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="text-xs font-medium text-gray-600">Foto roto</h4>
                             {formularios[selectedFormularioIndex]?.id && (
-                              <label className="cursor-pointer text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                              <label className="cursor-pointer text-xs bg-brand-primary text-white px-3 py-1 rounded hover:bg-brand-primary/80 transition-colors flex items-center gap-1">
                                 <input
                                   type="file"
                                   accept="image/*"
@@ -1810,19 +1838,12 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                             <div className="space-y-2">
                               {formularios[selectedFormularioIndex]['Foto roto'].map((file: AirtableAttachment, idx: number) => (
                                 <div key={idx} className="space-y-1">
-                                  <a
-                                    href={file.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm text-blue-600 hover:underline block"
-                                  >
-                                    Descargar
-                                  </a>
                                   {file.thumbnails?.large?.url && (
                                     <img
                                       src={file.thumbnails.large.url}
                                       alt="Foto roto"
-                                      className="w-full h-auto object-cover rounded border"
+                                      className="w-full h-auto object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                                      onClick={() => window.open(file.url, '_blank')}
                                     />
                                   )}
                                 </div>
@@ -1838,7 +1859,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="text-xs font-medium text-gray-600">Foto cuadro</h4>
                             {formularios[selectedFormularioIndex]?.id && (
-                              <label className="cursor-pointer text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1">
+                              <label className="cursor-pointer text-xs bg-brand-primary text-white px-3 py-1 rounded hover:bg-brand-primary/80 transition-colors flex items-center gap-1">
                                 <input
                                   type="file"
                                   accept="image/*"
@@ -1854,19 +1875,12 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                             <div className="space-y-2">
                               {formularios[selectedFormularioIndex]['Foto cuadro'].map((file: AirtableAttachment, idx: number) => (
                                 <div key={idx} className="space-y-1">
-                                  <a
-                                    href={file.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm text-blue-600 hover:underline block"
-                                  >
-                                    Descargar
-                                  </a>
                                   {file.thumbnails?.large?.url && (
                                     <img
                                       src={file.thumbnails.large.url}
                                       alt="Foto cuadro"
-                                      className="w-full h-auto object-cover rounded border"
+                                      className="w-full h-auto object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                                      onClick={() => window.open(file.url, '_blank')}
                                     />
                                   )}
                                 </div>
@@ -2185,7 +2199,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Seleccionar Resolución de Visita</h2>
 
             <div className="space-y-3">
-              {RESOLUCION_VISITA_OPTIONS.map((opcion) => (
+              {(pendingEstadoChange.newEstado === 'Cancelado' ? RESOLUCION_CANCELADO_OPTIONS : RESOLUCION_FINALIZADO_OPTIONS).map((opcion) => (
                 <button
                   key={opcion}
                   onClick={async () => {
@@ -2204,7 +2218,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                         opcion
                       );
 
-                      // Limpiar la Cita cuando se cambia a Llamado, Finalizado o Cancelado
+                      // Limpiar la Cita cuando se cambia a Cancelado o Finalizado
                       await airtableService.updateServiceField(
                         pendingEstadoChange.serviceId,
                         'Cita',

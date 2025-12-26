@@ -1401,8 +1401,10 @@ export const airtableService = {
           reparacion: f['Reparación'] ?? f['Repair'],
           cuadroElectrico: f['Cuadro eléctrico'] ?? f['Electrical Panel'],
           detalles: f['Detalles'] ?? f['Details'] ?? f['Descripción'],
+          Foto: f['Foto'] ?? f['Photo'],
           foto: f['Foto'] ?? f['Photo'],
           fotoGeneral: f['Foto'],
+          'Foto de la etiqueta': f['Foto de la etiqueta'] ?? f['Foto de la Etiqueta'],
           fotoEtiqueta: f['Foto de la etiqueta'] ?? f['Foto de la Etiqueta'],
           numeroSerie: f['Número de serie'] ?? f['Numero de serie'] ?? f['S/N'] ?? f['# S/N'] ?? f['Nº Serie'] ?? f['SN'],
         };
