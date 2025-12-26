@@ -274,6 +274,146 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     return () => clearInterval(interval);
   }, [services, isTramitacion, dismissedAppointmentId]);
 
+  // Gestiona el flujo completo de cambio de estado para que siempre abra los modales requeridos
+  const handleEstadoSelection = (service: Service, newEstado: string) => {
+    if (!newEstado || newEstado === service.estado) return;
+
+    const oldEstado = service.estado;
+
+    if (newEstado === 'Citado') {
+      setPendingEstadoChange({ serviceId: service.id, newEstado });
+      setShowCitaModal(true);
+      return;
+    }
+
+    if (['Cancelado', 'Finalizado', 'Pendiente presupuesto'].includes(newEstado)) {
+      setPendingEstadoChange({ serviceId: service.id, newEstado });
+      setShowResolucionModal(true);
+      return;
+    }
+
+    setSaving(true);
+    airtableService.updateServiceStatus(service.id, newEstado)
+      .then(() => {
+        if (newEstado !== 'Citado') {
+          return airtableService.updateServiceField(service.id, 'Cita', null);
+        }
+      })
+      .then(() => {
+        const updatedServices = services.map((s) =>
+          s.id === service.id ? { ...s, estado: newEstado, cita: newEstado !== 'Citado' ? undefined : s.cita } : s
+        );
+        setServices(updatedServices);
+
+        if (selectedService && selectedService.id === service.id) {
+          setSelectedService({
+            ...selectedService,
+            estado: newEstado,
+            cita: newEstado !== 'Citado' ? undefined : selectedService.cita
+          });
+        }
+      })
+      .catch((error) => {
+        console.error('Error updating estado:', error);
+        alert('Error al actualizar el estado');
+        if (selectedService && selectedService.id === service.id) {
+          setSelectedService({ ...selectedService, estado: oldEstado });
+        }
+      })
+      .finally(() => {
+        setSaving(false);
+      });
+  };
+
+  const pendingEstadoService = useMemo(
+    () => (pendingEstadoChange ? services.find((s) => s.id === pendingEstadoChange.serviceId) || null : null),
+    [pendingEstadoChange, services]
+  );
+
+  const hasFormularioPhotos = (form: any) => {
+    if (!form) return false;
+    const photoFields = ['Foto general', 'Foto etiqueta', 'Foto roto', 'Foto cuadro'];
+    return photoFields.some((field) => Array.isArray(form[field]) && form[field].length > 0);
+  };
+
+  const ensureFallbackFormulario = async (forms: any[], fallbackKey: string) => {
+    if (forms.length > 0) {
+      if (hasFormularioPhotos(forms[0])) {
+        setFallbackFormulario(null);
+        return;
+      }
+      const formWithPhotos = forms.find((f) => hasFormularioPhotos(f));
+      if (formWithPhotos) {
+        setFallbackFormulario(formWithPhotos);
+        return;
+      }
+    }
+
+    try {
+      const storageKey = 'fallbackFormularios';
+      const stored = localStorage.getItem(storageKey);
+      const fallbackMap = stored ? JSON.parse(stored) : {};
+
+      let randomForm = fallbackMap[fallbackKey]
+        ? await airtableService.getFormularioById(fallbackMap[fallbackKey])
+        : null;
+
+      if (!randomForm) {
+        randomForm = await airtableService.getRandomFormularioWithPhotos();
+        if (randomForm?.id) {
+          fallbackMap[fallbackKey] = randomForm.id;
+          localStorage.setItem(storageKey, JSON.stringify(fallbackMap));
+        }
+      }
+
+      setFallbackFormulario(randomForm);
+    } catch (err) {
+      console.error('Error cargando formulario random:', err);
+      setFallbackFormulario(null);
+    }
+  };
+
+  const loadFormulariosForService = async (service: Service | null) => {
+    const expediente = service?.expediente?.trim();
+    const direccion = service?.direccion?.trim();
+    const nombre = service?.nombre?.trim();
+
+    if (!expediente && !direccion && !nombre) {
+      setFormularios([]);
+      setSelectedFormularioIndex(0);
+      setFallbackFormulario(null);
+      return;
+    }
+
+    const fallbackKey = expediente || direccion || nombre || 'sin-clave';
+
+    setFormularios([]);
+    setSelectedFormularioIndex(0);
+
+    let data: any[] = [];
+
+    try {
+      if (expediente) {
+        data = await airtableService.getFormularioByExpediente(expediente);
+      }
+    } catch (error) {
+      console.warn('No se encontró formulario por expediente, se probarán otros criterios', error);
+      data = [];
+    }
+
+    if (data.length === 0) {
+      try {
+        data = await airtableService.getFormularioByClientInfo({ expediente, direccion, nombre });
+      } catch (error) {
+        console.error('Error buscando formularios por datos alternativos:', error);
+      }
+    }
+
+    setFormularios(data);
+    setSelectedFormularioIndex(0);
+    await ensureFallbackFormulario(data, fallbackKey);
+  };
+
   // Filtrado de servicios - mismo para todos los usuarios (como Gestor Operativa)
   const filteredServices = useMemo(() => {
     console.log('Services - Total services before filtering:', services.length);
@@ -283,6 +423,9 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     // Si el usuario es Responsable o Administrativa, mostrar TODOS los servicios sin filtros SOLO en Servicios (no en Tramitaciones)
     if (isResponsableOrAdministrativa && !isTramitacion) {
       console.log('Services - Usuario es Responsable/Administrativa: mostrando todos los servicios sin filtros');
+      servicesWithAllowedStates = services;
+    } else if (isResponsableOrAdministrativa && isTramitacion) {
+      console.log('Tramitaciones - Responsable/Administrativa: mostrando todos sin filtros');
       servicesWithAllowedStates = services;
     } else if (isTramitacion) {
       // Para tramitación: filtrar según condiciones específicas (aplica a TODOS los usuarios)
@@ -478,6 +621,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   const handleCloseModal = () => {
     setSelectedService(null);
     setFormularios([]);
+    setFallbackFormulario(null);
     setSelectedFormularioIndex(0);
     setReparaciones([]);
     setSelectedReparacionIndex(0);
@@ -492,110 +636,13 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   // Cargar datos de formulario cuando se selecciona la vista en el modal de detalles
   useEffect(() => {
     const loadInlineForm = async () => {
-      // Para tramitación, cargar siempre en la vista de detalles
-      if (isTramitacion && detailsView === 'detalles') {
-        const expediente = selectedService?.expediente;
-        if (!expediente) {
-          setFormularios([]);
-          setSelectedFormularioIndex(0);
-          return;
-        }
-        try {
-          const sameExp = formularios.length > 0 && (formularios[0]?.Expediente === expediente);
-          if (!sameExp) {
-            setFormularios([]);
-            const data = await airtableService.getFormularioByExpediente(expediente);
-            setFormularios(data);
-            setSelectedFormularioIndex(0);
-            
-            // Buscar si el primer formulario tiene fotos
-            const hasPhotos = data.length > 0 && (
-              (data[0]['Foto general'] && data[0]['Foto general'].length > 0) ||
-              (data[0]['Foto etiqueta'] && data[0]['Foto etiqueta'].length > 0) ||
-              (data[0]['Foto roto'] && data[0]['Foto roto'].length > 0) ||
-              (data[0]['Foto cuadro'] && data[0]['Foto cuadro'].length > 0)
-            );
-            
-            if (!hasPhotos) {
-              // Primero buscar si hay otro formulario del mismo expediente con fotos
-              const formWithPhotos = data.find((form: any) => 
-                (form['Foto general'] && form['Foto general'].length > 0) ||
-                (form['Foto etiqueta'] && form['Foto etiqueta'].length > 0) ||
-                (form['Foto roto'] && form['Foto roto'].length > 0) ||
-                (form['Foto cuadro'] && form['Foto cuadro'].length > 0)
-              );
-              
-              if (formWithPhotos) {
-                // Usar fotos de otro formulario del mismo expediente
-                setFallbackFormulario(formWithPhotos);
-              } else {
-                // Si no hay ningún formulario del expediente con fotos, cargar uno random
-                try {
-                  // Verificar si ya hay un formulario random asignado a este expediente
-                  const storageKey = 'fallbackFormularios';
-                  const stored = localStorage.getItem(storageKey);
-                  const fallbackMap = stored ? JSON.parse(stored) : {};
-                  
-                  let randomForm;
-                  if (fallbackMap[expediente]) {
-                    // Cargar el formulario previamente asignado
-                    randomForm = await airtableService.getFormularioById(fallbackMap[expediente]);
-                  }
-                  
-                  // Si no existe o falló la carga, obtener uno nuevo random
-                  if (!randomForm) {
-                    randomForm = await airtableService.getRandomFormularioWithPhotos();
-                    // Guardar la asignación en localStorage
-                    if (randomForm && randomForm._recordId) {
-                      fallbackMap[expediente] = randomForm._recordId;
-                      localStorage.setItem(storageKey, JSON.stringify(fallbackMap));
-                    }
-                  }
-                  
-                  setFallbackFormulario(randomForm);
-                } catch (err) {
-                  console.error('Error cargando formulario random:', err);
-                  setFallbackFormulario(null);
-                }
-              }
-            } else {
-              setFallbackFormulario(null);
-            }
-          }
-        } catch (e) {
-          console.error('Error cargando formularios (inline):', e);
-          setFormularios([]);
-          setSelectedFormularioIndex(0);
-        }
-        return;
-      }
-      
-      // Para servicios, solo cargar cuando esté en la vista de formulario
-      if (detailsView !== 'formulario') return;
-      const expediente = selectedService?.expediente;
-      if (!expediente) {
-        setFormularios([]);
-        setSelectedFormularioIndex(0);
-        return;
-      }
-      try {
-        // Si los formularios actuales no pertenecen al expediente seleccionado, recargar
-        const sameExp = formularios.length > 0 && (formularios[0]?.Expediente === expediente);
-        if (!sameExp) {
-          // Limpiar primero los formularios anteriores
-          setFormularios([]);
-          const data = await airtableService.getFormularioByExpediente(expediente);
-          setFormularios(data);
-          setSelectedFormularioIndex(0);
-        }
-      } catch (e) {
-        console.error('Error cargando formularios (inline):', e);
-        setFormularios([]);
-        setSelectedFormularioIndex(0);
-      }
+      const shouldLoad = (isTramitacion && detailsView === 'detalles') || (!isTramitacion && detailsView === 'formulario');
+      if (!shouldLoad) return;
+
+      await loadFormulariosForService(selectedService);
     };
     loadInlineForm();
-  }, [detailsView, selectedService?.id]);
+  }, [detailsView, selectedService?.id, isTramitacion]);
 
   // Cargar datos de reparaciones cuando se selecciona la vista en el modal de detalles
   useEffect(() => {
@@ -638,13 +685,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
 
     const loadDatos = async () => {
       try {
-        // Cargar formularios
-        const sameExpForm = formularios.length > 0 && (formularios[0]?.Expediente === expediente);
-        if (!sameExpForm) {
-          const dataForm = await airtableService.getFormularioByExpediente(expediente);
-          setFormularios(dataForm);
-          setSelectedFormularioIndex(0);
-        }
+        await loadFormulariosForService(selectedService);
       } catch (e) {
         console.error('Error cargando formularios para tramitaciones:', e);
         setFormularios([]);
@@ -1123,24 +1164,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                         <td className="px-4 py-3 whitespace-nowrap">
                         <select
                           value={service.estado || ''}
-                          onChange={async (e) => {
-                            const newValue = e.target.value;
-                            if (!newValue || newValue === service.estado) return;
-                            
-                            setSaving(true);
-                            try {
-                              await airtableService.updateServiceStatus(service.id, newValue);
-                              const updatedServices = services.map((s) =>
-                                s.id === service.id ? { ...s, estado: newValue } : s
-                              );
-                              setServices(updatedServices);
-                            } catch (error) {
-                              console.error('Error updating estado:', error);
-                              alert('Error al actualizar el estado');
-                            } finally {
-                              setSaving(false);
-                            }
-                          }}
+                          onChange={(e) => handleEstadoSelection(service, e.target.value)}
                           disabled={saving}
                           className={`py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 text-center ${getStatusColors(service.estado).bg} ${getStatusColors(service.estado).text}`}
                           style={{ 
@@ -1311,44 +1335,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                         value={selectedService.estado || ''}
                         onChange={(e) => {
                           const newValue = e.target.value;
-                          const oldValue = selectedService.estado;
-                          if (newValue === oldValue) return;
-                          
-                          // Si el nuevo estado es Citado, mostrar modal para seleccionar cita
-                          if (newValue === 'Citado') {
-                            setShowCitaModal(true);
-                            setPendingEstadoChange({ serviceId: selectedService.id, newEstado: newValue });
-                          } else if (['Cancelado', 'Finalizado', 'Pendiente presupuesto'].includes(newValue)) {
-                            // Si el nuevo estado requiere resolución visita, mostrar modal
-                            setPendingEstadoChange({ serviceId: selectedService.id, newEstado: newValue });
-                            setShowResolucionModal(true);
-                          } else {
-                            // Si no requiere modal, actualizar directamente y limpiar Cita
-                            setSaving(true);
-                            airtableService.updateServiceStatus(selectedService.id, newValue)
-                              .then(() => {
-                                // Si el nuevo estado no es Citado, limpiar la Cita
-                                if (newValue !== 'Citado') {
-                                  return airtableService.updateServiceField(selectedService.id, 'Cita', null);
-                                }
-                              })
-                              .then(() => {
-                                const updatedServices = services.map((s) =>
-                                  s.id === selectedService.id ? { ...s, estado: newValue, cita: newValue !== 'Citado' ? undefined : s.cita } : s
-                                );
-                                setServices(updatedServices);
-                                setSelectedService({...selectedService, estado: newValue, cita: newValue !== 'Citado' ? undefined : selectedService.cita});
-                              })
-                              .catch((error) => {
-                                console.error('Error updating estado:', error);
-                                alert('Error al actualizar el estado');
-                                // Revertir el estado si falla
-                                setSelectedService({...selectedService, estado: oldValue});
-                              })
-                              .finally(() => {
-                                setSaving(false);
-                              });
-                          }
+                          handleEstadoSelection(selectedService, newValue);
                         }}
                         disabled={saving}
                         className={`py-1 px-2 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border-0 inline-block text-center ${getStatusColors(selectedService.estado).bg} ${getStatusColors(selectedService.estado).text}`}
@@ -1702,6 +1689,36 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   </div>
 
                   <div className="space-y-4">
+                    {fallbackFormulario && (!formularios.length || !hasFormularioPhotos(formularios[selectedFormularioIndex])) && (
+                      <div className="space-y-3 rounded-lg border border-dashed border-gray-200 p-4 bg-gray-50">
+                        <p className="text-sm text-gray-600">No hay formulario del cliente; se muestran fotos de referencia.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {['Foto general', 'Foto etiqueta', 'Foto roto', 'Foto cuadro'].map((field) => {
+                            const files = Array.isArray(fallbackFormulario?.[field]) ? (fallbackFormulario[field] as AirtableAttachment[]) : [];
+                            if (files.length === 0) return null;
+                            return (
+                              <div key={field}>
+                                <h4 className="text-sm font-semibold text-gray-700 mb-2">{field}</h4>
+                                <div className="grid grid-cols-2 gap-3">
+                                  {files.map((file, idx) => (
+                                    <div key={`${field}-${idx}`} className="relative group">
+                                      <img
+                                        src={file.thumbnails?.large?.url || file.url}
+                                        alt={file.filename}
+                                        className="w-full h-32 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                                        onClick={() => window.open(file.url, '_blank')}
+                                      />
+                                      <p className="text-xs text-gray-500 mt-1 truncate">{file.filename}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Detalles */}
                     <div>
                       <div className="flex items-center justify-between mb-1">
@@ -2389,7 +2406,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   id="citaInput"
                   placeholder="DD/MM/YYYY hh:mm"
                   onChange={formatCitaInputWithAutoFormat}
-                  defaultValue={formatDateTimeForInput(selectedService?.cita)}
+                  defaultValue={formatDateTimeForInput(pendingEstadoService?.cita)}
                   maxLength={16}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
                   disabled={saving}

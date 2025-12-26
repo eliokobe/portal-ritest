@@ -53,11 +53,11 @@ const Agenda: React.FC = () => {
     }
   };
 
-  // Generar slots de 15 minutos desde las 8:00 hasta las 20:00
+  // Generar slots de 30 minutos desde las 8:00 hasta las 20:00
   const generateTimeSlots = (): string[] => {
     const slots: string[] = [];
     for (let hour = 8; hour < 20; hour++) {
-      for (let minute = 0; minute < 60; minute += 15) {
+      for (let minute = 0; minute < 60; minute += 30) {
         const hourStr = hour.toString().padStart(2, '0');
         const minuteStr = minute.toString().padStart(2, '0');
         slots.push(`${hourStr}:${minuteStr}`);

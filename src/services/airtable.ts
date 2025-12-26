@@ -149,6 +149,27 @@ type ServicioListado = {
   ipartner?: string;
 };
 
+const mapFormularioRecord = (r: any) => {
+  const f = r.fields ?? {};
+  return {
+    id: r.id,
+    _recordId: r.id,
+    Expediente: f['Expediente'],
+    Detalles: f['Detalles'] ?? f['Details'] ?? f['Descripción'],
+    'Potencia contratada': f['Potencia contratada'] ?? f['Contracted Power'],
+    'Fecha instalación': f['Fecha instalación'] ?? f['Installation Date'],
+    'Archivo 1': f['Archivo 1'] ?? f['File 1'],
+    'Archivo 2': f['Archivo 2'] ?? f['File 2'],
+    'Archivo 3': f['Archivo 3'] ?? f['File 3'],
+    'Foto general': f['Foto general'] ?? f['General Photo'],
+    'Foto etiqueta': f['Foto etiqueta'] ?? f['Label Photo'],
+    'Foto roto': f['Foto roto'] ?? f['Broken Photo'],
+    'Foto cuadro': f['Foto cuadro'] ?? f['Panel Photo'],
+    Nombre: f['Nombre'] ?? f['Cliente'],
+    Dirección: f['Dirección'] ?? f['Direccion'] ?? f['Address'],
+  };
+};
+
 async function fetchServicesByTable(params: {
   tableName: string;
   clinic?: string;
@@ -1455,29 +1476,75 @@ export const airtableService = {
       
       console.log('Records encontrados para formularios:', records.length);
       if (records.length === 0) {
-        throw new Error(`Formulario no encontrado para expediente ${expediente}`);
+        return [];
       }
-      
-      return records.map((r: any) => {
-        const f = r.fields ?? {};
-        return {
-          id: r.id,
-          Expediente: f['Expediente'],
-          Detalles: f['Detalles'] ?? f['Details'] ?? f['Descripción'],
-          'Potencia contratada': f['Potencia contratada'] ?? f['Contracted Power'],
-          'Fecha instalación': f['Fecha instalación'] ?? f['Installation Date'],
-          'Archivo 1': f['Archivo 1'] ?? f['File 1'],
-          'Archivo 2': f['Archivo 2'] ?? f['File 2'],
-          'Archivo 3': f['Archivo 3'] ?? f['File 3'],
-          'Foto general': f['Foto general'] ?? f['General Photo'],
-          'Foto etiqueta': f['Foto etiqueta'] ?? f['Label Photo'],
-          'Foto roto': f['Foto roto'] ?? f['Broken Photo'],
-          'Foto cuadro': f['Foto cuadro'] ?? f['Panel Photo'],
-        };
-      });
+      return records.map(mapFormularioRecord);
     } catch (error) {
-      console.error('Error fetching formularios:', error);
-      throw error;
+      console.warn('Error fetching formularios (devuelve vacío):', error);
+      return [];
+    }
+  },
+
+  async getFormularioByClientInfo(params: { expediente?: string; direccion?: string; nombre?: string }): Promise<any[]> {
+    const { expediente, direccion, nombre } = params;
+    const clauses: string[] = [];
+
+    const { names: formulariosFieldNames } = await inferServiciosFieldSample('Formularios');
+
+    const escapeValue = (value?: string) => (value ? value.replace(/'/g, "\\'") : '');
+    const joinOr = (parts: string[]) => parts.length === 1 ? parts[0] : `OR(${parts.join(',')})`;
+
+    if (expediente && formulariosFieldNames.has('Expediente')) {
+      clauses.push(`{Expediente} = '${escapeValue(expediente)}'`);
+    }
+
+    if (direccion) {
+      const dirFields = ['Dirección', 'Direccion', 'Address'].filter((f) => formulariosFieldNames.has(f));
+      if (dirFields.length > 0) {
+        const dirEsc = escapeValue(direccion);
+        clauses.push(joinOr(dirFields.map((f) => `{${f}} = '${dirEsc}'`)));
+      }
+    }
+
+    if (nombre) {
+      const nameFields = ['Nombre', 'Cliente'].filter((f) => formulariosFieldNames.has(f));
+      if (nameFields.length > 0) {
+        const nomEsc = escapeValue(nombre);
+        clauses.push(joinOr(nameFields.map((f) => `{${f}} = '${nomEsc}'`)));
+      }
+    }
+
+    if (clauses.length === 0) return [];
+
+    try {
+      const formula = joinOr(clauses);
+      const records = await fetchAllServicios('Formularios', {
+        filterByFormula: formula,
+        pageSize: 100,
+      });
+
+      console.log('[Formularios] Búsqueda por datos de cliente', {
+        expediente,
+        direccion,
+        nombre,
+        encontrados: records.length,
+      });
+
+      return records.map(mapFormularioRecord);
+    } catch (error) {
+      console.warn('Error buscando formularios por datos de cliente (devuelve vacío):', error);
+      return [];
+    }
+  },
+
+  async getFormularioById(recordId: string): Promise<any | null> {
+    try {
+      const { data } = await serviciosApi.get(`/Formularios/${recordId}`);
+      if (!(data as any)?.id) return null;
+      return mapFormularioRecord(data);
+    } catch (error) {
+      console.error('Error fetching formulario by id:', error);
+      return null;
     }
   },
 
@@ -1501,16 +1568,7 @@ export const airtableService = {
       // Seleccionar un registro random
       const randomIndex = Math.floor(Math.random() * records.length);
       const r = records[randomIndex];
-      const f = r.fields ?? {};
-      
-      return {
-        id: r.id,
-        Expediente: f['Expediente'],
-        'Foto general': f['Foto general'] ?? f['General Photo'],
-        'Foto etiqueta': f['Foto etiqueta'] ?? f['Label Photo'],
-        'Foto roto': f['Foto roto'] ?? f['Broken Photo'],
-        'Foto cuadro': f['Foto cuadro'] ?? f['Panel Photo'],
-      };
+      return mapFormularioRecord(r);
     } catch (error) {
       console.error('Error fetching random formulario:', error);
       throw error;
@@ -1528,7 +1586,7 @@ export const airtableService = {
       
       console.log('Records encontrados para reparaciones:', records.length);
       if (records.length === 0) {
-        throw new Error(`Reparación no encontrada para expediente ${expediente}`);
+        return [];
       }
       
       return records.map((r: any) => {
@@ -1550,7 +1608,7 @@ export const airtableService = {
         };
       });
     } catch (error) {
-      console.error('Error fetching reparaciones:', error);
+      console.warn('Error fetching reparaciones (devuelve vacío):', error);
       throw error;
     }
   },
