@@ -424,9 +424,6 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     if (isResponsableOrAdministrativa && !isTramitacion) {
       console.log('Services - Usuario es Responsable/Administrativa: mostrando todos los servicios sin filtros');
       servicesWithAllowedStates = services;
-    } else if (isResponsableOrAdministrativa && isTramitacion) {
-      console.log('Tramitaciones - Responsable/Administrativa: mostrando todos sin filtros');
-      servicesWithAllowedStates = services;
     } else if (isTramitacion) {
       // Para tramitación: filtrar según condiciones específicas (aplica a TODOS los usuarios)
       servicesWithAllowedStates = servicesWithAllowedStates.filter((s) => {

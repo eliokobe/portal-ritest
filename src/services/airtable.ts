@@ -1480,7 +1480,7 @@ export const airtableService = {
       }
       return records.map(mapFormularioRecord);
     } catch (error) {
-      console.warn('Error fetching formularios (devuelve vacío):', error);
+      console.error('Error fetching formularios:', error);
       return [];
     }
   },
@@ -1532,7 +1532,7 @@ export const airtableService = {
 
       return records.map(mapFormularioRecord);
     } catch (error) {
-      console.warn('Error buscando formularios por datos de cliente (devuelve vacío):', error);
+      console.error('Error buscando formularios por datos de cliente:', error);
       return [];
     }
   },
@@ -1608,7 +1608,7 @@ export const airtableService = {
         };
       });
     } catch (error) {
-      console.warn('Error fetching reparaciones (devuelve vacío):', error);
+      console.error('Error fetching reparaciones:', error);
       throw error;
     }
   },
