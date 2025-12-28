@@ -22,6 +22,7 @@ import {
   Truck,
   ClipboardList,
   Calendar,
+  UserCheck,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -65,6 +66,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       items: [
         { name: 'Panel Gráfico', href: '/panel-grafico', icon: BarChart3 },
         { name: 'Tramitación', href: '/tramitacion', icon: ClipboardList },
+        { name: 'Reparaciones', href: '/seguimiento-tecnicos', icon: UserCheck },
         { name: 'Técnicos', href: '/tecnicos', icon: Users },
         { name: 'Envíos', href: '/envios', icon: Package },
         { name: 'Ipas', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
@@ -120,6 +122,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Panel Gráfico', href: '/panel-grafico', icon: BarChart3 },
         { name: 'Servicios', href: '/servicios', icon: Wrench },
         { name: 'Tramitación', href: '/tramitacion', icon: ClipboardList },
+        { name: 'Reparaciones', href: '/seguimiento-tecnicos', icon: UserCheck },
         { name: 'Técnicos', href: '/tecnicos', icon: Users },
         { name: 'Envíos', href: '/envios', icon: Package },
         { name: 'Ipas', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
@@ -147,12 +150,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     navigationGroups;
 
   // Ocultar "Técnicos" en el sidebar para todos excepto Responsable
-  const finalNavigationGroups: NavigationGroup[] = (user?.role === 'Responsable')
-    ? activeNavigationGroups
-    : activeNavigationGroups.map((group) => ({
-        ...group,
-        items: group.items.filter((item) => item.name !== 'Técnicos')
-      }));
+  // Ocultar "Técnicos" para todos excepto Responsable
+  // Ocultar "Seguimiento técnicos" para todos excepto Responsable y Administrativa
+  const finalNavigationGroups: NavigationGroup[] = activeNavigationGroups.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      // Técnicos solo para Responsable
+      if (item.name === 'Técnicos' && user?.role !== 'Responsable') {
+        return false;
+      }
+      // Reparaciones solo para Responsable y Administrativa
+      if (item.name === 'Reparaciones' && user?.role !== 'Responsable' && user?.role !== 'Administrativa') {
+        return false;
+      }
+      return true;
+    })
+  }));
 
   // Debug: Ver qué rol tiene el usuario
   console.log('User role:', user?.role);

@@ -18,6 +18,7 @@ import Envios from './pages/Envios';
 import Inventario from './pages/Inventario';
 import Email from './pages/Email';
 import Agenda from './pages/Agenda';
+import Reparaciones from './pages/Reparaciones';
 
 const DefaultRoute = () => {
   const { user } = useAuth();
@@ -82,6 +83,19 @@ function App() {
                 >
                   <Layout>
                     <Services />
+                  </Layout>
+                </RoleProtectedRoute>
+              }
+            />
+            <Route
+              path="/seguimiento-tecnicos"
+              element={
+                <RoleProtectedRoute
+                  allowedRoles={["Administrativa", "Responsable"]}
+                  redirectTo="/panel-grafico"
+                >
+                  <Layout>
+                    <Reparaciones />
                   </Layout>
                 </RoleProtectedRoute>
               }

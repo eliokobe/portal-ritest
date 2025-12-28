@@ -136,6 +136,7 @@ type ServicioListado = {
   tecnico?: string;
   trabajadorId?: string[];
   notaTecnico?: string;
+  citaTecnico?: string;
   fechaRegistro?: string;
   ultimoCambio?: string;
   chatbot?: string;
@@ -147,6 +148,7 @@ type ServicioListado = {
   importe?: number;
   accionIpartner?: string;
   ipartner?: string;
+  seguimiento?: string;
 };
 
 const mapFormularioRecord = (r: any) => {
@@ -322,6 +324,7 @@ async function fetchServicesByTable(params: {
         importe: f['Importe'],
         accionIpartner: f['Acción Ipartner'] ?? f['Accion Ipartner'],
         ipartner: f['Ipartner'],
+        seguimiento: f['Seguimiento'],
       };
     });
 
@@ -1073,6 +1076,52 @@ export const airtableService = {
     return fetchServicesByTable({ tableName: AIRTABLE_SERVICES_TABLE, clinic, workerId, workerEmail });
   },
 
+  // Obtener reparaciones (tabla "Reparaciones")
+  async getReparaciones(clinic?: string): Promise<any[]> {
+    try {
+      const queryParams: Record<string, any> = {};
+      
+      if (clinic) {
+        const escapeFormulaString = (value: unknown) => String(value ?? '').replace(/'/g, "\\'");
+        const clinicEsc = escapeFormulaString(clinic);
+        queryParams.filterByFormula = `{Cliente} = '${clinicEsc}'`;
+      }
+      
+      const records = await fetchAllServicios('Reparaciones', { ...queryParams, pageSize: 100 });
+      
+      return records.map((r: any) => {
+        const f = r.fields ?? {};
+        // Teléfono técnico es un campo Lookup que viene como array
+        const telefonoTecnicoRaw = f['Teléfono técnico'];
+        const telefonoTecnico = Array.isArray(telefonoTecnicoRaw) && telefonoTecnicoRaw.length > 0 
+          ? telefonoTecnicoRaw[0] 
+          : telefonoTecnicoRaw;
+        
+        return {
+          id: r.id,
+          cliente: f['Cliente'],
+          telefono: f['Teléfono'] ?? f['Telefono'],
+          tecnico: f['Técnico'] ?? f['Technician'],
+          estado: f['Estado'],
+          fechaEstado: f['Fecha estado'] ?? f['Fecha Estado'],
+          seguimiento: f['Seguimiento'],
+          fechaSeguimiento: f['Fecha seguimiento'] ?? f['Fecha Seguimiento'],
+          expediente: f['Expediente'],
+          resultado: f['Resultado'],
+          reparacion: f['Reparación'],
+          detalles: f['Detalles'],
+          numeroSerie: f['Número de serie'] ?? f['Numero de serie'] ?? f['S/N'],
+          comentarios: f['Comentarios'],
+          conversationId: f['Conversation id'],
+          telefonoTecnico: telefonoTecnico,
+        };
+      });
+    } catch (error) {
+      console.error('Error fetching reparaciones:', error);
+      return [];
+    }
+  },
+
   // Obtener tramitaciones (misma estructura que Servicios)
   async getTramitaciones(
     clinic?: string,
@@ -1130,6 +1179,7 @@ export const airtableService = {
         citaTecnico: 'Cita técnico',
         trabajadorId: 'Trabajador',
         motivoCancelacion: 'Motivo cancelación',
+        seguimiento: 'Seguimiento',
       };
       
       const airtableField = fieldMap[field] || field;
