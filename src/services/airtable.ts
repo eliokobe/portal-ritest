@@ -1101,7 +1101,7 @@ export const airtableService = {
           id: r.id,
           cliente: f['Cliente'],
           telefono: f['Teléfono'] ?? f['Telefono'],
-          tecnico: f['Técnico'] ?? f['Technician'],
+          tecnico: f['Técnicos'] ?? f['Técnico'] ?? f['Technician'],
           estado: f['Estado'],
           fechaEstado: f['Fecha estado'] ?? f['Fecha Estado'],
           seguimiento: f['Seguimiento'],

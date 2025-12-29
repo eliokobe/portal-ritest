@@ -411,7 +411,12 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
 
     setFormularios(data);
     setSelectedFormularioIndex(0);
-    await ensureFallbackFormulario(data, fallbackKey);
+    // Solo cargar formulario de referencia en Tramitaciones
+    if (isTramitacion) {
+      await ensureFallbackFormulario(data, fallbackKey);
+    } else {
+      setFallbackFormulario(null);
+    }
   };
 
   // Filtrado de servicios - mismo para todos los usuarios (como Gestor Operativa)
@@ -440,11 +445,11 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
         return isPendiente || isFinalized;
       });
     } else {
-      // Para servicios: mostrar todo salvo Finalizado/Cancelado
+      // Para servicios: mostrar todo salvo Finalizado/Cancelado/Sin contactar
       servicesWithAllowedStates = services.filter((service) => {
         if (!service.estado) return true;
         const estadoLower = service.estado.toLowerCase();
-        return estadoLower !== 'finalizado' && estadoLower !== 'cancelado';
+        return estadoLower !== 'finalizado' && estadoLower !== 'cancelado' && estadoLower !== 'sin contactar';
       });
     }
     
@@ -1686,36 +1691,6 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   </div>
 
                   <div className="space-y-4">
-                    {fallbackFormulario && (!formularios.length || !hasFormularioPhotos(formularios[selectedFormularioIndex])) && (
-                      <div className="space-y-3 rounded-lg border border-dashed border-gray-200 p-4 bg-gray-50">
-                        <p className="text-sm text-gray-600">No hay formulario del cliente; se muestran fotos de referencia.</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {['Foto general', 'Foto etiqueta', 'Foto roto', 'Foto cuadro'].map((field) => {
-                            const files = Array.isArray(fallbackFormulario?.[field]) ? (fallbackFormulario[field] as AirtableAttachment[]) : [];
-                            if (files.length === 0) return null;
-                            return (
-                              <div key={field}>
-                                <h4 className="text-sm font-semibold text-gray-700 mb-2">{field}</h4>
-                                <div className="grid grid-cols-2 gap-3">
-                                  {files.map((file, idx) => (
-                                    <div key={`${field}-${idx}`} className="relative group">
-                                      <img
-                                        src={file.thumbnails?.large?.url || file.url}
-                                        alt={file.filename}
-                                        className="w-full h-32 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
-                                        onClick={() => window.open(file.url, '_blank')}
-                                      />
-                                      <p className="text-xs text-gray-500 mt-1 truncate">{file.filename}</p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
                     {/* Detalles */}
                     <div>
                       <div className="flex items-center justify-between mb-1">

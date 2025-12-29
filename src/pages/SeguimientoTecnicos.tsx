@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Search, X, XCircle, MessageCircle, Phone } from 'lucide-react';
+import { Search, X, XCircle } from 'lucide-react';
 import { airtableService } from '../services/airtable';
 import { useAuth } from '../contexts/AuthContext';
 import { getStatusColors } from '../utils/statusColors';
@@ -18,26 +18,37 @@ interface Service {
   reparacion?: string;
   detalles?: string;
   numeroSerie?: string;
-  comentarios?: string;
-  conversationId?: string;
-  telefonoTecnico?: string;
 }
 
 const STATUS_OPTIONS = [
-  'Asignado',
+  'Contactado',
+  'Formulario completado',
+  'Llamado',
+  'Pendiente de asignar',
+  'Pendiente de aceptación',
   'Aceptado',
-  'Rechazado',
   'Citado',
-  'Reparado',
-  'No reparado'
+  'Pendiente técnico',
+  'Pendiente de material',
+  'Pendiente presupuesto',
+  'Presupuesto enviado',
+  'Material enviado',
+  'Finalizado',
+  'Cancelado'
 ];
 
 const SEGUIMIENTO_OPTIONS = [
   'Sin contactar',
-  'Primera llamada',
-  'Segunda llamada',
-  'Whatsapp',
-  'Ilocalizable'
+  'Contactado',
+  'Primer recordatorio asistencia',
+  'Segundo recordatorio asistencia',
+  'Formulario enviado',
+  'Primer recordatorio formulario',
+  'Segundo recordatorio formulario',
+  'Primer recordatorio cita',
+  'Primer recordatorio asignación',
+  'Ilocalizable',
+  'Recordatorio llamada'
 ];
 
 const renderDetailValue = (value?: string) => {
@@ -49,20 +60,32 @@ const getSeguimientoColors = (seguimiento?: string) => {
   switch (seguimiento) {
     case 'Sin contactar':
       return { bg: 'bg-gray-100', text: 'text-gray-800' };
-    case 'Primera llamada':
+    case 'Contactado':
       return { bg: 'bg-blue-100', text: 'text-blue-800' };
-    case 'Segunda llamada':
+    case 'Primer recordatorio asistencia':
       return { bg: 'bg-yellow-100', text: 'text-yellow-800' };
-    case 'Whatsapp':
+    case 'Segundo recordatorio asistencia':
+      return { bg: 'bg-orange-100', text: 'text-orange-800' };
+    case 'Formulario enviado':
       return { bg: 'bg-green-100', text: 'text-green-800' };
+    case 'Primer recordatorio formulario':
+      return { bg: 'bg-yellow-100', text: 'text-yellow-800' };
+    case 'Segundo recordatorio formulario':
+      return { bg: 'bg-orange-100', text: 'text-orange-800' };
+    case 'Primer recordatorio cita':
+      return { bg: 'bg-purple-100', text: 'text-purple-800' };
+    case 'Primer recordatorio asignación':
+      return { bg: 'bg-indigo-100', text: 'text-indigo-800' };
     case 'Ilocalizable':
       return { bg: 'bg-red-100', text: 'text-red-800' };
+    case 'Recordatorio llamada':
+      return { bg: 'bg-pink-100', text: 'text-pink-800' };
     default:
       return { bg: 'bg-gray-100', text: 'text-gray-600' };
   }
 };
 
-const Reparaciones: React.FC = () => {
+const SeguimientoTecnicos: React.FC = () => {
   const { user } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
   const [technicians, setTechnicians] = useState<{ id: string; nombre?: string }[]>([]);
@@ -79,21 +102,17 @@ const Reparaciones: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        console.log('Reparaciones - Starting to load reparaciones...');
+        console.log('SeguimientoTecnicos - Starting to load reparaciones...');
         console.log('User info:', { email: user?.email, role: user?.role, id: user?.id });
         
         const data = await airtableService.getReparaciones(user?.clinic);
-        console.log('Reparaciones - Reparaciones received:', data.length, 'records');
-        if (data.length > 0) {
-          console.log('Reparaciones - Primera reparación:', data[0]);
-          console.log('Reparaciones - Campo técnico de la primera:', data[0].tecnico, 'tipo:', typeof data[0].tecnico);
-        }
+        console.log('SeguimientoTecnicos - Reparaciones received:', data.length, 'records');
         
         if (isMounted) {
           setServices(data);
         }
       } catch (error: any) {
-        console.error('Reparaciones - Error fetching data:', error);
+        console.error('SeguimientoTecnicos - Error fetching data:', error);
         if (isMounted) {
           const errorMessage = error.message || 'Error desconocido al cargar reparaciones';
           setError(errorMessage);
@@ -119,13 +138,11 @@ const Reparaciones: React.FC = () => {
     const loadTechnicians = async () => {
       try {
         const data = await airtableService.getTechnicians();
-        console.log('Reparaciones - Técnicos cargados:', data.length);
-        console.log('Reparaciones - Primer técnico:', data[0]);
         if (isMounted) {
           setTechnicians(data);
         }
       } catch (err) {
-        console.error('Reparaciones - Error cargando técnicos:', err);
+        console.error('SeguimientoTecnicos - Error cargando técnicos:', err);
       }
     };
     loadTechnicians();
@@ -147,28 +164,19 @@ const Reparaciones: React.FC = () => {
   }, [selectedService]);
 
   const technicianMap = useMemo(() => {
-    const map = technicians.reduce<Record<string, string>>((acc, t) => {
+    return technicians.reduce<Record<string, string>>((acc, t) => {
       if (t.id && t.nombre) {
         acc[t.id] = t.nombre;
       }
       return acc;
     }, {});
-    console.log('Reparaciones - Mapa de técnicos creado:', Object.keys(map).length, 'técnicos');
-    console.log('Reparaciones - Mapa completo:', map);
-    return map;
   }, [technicians]);
 
   const getTechnicianName = (service: Service): string => {
     if (!service) return '-';
     if (typeof service.tecnico === 'string') return service.tecnico || '-';
     if (Array.isArray(service.tecnico)) {
-      const names = service.tecnico.map((id) => {
-        const name = technicianMap[id];
-        if (!name) {
-          console.log(`Técnico ID ${id} no encontrado en el mapa. IDs disponibles:`, Object.keys(technicianMap));
-        }
-        return name;
-      }).filter(Boolean);
+      const names = service.tecnico.map((id) => technicianMap[id]).filter(Boolean);
       return names.length > 0 ? names.join(', ') : '-';
     }
     return '-';
@@ -182,7 +190,7 @@ const Reparaciones: React.FC = () => {
       setServices((prev) => prev.map((s) => (s.id === service.id ? { ...s, estado: newEstado } : s)));
       setSelectedService((prev) => (prev && prev.id === service.id ? { ...prev, estado: newEstado } : prev));
     } catch (err) {
-      console.error('Reparaciones - Error actualizando estado:', err);
+      console.error('SeguimientoTecnicos - Error actualizando estado:', err);
       alert('Error al actualizar el estado');
     } finally {
       setSaving(false);
@@ -197,7 +205,7 @@ const Reparaciones: React.FC = () => {
       setServices((prev) => prev.map((s) => (s.id === service.id ? { ...s, seguimiento: newSeguimiento } : s)));
       setSelectedService((prev) => (prev && prev.id === service.id ? { ...prev, seguimiento: newSeguimiento } : prev));
     } catch (err) {
-      console.error('Reparaciones - Error actualizando seguimiento:', err);
+      console.error('SeguimientoTecnicos - Error actualizando seguimiento:', err);
       alert('Error al actualizar el seguimiento');
     } finally {
       setSaving(false);
@@ -206,12 +214,15 @@ const Reparaciones: React.FC = () => {
 
   // Filtrar reparaciones por término de búsqueda
   const filteredServices = useMemo(() => {
-    const allowedStates = new Set(['Asignado', 'Aceptado', 'Citado']);
+    const now = new Date();
+    const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+    const allowedStates = new Set(['Asignado', 'Aceptado', 'Rechazado']);
 
-    // Mostrar registros con estado válido (sin filtro de 48h)
     let filtered = services.filter((service) => {
       const estadoValido = service.estado && allowedStates.has(service.estado);
-      return estadoValido;
+      const fechaEstadoDate = service.fechaEstado ? new Date(service.fechaEstado) : null;
+      const fechaValida = fechaEstadoDate !== null && fechaEstadoDate < fortyEightHoursAgo;
+      return estadoValido && fechaValida;
     });
 
     const term = searchTerm.trim().toLowerCase();
@@ -416,51 +427,31 @@ const Reparaciones: React.FC = () => {
             className="relative w-full max-w-4xl bg-white rounded-2xl shadow-lg border border-gray-200 my-8"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-              {selectedService.telefonoTecnico && (
-                <a
-                  href={`tel:${selectedService.telefonoTecnico}`}
-                  className="p-2 rounded-full text-green-600 hover:bg-green-100 transition-colors"
-                  title="Llamar técnico"
-                >
-                  <Phone className="h-5 w-5" />
-                </a>
-              )}
-              {selectedService.conversationId && (
-                <a
-                  href={`https://chat.ritest.es/app/accounts/1/inbox-view/conversation/${selectedService.conversationId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-2 rounded-full text-green-600 hover:bg-green-100 transition-colors"
-                  title="Abrir chat"
-                >
-                  <MessageCircle className="h-5 w-5" />
-                </a>
-              )}
-              <button
-                type="button"
-                onClick={() => setSelectedService(null)}
-                className="p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
-                aria-label="Cerrar"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedService(null)}
+              className="absolute top-4 right-4 z-10 p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
+              aria-label="Cerrar"
+            >
+              <X className="h-5 w-5" />
+            </button>
 
             <div className="p-6 space-y-6 bg-white rounded-2xl">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">Detalle de la reparación</h2>
-                {selectedService.expediente && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    Expediente {selectedService.expediente}
-                  </p>
-                )}
+                <p className="text-sm text-gray-500 mt-1">
+                  {selectedService.expediente ? `Expediente ${selectedService.expediente}` : 'Sin expediente asignado'}
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-xs uppercase text-gray-500">Cliente</p>
                   <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.cliente)}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Teléfono</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.telefono)}</p>
                 </div>
                 <div>
                   <p className="text-xs uppercase text-gray-500">Técnico</p>
@@ -506,39 +497,38 @@ const Reparaciones: React.FC = () => {
                   <p className="text-xs uppercase text-gray-500">Fecha seguimiento</p>
                   <p className="text-sm text-gray-900 mt-1">{formatDateTime(selectedService.fechaSeguimiento)}</p>
                 </div>
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Número de serie</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.numeroSerie)}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Resultado</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.resultado)}</p>
+                </div>
               </div>
 
-              {/* Sección de Comentarios */}
+              {/* Detalles adicionales */}
               <div className="border-t pt-4">
-                <p className="text-xs uppercase text-gray-500 mb-1">Comentarios</p>
-                <textarea
-                  data-autosize="true"
-                  defaultValue={selectedService.comentarios || ''}
-                  onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
-                    target.style.height = 'auto';
-                    target.style.height = target.scrollHeight + 'px';
-                  }}
-                  onBlur={async (e) => {
-                    const newValue = e.target.value;
-                    if (newValue === selectedService.comentarios) return;
-                    setSaving(true);
-                    try {
-                      await airtableService.updateServiceField(selectedService.id, 'Comentarios', newValue, 'Reparaciones');
-                      setServices((prev) => prev.map((s) => (s.id === selectedService.id ? { ...s, comentarios: newValue } : s)));
-                      setSelectedService((prev) => (prev && prev.id === selectedService.id ? { ...prev, comentarios: newValue } : prev));
-                    } catch (error) {
-                      console.error('Error:', error);
-                      alert('Error al guardar comentarios');
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm resize-none overflow-hidden"
-                  style={{ minHeight: '60px' }}
-                  disabled={saving}
-                  placeholder="Escribe comentarios..."
-                />
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Información adicional</h3>
+                <div className="space-y-4">
+                  {selectedService.reparacion && (
+                    <div>
+                      <p className="text-xs uppercase text-gray-500">Reparación</p>
+                      <p className="text-sm text-gray-900 mt-1 whitespace-pre-line">
+                        {selectedService.reparacion}
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedService.detalles && (
+                    <div>
+                      <p className="text-xs uppercase text-gray-500">Detalles</p>
+                      <p className="text-sm text-gray-900 mt-1 whitespace-pre-line">
+                        {selectedService.detalles}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -548,4 +538,4 @@ const Reparaciones: React.FC = () => {
   );
 };
 
-export default Reparaciones;
+export default SeguimientoTecnicos;
