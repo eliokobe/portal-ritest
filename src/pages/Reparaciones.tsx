@@ -207,11 +207,22 @@ const Reparaciones: React.FC = () => {
   // Filtrar reparaciones por término de búsqueda
   const filteredServices = useMemo(() => {
     const allowedStates = new Set(['Asignado', 'Aceptado', 'Citado']);
+    const now = new Date();
+    const HOURS_48_IN_MS = 48 * 60 * 60 * 1000;
 
-    // Mostrar registros con estado válido (sin filtro de 48h)
+    // Mostrar registros con estado válido y que han pasado más de 48 horas desde fechaEstado
     let filtered = services.filter((service) => {
       const estadoValido = service.estado && allowedStates.has(service.estado);
-      return estadoValido;
+      
+      if (!estadoValido) return false;
+      
+      // Verificar que han pasado más de 48 horas desde fechaEstado
+      if (!service.fechaEstado) return false;
+      
+      const fechaEstado = new Date(service.fechaEstado);
+      const timeDiff = now.getTime() - fechaEstado.getTime();
+      
+      return timeDiff > HOURS_48_IN_MS;
     });
 
     const term = searchTerm.trim().toLowerCase();

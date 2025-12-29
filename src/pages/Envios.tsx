@@ -199,8 +199,9 @@ export default function Envios() {
   };
 
   const filteredEnvios = envios.filter(envio => {
-    // Excluir envíos con estado "Entregado"
-    if (envio.estado === 'Entregado') return false;
+    // Excluir envíos con estados finalizados
+    const estadosExcluidos = ['Entregado', 'Devuelto', 'Recogida hecha'];
+    if (envio.estado && estadosExcluidos.includes(envio.estado)) return false;
     
     if (!searchTerm) return true;
     const needle = searchTerm.toLowerCase();
