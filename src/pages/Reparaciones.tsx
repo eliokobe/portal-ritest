@@ -21,6 +21,7 @@ interface Service {
   comentarios?: string;
   conversationId?: string;
   telefonoTecnico?: string;
+  cita?: string;
 }
 
 const STATUS_OPTIONS = [
@@ -516,6 +517,10 @@ const Reparaciones: React.FC = () => {
                 <div>
                   <p className="text-xs uppercase text-gray-500">Fecha seguimiento</p>
                   <p className="text-sm text-gray-900 mt-1">{formatDateTime(selectedService.fechaSeguimiento)}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Cita</p>
+                  <p className="text-sm text-gray-900 mt-1">{formatDateTime(selectedService.cita)}</p>
                 </div>
               </div>
 

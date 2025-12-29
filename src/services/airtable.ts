@@ -1114,6 +1114,7 @@ export const airtableService = {
           comentarios: f['Comentarios'],
           conversationId: f['Conversation id'],
           telefonoTecnico: telefonoTecnico,
+          cita: f['Cita'],
         };
       });
     } catch (error) {
