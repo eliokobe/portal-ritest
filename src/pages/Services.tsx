@@ -1,5 +1,5 @@
 import React, { ChangeEvent, useEffect, useMemo, useState } from 'react';
-import { Search, Info, X, Check, XCircle, Phone, MessageCircle } from 'lucide-react';
+import { Search, Info, X, XCircle, Phone, MessageCircle } from 'lucide-react';
 import { airtableService } from '../services/airtable';
 import { useAuth } from '../contexts/AuthContext';
 import { getStatusColors, getIpartnerColors } from '../utils/statusColors';
@@ -124,7 +124,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [detailsView, setDetailsView] = useState<'detalles' | 'formulario' | 'reparaciones'>('detalles');
   const [formularios, setFormularios] = useState<any[]>([]);
-  const [fallbackFormulario, setFallbackFormulario] = useState<any | null>(null);
+  const [_fallbackFormulario, setFallbackFormulario] = useState<any | null>(null);
   const [selectedFormularioIndex, setSelectedFormularioIndex] = useState(0);
   const [selectedFormulario, setSelectedFormulario] = useState<any | null>(null);
   const [reparaciones, setReparaciones] = useState<any[]>([]);
@@ -144,8 +144,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   const [pendingEstadoChange, setPendingEstadoChange] = useState<{serviceId: string, newEstado: string} | null>(null);
   const [showCitaModal, setShowCitaModal] = useState(false);
 
-  // Determinar si el usuario es Gestora Operativa
-  const isGestoraOperativa = user?.role === 'Gestora Operativa';
+  // Determinar si el usuario es Gestora Técnica
   const isGestoraTecnica = user?.role === 'Gestora Técnica';
   const isResponsableOrAdministrativa = user?.role === 'Responsable' || user?.role === 'Administrativa';
 
@@ -507,7 +506,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
           (s) => {
             if (!s.tecnico) return true;
             if (typeof s.tecnico === 'string') return s.tecnico.trim() === '';
-            if (Array.isArray(s.tecnico)) return s.tecnico.length === 0;
+            if (Array.isArray(s.tecnico)) return (s.tecnico as string[]).length === 0;
             return true;
           }
         );
@@ -793,7 +792,8 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     }
   }, [selectedService, selectedFormulario, selectedReparacion, lastSelectedServiceId]);
 
-  const handleMarkSynced = async (id: string) => {
+  // Función para marcar como tramitado (no se usa actualmente pero se mantiene para futura funcionalidad)
+  const _handleMarkSynced = async (id: string) => {
     if (!isTramitacion) return;
     if (updatingId) return;
     setUpdatingId(id);
@@ -807,6 +807,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     }
   };
 
+  // Función para manejar edición de campos
   const handleEdit = (serviceId: string, field: string, currentValue: string) => {
     setEditingField({ id: serviceId, field });
     setEditValue(currentValue || '');
