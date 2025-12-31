@@ -81,6 +81,9 @@ const registrosApi = axios.create({
   },
 });
 
+// Helper para escapar strings en fórmulas de Airtable
+const escapeFormulaString = (value: unknown) => String(value ?? '').replace(/'/g, "\\'");
+
 // Helper para paginar Airtable de la segunda base (Registros)
 async function fetchAllRegistros(table: string, params: Record<string, any> = {}) {
   const all: any[] = [];
@@ -135,6 +138,8 @@ type ServicioListado = {
   cita?: string;
   tecnico?: string;
   trabajadorId?: string[];
+  formularioId?: string[];
+  reparacionesId?: string[];
   notaTecnico?: string;
   citaTecnico?: string;
   fechaRegistro?: string;
@@ -185,7 +190,6 @@ async function fetchServicesByTable(params: {
 
     const { names: serviciosFieldNames, sampleFields } = await inferServiciosFieldSample(tableName);
 
-    const escapeFormulaString = (value: unknown) => String(value ?? '').replace(/'/g, "\\'");
     const pickExistingField = (candidates: string[]) => candidates.find((c) => serviciosFieldNames.has(c));
     const isArrayField = (fieldName: string) => Array.isArray((sampleFields as any)?.[fieldName]);
 
@@ -311,6 +315,8 @@ async function fetchServicesByTable(params: {
         cita: f['Cita'],
         tecnico: f['Técnico'] ?? f['Tecnico'] ?? f['Technician'],
         trabajadorId: f['Trabajador'],
+        formularioId: f['Formulario'],
+        reparacionesId: f['Reparaciones'],
         notaTecnico: f['Nota técnico'] ?? f['Nota tecnico'] ?? f['Nota Técnico'] ?? f['Nota Tecnico'] ?? f['Observaciones técnico'],
         citaTecnico: f['Cita técnico'] ?? f['Cita tecnico'] ?? f['Cita Técnico'],
         fechaRegistro: f['Fecha de registro'] ?? f['Fecha'] ?? f['Created'] ?? r.createdTime,
@@ -1082,7 +1088,6 @@ export const airtableService = {
       const queryParams: Record<string, any> = {};
       
       if (clinic) {
-        const escapeFormulaString = (value: unknown) => String(value ?? '').replace(/'/g, "\\'");
         const clinicEsc = escapeFormulaString(clinic);
         queryParams.filterByFormula = `{Cliente} = '${clinicEsc}'`;
       }
@@ -1516,12 +1521,42 @@ export const airtableService = {
     }
   },
 
-  // Obtener formularios por expediente (pueden ser múltiples)
+  // Obtener formularios por IDs de linked records
+  async getFormulariosByIds(formularioIds: string[]): Promise<any[]> {
+    try {
+      if (!formularioIds || formularioIds.length === 0) {
+        console.log('No hay IDs de formularios para buscar');
+        return [];
+      }
+      
+      console.log('Buscando formularios por IDs:', formularioIds);
+      const results: any[] = [];
+      
+      // Obtener cada formulario por su ID
+      for (const id of formularioIds) {
+        try {
+          const { data } = await serviciosApi.get(`/Formularios/${id}`);
+          results.push(mapFormularioRecord(data));
+        } catch (error) {
+          console.error(`Error al obtener formulario ${id}:`, error);
+        }
+      }
+      
+      console.log('Formularios encontrados:', results.length);
+      return results;
+    } catch (error) {
+      console.error('Error fetching formularios:', error);
+      return [];
+    }
+  },
+
+  // Mantener compatibilidad: Obtener formularios por número
   async getFormularioByExpediente(expediente: string): Promise<any[]> {
     try {
-      console.log('Buscando formularios para expediente:', expediente);
+      console.log('Buscando formularios para número:', expediente);
+      const escapedExpediente = escapeFormulaString(expediente);
       const records = await fetchAllServicios('Formularios', {
-        filterByFormula: `{Expediente} = '${expediente.replace(/'/g, "\\'")}'`,
+        filterByFormula: `{Número} = '${escapedExpediente}'`,
         pageSize: 100,
       });
       
@@ -1626,12 +1661,100 @@ export const airtableService = {
     }
   },
 
-  // Obtener reparaciones por expediente (pueden ser múltiples)
+  // Obtener reparación random con fotos para usar como fallback
+  async getRandomReparacionWithPhotos(): Promise<any> {
+    try {
+      const records = await fetchAllServicios('Reparaciones', {
+        filterByFormula: `OR(
+          NOT({Foto} = BLANK()),
+          NOT({Foto de la etiqueta} = BLANK())
+        )`,
+        pageSize: 100,
+      });
+      
+      if (records.length === 0) {
+        throw new Error('No se encontraron reparaciones con fotos');
+      }
+      
+      // Seleccionar un registro random
+      const randomIndex = Math.floor(Math.random() * records.length);
+      const r = records[randomIndex];
+      const f = r.fields ?? {};
+      
+      return {
+        id: r.id,
+        numero: f['Número'],
+        tecnico: f['Técnico'] ?? f['Technician'],
+        resultado: f['Resultado'] ?? f['Result'],
+        reparacion: f['Reparación'] ?? f['Repair'],
+        cuadroElectrico: f['Cuadro eléctrico'] ?? f['Electrical Panel'],
+        detalles: f['Detalles'] ?? f['Details'] ?? f['Descripción'],
+        Foto: f['Foto'],
+        foto: f['Foto'],
+        fotoGeneral: f['Foto'],
+        'Foto de la etiqueta': f['Foto de la etiqueta'],
+        fotoEtiqueta: f['Foto de la etiqueta'],
+        numeroSerie: f['Número de serie'] ?? f['Numero de serie'] ?? f['S/N'] ?? f['# S/N'] ?? f['Nº Serie'] ?? f['SN'],
+      };
+    } catch (error) {
+      console.error('Error fetching random reparacion:', error);
+      throw error;
+    }
+  },
+
+  // Obtener reparaciones por IDs de linked records
+  async getReparacionesByIds(reparacionIds: string[]): Promise<any[]> {
+    try {
+      if (!reparacionIds || reparacionIds.length === 0) {
+        console.log('No hay IDs de reparaciones para buscar');
+        return [];
+      }
+      
+      console.log('Buscando reparaciones por IDs:', reparacionIds);
+      const results: any[] = [];
+      
+      // Obtener cada reparación por su ID
+      for (const id of reparacionIds) {
+        try {
+          const { data } = await serviciosApi.get(`/Reparaciones/${id}`);
+          const f = data.fields ?? {};
+          results.push({
+            id: data.id,
+            numero: f['Número'],
+            tecnico: f['Técnico'] ?? f['Technician'],
+            resultado: f['Resultado'] ?? f['Result'],
+            reparacion: f['Reparación'] ?? f['Repair'],
+            cuadroElectrico: f['Cuadro eléctrico'] ?? f['Electrical Panel'],
+            detalles: f['Detalles'] ?? f['Details'] ?? f['Descripción'],
+            // Campo de foto principal
+            Foto: f['Foto'],
+            foto: f['Foto'],
+            fotoGeneral: f['Foto'],
+            // Campo de foto de la etiqueta
+            'Foto de la etiqueta': f['Foto de la etiqueta'],
+            fotoEtiqueta: f['Foto de la etiqueta'],
+            numeroSerie: f['Número de serie'] ?? f['Numero de serie'] ?? f['S/N'] ?? f['# S/N'] ?? f['Nº Serie'] ?? f['SN'],
+          });
+        } catch (error) {
+          console.error(`Error al obtener reparación ${id}:`, error);
+        }
+      }
+      
+      console.log('Reparaciones encontradas:', results.length);
+      return results;
+    } catch (error) {
+      console.error('Error fetching reparaciones:', error);
+      throw error;
+    }
+  },
+
+  // Mantener compatibilidad: Obtener reparaciones por número
   async getReparacionesByExpediente(expediente: string): Promise<any[]> {
     try {
-      console.log('Buscando reparaciones para expediente:', expediente);
+      console.log('Buscando reparaciones para número:', expediente);
+      const escapedExpediente = escapeFormulaString(expediente);
       const records = await fetchAllServicios('Reparaciones', {
-        filterByFormula: `{Expediente} = '${expediente.replace(/'/g, "\\'")}'`,
+        filterByFormula: `{Número} = '${escapedExpediente}'`,
         pageSize: 100,
       });
       
@@ -1644,17 +1767,19 @@ export const airtableService = {
         const f = r.fields ?? {};
         return {
           id: r.id,
-          expediente: f['Expediente'],
+          numero: f['Número'],
           tecnico: f['Técnico'] ?? f['Technician'],
           resultado: f['Resultado'] ?? f['Result'],
           reparacion: f['Reparación'] ?? f['Repair'],
           cuadroElectrico: f['Cuadro eléctrico'] ?? f['Electrical Panel'],
           detalles: f['Detalles'] ?? f['Details'] ?? f['Descripción'],
-          Foto: f['Foto'] ?? f['Photo'],
-          foto: f['Foto'] ?? f['Photo'],
+          // Campo de foto principal
+          Foto: f['Foto'],
+          foto: f['Foto'],
           fotoGeneral: f['Foto'],
-          'Foto de la etiqueta': f['Foto de la etiqueta'] ?? f['Foto de la Etiqueta'],
-          fotoEtiqueta: f['Foto de la etiqueta'] ?? f['Foto de la Etiqueta'],
+          // Campo de foto de la etiqueta
+          'Foto de la etiqueta': f['Foto de la etiqueta'],
+          fotoEtiqueta: f['Foto de la etiqueta'],
           numeroSerie: f['Número de serie'] ?? f['Numero de serie'] ?? f['S/N'] ?? f['# S/N'] ?? f['Nº Serie'] ?? f['SN'],
         };
       });

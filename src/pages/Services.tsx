@@ -34,6 +34,8 @@ interface Service {
   cita?: string;
   tecnico?: string;
   trabajadorId?: string[];
+  formularioId?: string[];
+  reparacionesId?: string[];
   notaTecnico?: string;
   citaTecnico?: string;
   chatbot?: string;
@@ -374,16 +376,10 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   };
 
   const loadFormulariosForService = async (service: Service | null) => {
+    const formularioIds = service?.formularioId;
     const expediente = service?.expediente?.trim();
     const direccion = service?.direccion?.trim();
     const nombre = service?.nombre?.trim();
-
-    if (!expediente && !direccion && !nombre) {
-      setFormularios([]);
-      setSelectedFormularioIndex(0);
-      setFallbackFormulario(null);
-      return;
-    }
 
     const fallbackKey = expediente || direccion || nombre || 'sin-clave';
 
@@ -392,16 +388,29 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
 
     let data: any[] = [];
 
+    // Primero: intentar obtener por IDs de linked records
     try {
-      if (expediente) {
-        data = await airtableService.getFormularioByExpediente(expediente);
+      if (formularioIds && formularioIds.length > 0) {
+        console.log('Cargando formularios por linked records:', formularioIds);
+        data = await airtableService.getFormulariosByIds(formularioIds);
       }
     } catch (error) {
-      console.warn('No se encontró formulario por expediente, se probarán otros criterios', error);
+      console.warn('No se pudieron cargar formularios por linked records', error);
       data = [];
     }
 
-    if (data.length === 0) {
+    // Segundo: buscar por expediente/número
+    if (data.length === 0 && expediente) {
+      try {
+        data = await airtableService.getFormularioByExpediente(expediente);
+      } catch (error) {
+        console.warn('No se encontró formulario por expediente', error);
+        data = [];
+      }
+    }
+
+    // Tercero: buscar por datos del cliente
+    if (data.length === 0 && (expediente || direccion || nombre)) {
       try {
         data = await airtableService.getFormularioByClientInfo({ expediente, direccion, nombre });
       } catch (error) {
@@ -650,21 +659,31 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   useEffect(() => {
     const loadInlineRep = async () => {
       if (detailsView !== 'reparaciones') return;
-      const expediente = selectedService?.expediente;
-      if (!expediente) {
+      if (!selectedService) {
         setReparaciones([]);
         setSelectedReparacionIndex(0);
         return;
       }
+      
+      const reparacionIds = selectedService.reparacionesId;
+      const expediente = selectedService.expediente;
+      
       try {
-        const sameExp = reparaciones.length > 0 && (reparaciones[0]?.expediente === expediente);
-        if (!sameExp) {
-          // Limpiar primero las reparaciones anteriores
-          setReparaciones([]);
-          const data = await airtableService.getReparacionesByExpediente(expediente);
-          setReparaciones(data);
-          setSelectedReparacionIndex(0);
+        let data: any[] = [];
+        
+        // Primero: intentar obtener por IDs de linked records
+        if (reparacionIds && reparacionIds.length > 0) {
+          console.log('Cargando reparaciones por linked records:', reparacionIds);
+          data = await airtableService.getReparacionesByIds(reparacionIds);
         }
+        
+        // Segundo: buscar por expediente/número
+        if (data.length === 0 && expediente) {
+          data = await airtableService.getReparacionesByExpediente(expediente);
+        }
+        
+        setReparaciones(data);
+        setSelectedReparacionIndex(0);
       } catch (e) {
         console.error('Error cargando reparaciones (inline):', e);
         setReparaciones([]);
@@ -677,33 +696,89 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   // Cargar formularios y reparaciones cuando se abre modal de tramitaciones
   useEffect(() => {
     if (!isTramitacion || !selectedService) return;
-    
-    const expediente = selectedService.expediente;
-    if (!expediente) {
-      setFormularios([]);
-      setReparaciones([]);
-      return;
-    }
 
     const loadDatos = async () => {
+      // PRIMERO: Cargar reparaciones
+      let dataRep: any[] = [];
       try {
-        await loadFormulariosForService(selectedService);
-      } catch (e) {
-        console.error('Error cargando formularios para tramitaciones:', e);
-        setFormularios([]);
-      }
-
-      try {
-        // Cargar reparaciones
-        const sameExpRep = reparaciones.length > 0 && (reparaciones[0]?.expediente === expediente);
-        if (!sameExpRep) {
-          const dataRep = await airtableService.getReparacionesByExpediente(expediente);
-          setReparaciones(dataRep);
-          setSelectedReparacionIndex(0);
+        // Intentar obtener por IDs de linked records
+        if (selectedService.reparacionesId && selectedService.reparacionesId.length > 0) {
+          console.log('Cargando reparaciones por linked records:', selectedService.reparacionesId);
+          dataRep = await airtableService.getReparacionesByIds(selectedService.reparacionesId);
         }
+        
+        // Buscar por expediente/número
+        if (dataRep.length === 0 && selectedService.expediente) {
+          dataRep = await airtableService.getReparacionesByExpediente(selectedService.expediente);
+        }
+        
+        setReparaciones(dataRep);
+        setSelectedReparacionIndex(0);
       } catch (e) {
         console.error('Error cargando reparaciones para tramitaciones:', e);
         setReparaciones([]);
+        dataRep = [];
+      }
+
+      // SEGUNDO: Cargar formularios (pasando información de reparaciones)
+      try {
+        const formularioIds = selectedService?.formularioId;
+        const expediente = selectedService?.expediente?.trim();
+        const direccion = selectedService?.direccion?.trim();
+        const nombre = selectedService?.nombre?.trim();
+
+        let dataForm: any[] = [];
+
+        // Intentar obtener por IDs de linked records
+        try {
+          if (formularioIds && formularioIds.length > 0) {
+            console.log('Cargando formularios por linked records:', formularioIds);
+            dataForm = await airtableService.getFormulariosByIds(formularioIds);
+          }
+        } catch (error) {
+          console.warn('No se pudieron cargar formularios por linked records', error);
+        }
+
+        // Buscar por expediente/número
+        if (dataForm.length === 0 && expediente) {
+          try {
+            dataForm = await airtableService.getFormularioByExpediente(expediente);
+          } catch (error) {
+            console.warn('No se encontró formulario por expediente', error);
+          }
+        }
+
+        // Buscar por datos del cliente
+        if (dataForm.length === 0 && (expediente || direccion || nombre)) {
+          try {
+            dataForm = await airtableService.getFormularioByClientInfo({ expediente, direccion, nombre });
+          } catch (error) {
+            console.error('Error buscando formularios por datos alternativos:', error);
+          }
+        }
+
+        // SOLO cargar formulario random si no hay formularios NI reparaciones
+        if (dataForm.length === 0 && dataRep.length === 0) {
+          try {
+            console.log('No se encontraron formularios ni reparaciones, cargando formulario random con fotos...');
+            const randomForm = await airtableService.getRandomFormularioWithPhotos();
+            if (randomForm) {
+              dataForm = [randomForm];
+              console.log('Formulario random cargado:', randomForm.id);
+            }
+          } catch (error) {
+            console.error('Error cargando formulario random:', error);
+          }
+        }
+
+        setFormularios(dataForm);
+        setSelectedFormularioIndex(0);
+        
+        const fallbackKey = expediente || direccion || nombre || 'sin-clave';
+        await ensureFallbackFormulario(dataForm, fallbackKey);
+      } catch (e) {
+        console.error('Error cargando formularios para tramitaciones:', e);
+        setFormularios([]);
       }
     };
 
@@ -1434,123 +1509,59 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
               )}
               {isTramitacion && detailsView === 'detalles' && (formularios.length > 0 || reparaciones.length > 0) && (
                 <div className="space-y-6">
-                  {/* Fotos del formulario */}
-                  {(formularios.length > 0 || fallbackFormulario) && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Fotos del formulario</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {/* Foto general */}
-                        {((formularios[0]?.['Foto general'] && Array.isArray(formularios[0]['Foto general']) && formularios[0]['Foto general'].length > 0) ||
-                          (fallbackFormulario?.['Foto general'] && Array.isArray(fallbackFormulario['Foto general']))) &&
-                          ((formularios[0]?.['Foto general'] && formularios[0]['Foto general'].length > 0 
-                            ? formularios[0]['Foto general'] 
-                            : fallbackFormulario?.['Foto general']) || []).map((file: AirtableAttachment, idx: number) => (
-                          <div key={`general-${idx}`} className="space-y-2">
-                            <p className="text-xs font-medium text-gray-600">Foto general</p>
-                            {file.thumbnails?.large?.url && (
-                              <img
-                                src={file.thumbnails.large.url}
-                                alt="Foto general"
-                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => window.open(file.url, '_blank')}
-                              />
-                            )}
-                          </div>
-                        ))}
-                        {/* Foto etiqueta */}
-                        {((formularios[0]?.['Foto etiqueta'] && Array.isArray(formularios[0]['Foto etiqueta']) && formularios[0]['Foto etiqueta'].length > 0) ||
-                          (fallbackFormulario?.['Foto etiqueta'] && Array.isArray(fallbackFormulario['Foto etiqueta']))) &&
-                          ((formularios[0]?.['Foto etiqueta'] && formularios[0]['Foto etiqueta'].length > 0 
-                            ? formularios[0]['Foto etiqueta'] 
-                            : fallbackFormulario?.['Foto etiqueta']) || []).map((file: AirtableAttachment, idx: number) => (
-                          <div key={`etiqueta-${idx}`} className="space-y-2">
-                            <p className="text-xs font-medium text-gray-600">Foto etiqueta</p>
-                            {file.thumbnails?.large?.url && (
-                              <img
-                                src={file.thumbnails.large.url}
-                                alt="Foto etiqueta"
-                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => window.open(file.url, '_blank')}
-                              />
-                            )}
-                          </div>
-                        ))}
-                        {/* Foto roto */}
-                        {((formularios[0]?.['Foto roto'] && Array.isArray(formularios[0]['Foto roto']) && formularios[0]['Foto roto'].length > 0) ||
-                          (fallbackFormulario?.['Foto roto'] && Array.isArray(fallbackFormulario['Foto roto']))) &&
-                          ((formularios[0]?.['Foto roto'] && formularios[0]['Foto roto'].length > 0 
-                            ? formularios[0]['Foto roto'] 
-                            : fallbackFormulario?.['Foto roto']) || []).map((file: AirtableAttachment, idx: number) => (
-                          <div key={`roto-${idx}`} className="space-y-2">
-                            <p className="text-xs font-medium text-gray-600">Foto roto</p>
-                            {file.thumbnails?.large?.url && (
-                              <img
-                                src={file.thumbnails.large.url}
-                                alt="Foto roto"
-                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => window.open(file.url, '_blank')}
-                              />
-                            )}
-                          </div>
-                        ))}
-                        {/* Foto cuadro */}
-                        {((formularios[0]?.['Foto cuadro'] && Array.isArray(formularios[0]['Foto cuadro']) && formularios[0]['Foto cuadro'].length > 0) ||
-                          (fallbackFormulario?.['Foto cuadro'] && Array.isArray(fallbackFormulario['Foto cuadro']))) &&
-                          ((formularios[0]?.['Foto cuadro'] && formularios[0]['Foto cuadro'].length > 0 
-                            ? formularios[0]['Foto cuadro'] 
-                            : fallbackFormulario?.['Foto cuadro']) || []).map((file: AirtableAttachment, idx: number) => (
-                          <div key={`cuadro-${idx}`} className="space-y-2">
-                            <p className="text-xs font-medium text-gray-600">Foto cuadro</p>
-                            {file.thumbnails?.large?.url && (
-                              <img
-                                src={file.thumbnails.large.url}
-                                alt="Foto cuadro"
-                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => window.open(file.url, '_blank')}
-                              />
-                            )}
-                          </div>
-                        ))}
+                  {/* Fotos del formulario o fallback de reparación */}
+                  {(() => {
+                    // Fotos del formulario
+                    const fotosFormulario = formularios[0]?.['Foto general'] && Array.isArray(formularios[0]['Foto general']) && formularios[0]['Foto general'].length > 0
+                      ? formularios[0]['Foto general']
+                      : null;
+                    const fotosEtiqueta = formularios[0]?.['Foto etiqueta'] && Array.isArray(formularios[0]['Foto etiqueta']) && formularios[0]['Foto etiqueta'].length > 0
+                      ? formularios[0]['Foto etiqueta']
+                      : null;
+                    // Si no hay fotos en el formulario, usar una reparación random
+                    let fallbackFotos = null;
+                    let fallbackEtiqueta = null;
+                    if (!fotosFormulario && reparaciones.length > 0) {
+                      const randomRep = reparaciones[Math.floor(Math.random() * reparaciones.length)];
+                      fallbackFotos = randomRep?.fotoGeneral && Array.isArray(randomRep.fotoGeneral) && randomRep.fotoGeneral.length > 0 ? randomRep.fotoGeneral : null;
+                      fallbackEtiqueta = randomRep?.fotoEtiqueta && Array.isArray(randomRep.fotoEtiqueta) && randomRep.fotoEtiqueta.length > 0 ? randomRep.fotoEtiqueta : null;
+                    }
+                    return (
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Fotos del servicio</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                          {/* Foto general */}
+                          {(fotosFormulario || fallbackFotos) && (fotosFormulario || fallbackFotos).map((file: any, idx: number) => (
+                            <div key={`general-${idx}`} className="space-y-2">
+                              <p className="text-xs font-medium text-gray-600">Foto general</p>
+                              {file.thumbnails?.large?.url && (
+                                <img
+                                  src={file.thumbnails.large.url}
+                                  alt="Foto general"
+                                  className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={() => window.open(file.url, '_blank')}
+                                />
+                              )}
+                            </div>
+                          ))}
+                          {/* Foto etiqueta */}
+                          {(fotosEtiqueta || fallbackEtiqueta) && (fotosEtiqueta || fallbackEtiqueta).map((file: any, idx: number) => (
+                            <div key={`etiqueta-${idx}`} className="space-y-2">
+                              <p className="text-xs font-medium text-gray-600">Foto etiqueta</p>
+                              {file.thumbnails?.large?.url && (
+                                <img
+                                  src={file.thumbnails.large.url}
+                                  alt="Foto etiqueta"
+                                  className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={() => window.open(file.url, '_blank')}
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-
-                  {/* Fotos de la reparación */}
-                  {reparaciones.length > 0 && (
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Fotos de la reparación</h3>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {/* Foto */}
-                        {reparaciones[0]?.['Foto'] && Array.isArray(reparaciones[0]['Foto']) && reparaciones[0]['Foto'].map((file: AirtableAttachment, idx: number) => (
-                          <div key={`foto-${idx}`} className="space-y-2">
-                            <p className="text-xs font-medium text-gray-600">Foto</p>
-                            {file.thumbnails?.large?.url && (
-                              <img
-                                src={file.thumbnails.large.url}
-                                alt="Foto reparación"
-                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => window.open(file.url, '_blank')}
-                              />
-                            )}
-                          </div>
-                        ))}
-                        {/* Foto de la etiqueta */}
-                        {reparaciones[0]?.['Foto de la etiqueta'] && Array.isArray(reparaciones[0]['Foto de la etiqueta']) && reparaciones[0]['Foto de la etiqueta'].map((file: AirtableAttachment, idx: number) => (
-                          <div key={`foto-etiqueta-${idx}`} className="space-y-2">
-                            <p className="text-xs font-medium text-gray-600">Foto de la etiqueta</p>
-                            {file.thumbnails?.large?.url && (
-                              <img
-                                src={file.thumbnails.large.url}
-                                alt="Foto de la etiqueta"
-                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => window.open(file.url, '_blank')}
-                              />
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               )}
               
@@ -1850,7 +1861,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                                   )}
                                 </div>
                               ))}
-                            </div>
+                          </div>
                           ) : (
                             <p className="text-sm text-gray-500">Sin foto</p>
                           )}
@@ -1887,7 +1898,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                                   )}
                                 </div>
                               ))}
-                            </div>
+                          </div>
                           ) : (
                             <p className="text-sm text-gray-500">Sin foto</p>
                           )}
@@ -1924,7 +1935,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                                   )}
                                 </div>
                               ))}
-                            </div>
+                          </div>
                           ) : (
                             <p className="text-sm text-gray-500">Sin foto</p>
                           )}
@@ -1961,7 +1972,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                                   )}
                                 </div>
                               ))}
-                            </div>
+                          </div>
                           ) : (
                             <p className="text-sm text-gray-500">Sin foto</p>
                           )}
