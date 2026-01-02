@@ -1508,31 +1508,30 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.accionIpartner)}</p>
                 </div>
               )}
-              {isTramitacion && detailsView === 'detalles' && (formularios.length > 0 || reparaciones.length > 0) && (
+              {isTramitacion && detailsView === 'detalles' && (formularios.length > 0 || _fallbackFormulario) && (
                 <div className="space-y-6">
-                  {/* Fotos del formulario o fallback de reparación */}
+                  {/* Fotos del formulario o fallback */}
                   {(() => {
-                    // Fotos del formulario
-                    const fotosFormulario = formularios[0]?.['Foto general'] && Array.isArray(formularios[0]['Foto general']) && formularios[0]['Foto general'].length > 0
-                      ? formularios[0]['Foto general']
+                    // Determinar qué formulario usar
+                    const formulario = formularios.length > 0 ? formularios[0] : null;
+                    const fotoGeneral = formulario?.['Foto general'];
+                    const hasPhoto = Array.isArray(fotoGeneral) && fotoGeneral.length > 0;
+                    
+                    // Si hay formulario pero no tiene foto general, usar fallback
+                    const displayFormulario = formulario && !hasPhoto ? _fallbackFormulario : formulario;
+                    const fotosFormulario = displayFormulario?.['Foto general'] && Array.isArray(displayFormulario['Foto general']) && displayFormulario['Foto general'].length > 0
+                      ? displayFormulario['Foto general']
                       : null;
-                    const fotosEtiqueta = formularios[0]?.['Foto etiqueta'] && Array.isArray(formularios[0]['Foto etiqueta']) && formularios[0]['Foto etiqueta'].length > 0
-                      ? formularios[0]['Foto etiqueta']
+                    const fotosEtiqueta = displayFormulario?.['Foto etiqueta'] && Array.isArray(displayFormulario['Foto etiqueta']) && displayFormulario['Foto etiqueta'].length > 0
+                      ? displayFormulario['Foto etiqueta']
                       : null;
-                    // Si no hay fotos en el formulario, usar una reparación random
-                    let fallbackFotos = null;
-                    let fallbackEtiqueta = null;
-                    if (!fotosFormulario && reparaciones.length > 0) {
-                      const randomRep = reparaciones[Math.floor(Math.random() * reparaciones.length)];
-                      fallbackFotos = randomRep?.fotoGeneral && Array.isArray(randomRep.fotoGeneral) && randomRep.fotoGeneral.length > 0 ? randomRep.fotoGeneral : null;
-                      fallbackEtiqueta = randomRep?.fotoEtiqueta && Array.isArray(randomRep.fotoEtiqueta) && randomRep.fotoEtiqueta.length > 0 ? randomRep.fotoEtiqueta : null;
-                    }
-                    return (
+
+                    return fotosFormulario || fotosEtiqueta ? (
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">Fotos del servicio</h3>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                           {/* Foto general */}
-                          {(fotosFormulario || fallbackFotos) && (fotosFormulario || fallbackFotos).map((file: any, idx: number) => (
+                          {fotosFormulario && fotosFormulario.map((file: any, idx: number) => (
                             <div key={`general-${idx}`} className="space-y-2">
                               <p className="text-xs font-medium text-gray-600">Foto general</p>
                               {file.thumbnails?.large?.url && (
@@ -1546,7 +1545,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                             </div>
                           ))}
                           {/* Foto etiqueta */}
-                          {(fotosEtiqueta || fallbackEtiqueta) && (fotosEtiqueta || fallbackEtiqueta).map((file: any, idx: number) => (
+                          {fotosEtiqueta && fotosEtiqueta.map((file: any, idx: number) => (
                             <div key={`etiqueta-${idx}`} className="space-y-2">
                               <p className="text-xs font-medium text-gray-600">Foto etiqueta</p>
                               {file.thumbnails?.large?.url && (
@@ -1561,7 +1560,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                           ))}
                         </div>
                       </div>
-                    );
+                    ) : null;
                   })()}
                 </div>
               )}

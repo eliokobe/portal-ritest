@@ -1120,6 +1120,7 @@ export const airtableService = {
           conversationId: f['Conversation id'],
           telefonoTecnico: telefonoTecnico,
           cita: f['Cita'],
+          formularioId: f['Formulario'],
         };
       });
     } catch (error) {

@@ -22,6 +22,7 @@ interface Service {
   conversationId?: string;
   telefonoTecnico?: string;
   cita?: string;
+  formularioId?: string[];
 }
 
 const STATUS_OPTIONS = [
@@ -72,6 +73,8 @@ const Reparaciones: React.FC = () => {
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [formularios, setFormularios] = useState<any[]>([]);
+  const [fallbackFormulario, setFallbackFormulario] = useState<any | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -147,6 +150,16 @@ const Reparaciones: React.FC = () => {
     };
   }, [selectedService]);
 
+  // Cargar formularios cuando se selecciona un servicio
+  useEffect(() => {
+    if (selectedService) {
+      loadFormulariosForService(selectedService);
+    } else {
+      setFormularios([]);
+      setFallbackFormulario(null);
+    }
+  }, [selectedService]);
+
   const technicianMap = useMemo(() => {
     const map = technicians.reduce<Record<string, string>>((acc, t) => {
       if (t.id && t.nombre) {
@@ -173,6 +186,84 @@ const Reparaciones: React.FC = () => {
       return names.length > 0 ? names.join(', ') : '-';
     }
     return '-';
+  };
+
+  const hasFormularioPhotos = (form: any) => {
+    if (!form) return false;
+    const photoFields = ['Foto general', 'Foto etiqueta', 'Foto roto', 'Foto cuadro'];
+    return photoFields.some((field) => Array.isArray(form[field]) && form[field].length > 0);
+  };
+
+  const ensureFallbackFormulario = async (forms: any[], fallbackKey: string) => {
+    if (forms.length > 0) {
+      if (hasFormularioPhotos(forms[0])) {
+        setFallbackFormulario(null);
+        return;
+      }
+      const formWithPhotos = forms.find((f) => hasFormularioPhotos(f));
+      if (formWithPhotos) {
+        setFallbackFormulario(formWithPhotos);
+        return;
+      }
+    }
+
+    try {
+      const storageKey = 'fallbackFormularios';
+      const stored = localStorage.getItem(storageKey);
+      const fallbackMap = stored ? JSON.parse(stored) : {};
+
+      let randomForm = fallbackMap[fallbackKey]
+        ? await airtableService.getFormularioById(fallbackMap[fallbackKey])
+        : null;
+
+      if (!randomForm) {
+        randomForm = await airtableService.getRandomFormularioWithPhotos();
+        if (randomForm?.id) {
+          fallbackMap[fallbackKey] = randomForm.id;
+          localStorage.setItem(storageKey, JSON.stringify(fallbackMap));
+        }
+      }
+
+      setFallbackFormulario(randomForm);
+    } catch (err) {
+      console.error('Error cargando formulario random:', err);
+      setFallbackFormulario(null);
+    }
+  };
+
+  const loadFormulariosForService = async (service: Service | null) => {
+    const formularioIds = service?.formularioId;
+    const expediente = service?.expediente?.trim();
+
+    const fallbackKey = expediente || 'sin-clave';
+
+    setFormularios([]);
+
+    let data: any[] = [];
+
+    // Primero: intentar obtener por IDs de linked records
+    try {
+      if (formularioIds && formularioIds.length > 0) {
+        console.log('Cargando formularios por linked records:', formularioIds);
+        data = await airtableService.getFormulariosByIds(formularioIds);
+      }
+    } catch (error) {
+      console.warn('No se pudieron cargar formularios por linked records', error);
+      data = [];
+    }
+
+    // Segundo: buscar por expediente/número
+    if (data.length === 0 && expediente) {
+      try {
+        data = await airtableService.getFormularioByExpediente(expediente);
+      } catch (error) {
+        console.warn('No se encontró formulario por expediente', error);
+        data = [];
+      }
+    }
+
+    setFormularios(data);
+    await ensureFallbackFormulario(data, fallbackKey);
   };
 
   const handleEstadoChange = async (service: Service, newEstado: string) => {
@@ -556,6 +647,34 @@ const Reparaciones: React.FC = () => {
                   placeholder="Escribe comentarios..."
                 />
               </div>
+
+              {/* Sección de Foto general del Formulario */}
+              {(() => {
+                const formulario = formularios.length > 0 ? formularios[0] : null;
+                const fotoGeneral = formulario?.['Foto general'];
+                const hasPhoto = Array.isArray(fotoGeneral) && fotoGeneral.length > 0;
+                
+                // Si hay formulario pero no tiene foto general, usar fallback
+                const displayFormulario = formulario && !hasPhoto ? fallbackFormulario : formulario;
+                const displayFotoGeneral = displayFormulario?.['Foto general'];
+                const displayHasPhoto = Array.isArray(displayFotoGeneral) && displayFotoGeneral.length > 0;
+
+                if (displayHasPhoto) {
+                  return (
+                    <div className="border-t pt-4">
+                      <p className="text-xs uppercase text-gray-500 mb-2">Foto general</p>
+                      <div className="flex justify-center">
+                        <img
+                          src={displayFotoGeneral[0].url}
+                          alt="Foto general"
+                          className="max-w-full max-h-96 rounded-lg shadow-md object-contain"
+                        />
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             </div>
           </div>
         </div>
