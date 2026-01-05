@@ -77,6 +77,8 @@ const Reparaciones: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [formularios, setFormularios] = useState<any[]>([]);
   const [fallbackFormulario, setFallbackFormulario] = useState<any | null>(null);
+  const [showCitaModal, setShowCitaModal] = useState(false);
+  const [pendingEstadoChange, setPendingEstadoChange] = useState<{serviceId: string, newEstado: string} | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -144,6 +146,15 @@ const Reparaciones: React.FC = () => {
   useEffect(() => {
     if (selectedService) {
       document.body.style.overflow = 'hidden';
+      
+      // Autoajustar altura del textarea de comentarios cuando se abre el modal
+      setTimeout(() => {
+        const textarea = document.querySelector('textarea[data-autosize="true"]') as HTMLTextAreaElement;
+        if (textarea) {
+          textarea.style.height = 'auto';
+          textarea.style.height = textarea.scrollHeight + 'px';
+        }
+      }, 0);
     } else {
       document.body.style.overflow = 'unset';
     }
@@ -194,6 +205,64 @@ const Reparaciones: React.FC = () => {
     if (!form) return false;
     const photoFields = ['Foto general', 'Foto etiqueta', 'Foto roto', 'Foto cuadro'];
     return photoFields.some((field) => Array.isArray(form[field]) && form[field].length > 0);
+  };
+
+  const formatDateTimeForInput = (dateString?: string) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${day}/${month}/${year} ${hours}:${minutes}`;
+    } catch {
+      return '';
+    }
+  };
+
+  const parseCitaInput = (input: string): Date | null => {
+    const regex = /^(\d{2})\/(\d{2})\/(\d{4})\s(\d{2}):(\d{2})$/;
+    const match = input.trim().match(regex);
+    
+    if (!match) {
+      return null;
+    }
+
+    const [, day, month, year, hours, minutes] = match;
+    try {
+      const date = new Date(
+        parseInt(year),
+        parseInt(month) - 1,
+        parseInt(day),
+        parseInt(hours),
+        parseInt(minutes)
+      );
+      return date;
+    } catch {
+      return null;
+    }
+  };
+
+  const formatCitaInputWithAutoFormat = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let input = e.target.value.replace(/\D/g, '');
+    
+    if (input.length > 0) {
+      if (input.length <= 2) {
+        e.target.value = input;
+      } else if (input.length <= 4) {
+        e.target.value = input.slice(0, 2) + '/' + input.slice(2);
+      } else if (input.length <= 8) {
+        e.target.value = input.slice(0, 2) + '/' + input.slice(2, 4) + '/' + input.slice(4);
+      } else if (input.length <= 10) {
+        e.target.value = input.slice(0, 2) + '/' + input.slice(2, 4) + '/' + input.slice(4, 8) + ' ' + input.slice(8);
+      } else {
+        e.target.value = input.slice(0, 2) + '/' + input.slice(2, 4) + '/' + input.slice(4, 8) + ' ' + input.slice(8, 10) + ':' + input.slice(10, 12);
+      }
+    } else {
+      e.target.value = '';
+    }
   };
 
   const ensureFallbackFormulario = async (forms: any[], fallbackKey: string) => {
@@ -270,11 +339,25 @@ const Reparaciones: React.FC = () => {
 
   const handleEstadoChange = async (service: Service, newEstado: string) => {
     if (!service || !newEstado || newEstado === service.estado) return;
+    
+    // Si el nuevo estado es Citado, abrir modal de cita
+    if (newEstado === 'Citado') {
+      setPendingEstadoChange({ serviceId: service.id, newEstado });
+      setShowCitaModal(true);
+      return;
+    }
+    
     setSaving(true);
     try {
       await airtableService.updateServiceField(service.id, 'Estado', newEstado, 'Reparaciones');
-      setServices((prev) => prev.map((s) => (s.id === service.id ? { ...s, estado: newEstado } : s)));
-      setSelectedService((prev) => (prev && prev.id === service.id ? { ...prev, estado: newEstado } : prev));
+      
+      // Si no es Citado, limpiar la cita
+      if (newEstado !== 'Citado') {
+        await airtableService.updateServiceField(service.id, 'Cita', null, 'Reparaciones');
+      }
+      
+      setServices((prev) => prev.map((s) => (s.id === service.id ? { ...s, estado: newEstado, cita: newEstado !== 'Citado' ? undefined : s.cita } : s)));
+      setSelectedService((prev) => (prev && prev.id === service.id ? { ...prev, estado: newEstado, cita: newEstado !== 'Citado' ? undefined : prev.cita } : prev));
     } catch (err) {
       console.error('Reparaciones - Error actualizando estado:', err);
       alert('Error al actualizar el estado');
@@ -689,6 +772,135 @@ const Reparaciones: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal para seleccionar Cita */}
+      {showCitaModal && pendingEstadoChange && (() => {
+        const pendingService = services.find(s => s.id === pendingEstadoChange.serviceId);
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={() => {
+              setShowCitaModal(false);
+              setPendingEstadoChange(null);
+            }}
+          >
+            <div
+              className="relative w-full max-w-md bg-white rounded-2xl shadow-lg border border-gray-200 p-6"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCitaModal(false);
+                  setPendingEstadoChange(null);
+                }}
+                className="absolute top-4 right-4 p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
+                aria-label="Cerrar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Seleccionar Fecha y Hora de Cita</h2>
+
+              <div className="space-y-4">
+                <div>
+                  <input
+                    type="text"
+                    id="citaInputReparaciones"
+                    placeholder="DD/MM/YYYY hh:mm"
+                    onChange={formatCitaInputWithAutoFormat}
+                    defaultValue={formatDateTimeForInput(pendingService?.cita)}
+                    maxLength={16}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                    disabled={saving}
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      const citaInput = document.getElementById('citaInputReparaciones') as HTMLInputElement;
+                      const inputValue = citaInput?.value;
+                      
+                      if (!inputValue || inputValue.length < 16) {
+                        alert('Por favor completa la fecha y hora en formato DD/MM/YYYY hh:mm');
+                        return;
+                      }
+
+                      const date = parseCitaInput(inputValue);
+                      if (!date) {
+                        alert('Fecha y hora inválidas');
+                        return;
+                      }
+
+                      setSaving(true);
+                      try {
+                        const isoString = date.toISOString();
+
+                        // Actualizar el estado
+                        await airtableService.updateServiceField(
+                          pendingEstadoChange.serviceId,
+                          'Estado',
+                          pendingEstadoChange.newEstado,
+                          'Reparaciones'
+                        );
+
+                        // Actualizar la cita
+                        await airtableService.updateServiceField(
+                          pendingEstadoChange.serviceId,
+                          'Cita',
+                          isoString,
+                          'Reparaciones'
+                        );
+
+                        // Actualizar el estado local
+                        const updatedServices = services.map((s) =>
+                          s.id === pendingEstadoChange.serviceId
+                            ? { ...s, estado: pendingEstadoChange.newEstado, cita: isoString }
+                            : s
+                        );
+                        setServices(updatedServices);
+
+                        // Actualizar el servicio seleccionado
+                        if (selectedService && selectedService.id === pendingEstadoChange.serviceId) {
+                          setSelectedService({
+                            ...selectedService,
+                            estado: pendingEstadoChange.newEstado,
+                            cita: isoString
+                          });
+                        }
+
+                        // Cerrar el modal
+                        setShowCitaModal(false);
+                        setPendingEstadoChange(null);
+                      } catch (error) {
+                        console.error('Error:', error);
+                        alert('Error al guardar');
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                    disabled={saving}
+                    className="flex-1 px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-green transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                  >
+                    Guardar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowCitaModal(false);
+                      setPendingEstadoChange(null);
+                    }}
+                    disabled={saving}
+                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

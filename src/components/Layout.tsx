@@ -23,6 +23,7 @@ import {
   ClipboardList,
   Calendar,
   UserCheck,
+  Search,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -80,6 +81,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     },
     {
       items: [
+        { name: 'Buscador', href: '/buscador', icon: Search },
         { name: 'Recursos', href: '/recursos', icon: FileDown },
       ],
     },
@@ -91,6 +93,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       title: 'Asesoramiento',
       items: [
         { name: 'Asesoramientos', href: '/asesoramientos', icon: Lightbulb },
+      ],
+    },
+    {
+      items: [
+        { name: 'Buscador', href: '/buscador', icon: Search },
       ],
     },
   ];
@@ -109,6 +116,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     },
     {
       items: [
+        { name: 'Buscador', href: '/buscador', icon: Search },
         { name: 'Recursos', href: '/recursos', icon: FileDown },
       ],
     },
@@ -137,6 +145,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     },
     {
       items: [
+        { name: 'Buscador', href: '/buscador', icon: Search },
         { name: 'Recursos', href: '/recursos', icon: FileDown },
       ],
     },

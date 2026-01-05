@@ -19,6 +19,7 @@ import Inventario from './pages/Inventario';
 import Email from './pages/Email';
 import Agenda from './pages/Agenda';
 import Reparaciones from './pages/Reparaciones';
+import Buscador from './pages/Buscador';
 
 const DefaultRoute = () => {
   const { user } = useAuth();
@@ -196,6 +197,16 @@ function App() {
                 <ProtectedRoute>
                   <Layout>
                     <Agenda />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/buscador"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Buscador />
                   </Layout>
                 </ProtectedRoute>
               }
