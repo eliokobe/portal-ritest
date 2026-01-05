@@ -1121,6 +1121,8 @@ export const airtableService = {
           telefonoTecnico: telefonoTecnico,
           cita: f['Cita'],
           formularioId: f['Formulario'],
+          direccion: f['Dirección'] ?? f['Direccion'] ?? f['Address'],
+          poblacion: f['Población'] ?? f['Poblacion'],
         };
       });
     } catch (error) {

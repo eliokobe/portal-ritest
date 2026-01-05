@@ -799,6 +799,15 @@ export default function Envios() {
                 <p className="text-xs uppercase text-gray-500">Número</p>
                 <p className="text-sm text-gray-900">{selectedEnvio.numero || '-'}</p>
               </div>
+              <div>
+                <p className="text-xs uppercase text-gray-500">Expediente</p>
+                <p className="text-sm text-gray-900">
+                  {(() => {
+                    const servicioRelacionado = serviciosInfo.find(s => s.id === selectedEnvio.servicio);
+                    return servicioRelacionado?.expediente || '-';
+                  })()}
+                </p>
+              </div>
               <div className="sm:col-span-2">
                 <p className="text-xs uppercase text-gray-500 mb-1">Número de recogida</p>
                 <input

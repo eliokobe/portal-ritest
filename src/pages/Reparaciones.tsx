@@ -23,6 +23,8 @@ interface Service {
   telefonoTecnico?: string;
   cita?: string;
   formularioId?: string[];
+  direccion?: string;
+  poblacion?: string;
 }
 
 const STATUS_OPTIONS = [
@@ -570,6 +572,14 @@ const Reparaciones: React.FC = () => {
                   <p className="text-sm text-gray-900 mt-1 font-medium">
                     {renderDetailValue(getTechnicianName(selectedService))}
                   </p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Dirección</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.direccion)}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Población</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.poblacion)}</p>
                 </div>
                 <div>
                   <p className="text-xs uppercase text-gray-500 mb-1">Estado</p>
