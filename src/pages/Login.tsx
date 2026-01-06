@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
@@ -9,8 +9,21 @@ const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const navigate = useNavigate();
+
+  // Redirigir cuando el usuario se autentica
+  useEffect(() => {
+    if (user) {
+      console.log('User logged in:', user);
+      console.log('User role:', user.role);
+      if (user.role === 'Asesora energética') {
+        navigate('/chatbot');
+      } else {
+        navigate('/servicios');
+      }
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,13 +31,8 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const userData = await login(email, password);
-      // Redirigir a Chatbot si es Asesora energética, si no a servicios
-      if (userData?.Puesto === 'Asesora energética') {
-        navigate('/chatbot');
-      } else {
-        navigate('/servicios');
-      }
+      await login(email, password);
+      // La redirección se hará después de que el estado del user se actualice
     } catch {
       setError('Credenciales inválidas. Por favor, intenta de nuevo.');
     } finally {

@@ -2028,4 +2028,46 @@ export const airtableService = {
       throw new Error(error.response?.data?.error || 'Error al actualizar contrato');
     }
   },
+
+  // Subir PDF a contrato
+  async uploadContractPDF(contractId: string, file: File): Promise<void> {
+    try {
+      const CONTRACTS_BASE_ID = 'applcT2fcdNDpCRQ0';
+
+      // Convertir archivo a base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          // Extraer solo la parte base64 (sin el prefijo data:...)
+          const base64String = result.split(',')[1];
+          resolve(base64String);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      // Usar el endpoint específico de Airtable para subir attachments
+      const uploadUrl = `https://content.airtable.com/v0/${CONTRACTS_BASE_ID}/${contractId}/PDF/uploadAttachment`;
+      
+      await axios.post(
+        uploadUrl,
+        {
+          contentType: file.type,
+          filename: file.name,
+          file: base64,
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    } catch (error: any) {
+      console.error('Error uploading PDF to contract:', error);
+      console.error('Error details:', error.response?.data);
+      throw new Error(error.response?.data?.error?.message || error.message || 'Error al subir PDF');
+    }
+  },
 };   

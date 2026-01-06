@@ -8,6 +8,7 @@ interface Contract {
   'Expediente Ipas'?: string;
   Created?: string;
   'Fecha chatbot'?: string;
+  'Fecha PDF'?: string;
   Email?: string;
   'Tipo de vivienda'?: string;
   'Nº de habitantes'?: string;
@@ -192,11 +193,33 @@ const Chatbot: React.FC = () => {
   };
 
   const filteredContracts = useMemo(() => {
-    // Filtrar solo contratos sin PDF adjunto y que no estén en estado Anulado
-    let filtered = contracts.filter(c => 
-      (!c.PDF || (Array.isArray(c.PDF) && c.PDF.length === 0)) &&
-      c.Chatbot !== 'Anulado'
-    );
+    // Filtrar contratos:
+    // 1. Sin PDF y no anulados
+    // 2. Con estado "Realizado", con PDF y Fecha PDF de menos de 30 días
+    let filtered = contracts.filter(c => {
+      const hasPDF = c.PDF && Array.isArray(c.PDF) && c.PDF.length > 0;
+      const isAnulado = c.Chatbot === 'Anulado';
+      const isRealizado = c.Chatbot === 'Realizado';
+      
+      // Caso 1: Sin PDF y no anulado
+      if (!hasPDF && !isAnulado) {
+        return true;
+      }
+      
+      // Caso 2: Realizado con PDF reciente (menos de 30 días)
+      if (isRealizado && hasPDF && c['Fecha PDF']) {
+        try {
+          const fechaPDF = new Date(c['Fecha PDF']);
+          const now = new Date();
+          const diffInDays = (now.getTime() - fechaPDF.getTime()) / (1000 * 60 * 60 * 24);
+          return diffInDays <= 30;
+        } catch {
+          return false;
+        }
+      }
+      
+      return false;
+    });
 
     // Filtro de búsqueda
     if (searchTerm.trim()) {
@@ -334,9 +357,10 @@ const Chatbot: React.FC = () => {
                       </select>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {contract.PDF && Array.isArray(contract.PDF) && contract.PDF.length > 0 ? (
-                        renderValue(contract.PDF)
-                      ) : (
+                      <div className="flex items-center gap-2">
+                        {contract.PDF && Array.isArray(contract.PDF) && contract.PDF.length > 0 && (
+                          renderValue(contract.PDF)
+                        )}
                         <label className="cursor-pointer text-gray-400 hover:text-brand-primary transition-colors">
                           <Paperclip className="h-5 w-5" />
                           <input
@@ -353,13 +377,23 @@ const Chatbot: React.FC = () => {
                                 return;
                               }
                               
-                              alert('Funcionalidad de subida de PDF requiere integración con servicio de almacenamiento (S3, Cloudinary, etc.)');
-                              e.target.value = '';
-                              // TODO: Implementar subida real a servidor y actualizar Airtable
+                              setSaving(true);
+                              try {
+                                await airtableService.uploadContractPDF(contract.id, file);
+                                // Recargar contratos para ver el PDF actualizado
+                                await loadContracts();
+                                alert('PDF subido correctamente');
+                              } catch (error) {
+                                console.error('Error uploading PDF:', error);
+                                alert('Error al subir el PDF');
+                              } finally {
+                                setSaving(false);
+                                e.target.value = '';
+                              }
                             }}
                           />
                         </label>
-                      )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(contract['Fecha chatbot'])}
