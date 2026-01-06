@@ -992,36 +992,67 @@ export default function Envios() {
               </div>
               <div className="sm:col-span-2">
                 <p className="text-xs uppercase text-gray-500 mb-1">Comentarios</p>
-                <textarea
-                  defaultValue={selectedEnvio.comentarios || ''}
-                  onInput={(e) => {
-                    // Auto-resize textarea
-                    const target = e.target as HTMLTextAreaElement;
-                    target.style.height = 'auto';
-                    target.style.height = Math.max(target.scrollHeight, 100) + 'px';
-                  }}
-                  onBlur={(e) => {
-                    const newValue = e.target.value;
-                    if (newValue === selectedEnvio.comentarios) return;
-                    setSavingComment(true);
-                    airtableService.updateEnvio(selectedEnvio.id, { comentarios: newValue })
-                      .then(() => {
-                        setEnvios((prev) => prev.map((e) => (e.id === selectedEnvio.id ? { ...e, comentarios: newValue } : e)));
-                        setSelectedEnvio((prev) => (prev ? { ...prev, comentarios: newValue } : prev));
-                      })
-                      .catch((error) => {
-                        console.error('Error updating comentarios:', error);
-                        alert('Error al actualizar los comentarios');
-                      })
-                      .finally(() => {
+                {selectedEnvio.comentarios && (
+                  <div className="mb-2 p-3 bg-gray-50 rounded-lg border border-gray-200 max-h-60 overflow-y-auto">
+                    <p className="text-sm text-gray-900 whitespace-pre-line">{selectedEnvio.comentarios}</p>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <textarea
+                    id={`new-comment-envio-${selectedEnvio.id}`}
+                    placeholder="Escribe un nuevo comentario..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm resize-none"
+                    rows={3}
+                    disabled={savingComment}
+                  />
+                  <button
+                    onClick={async () => {
+                      const textarea = document.getElementById(`new-comment-envio-${selectedEnvio.id}`) as HTMLTextAreaElement;
+                      const newComment = textarea?.value?.trim();
+                      
+                      if (!newComment) {
+                        alert('Por favor escribe un comentario');
+                        return;
+                      }
+
+                      setSavingComment(true);
+                      try {
+                        const now = new Date();
+                        const day = String(now.getDate()).padStart(2, '0');
+                        const month = String(now.getMonth() + 1).padStart(2, '0');
+                        const year = now.getFullYear();
+                        const hours = String(now.getHours()).padStart(2, '0');
+                        const minutes = String(now.getMinutes()).padStart(2, '0');
+                        const formattedDate = `${day}/${month}/${year} ${hours}:${minutes}`;
+                        
+                        const userName = user?.name || 'Usuario';
+                        const formattedComment = `${formattedDate} - ${userName}: ${newComment}`;
+                        
+                        const updatedComments = selectedEnvio.comentarios 
+                          ? `${formattedComment}\n\n${selectedEnvio.comentarios}`
+                          : formattedComment;
+                        
+                        await airtableService.updateEnvio(selectedEnvio.id, { comentarios: updatedComments });
+                        
+                        setEnvios((prev) => prev.map((e) => 
+                          e.id === selectedEnvio.id ? {...e, comentarios: updatedComments} : e
+                        ));
+                        setSelectedEnvio((prev) => prev ? {...prev, comentarios: updatedComments} : prev);
+                        
+                        textarea.value = '';
+                      } catch (error) {
+                        console.error('Error:', error);
+                        alert('Error al guardar el comentario');
+                      } finally {
                         setSavingComment(false);
-                      });
-                  }}
-                  disabled={savingComment}
-                  className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm resize-none overflow-hidden"
-                  placeholder="Añade comentarios"
-                  style={{ minHeight: '100px' }}
-                />
+                      }
+                    }}
+                    disabled={savingComment}
+                    className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-green transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                  >
+                    {savingComment ? 'Guardando...' : 'Agregar Comentario'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

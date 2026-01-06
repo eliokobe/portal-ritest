@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Search, X, XCircle, FileText, AlertCircle, ChevronUp, ChevronDown, Paperclip } from 'lucide-react';
 import { airtableService } from '../services/airtable';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Contract {
   id: string;
@@ -116,6 +117,7 @@ const renderValue = (value: any) => {
 };
 
 const Chatbot: React.FC = () => {
+  const { user } = useAuth();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -193,31 +195,106 @@ const Chatbot: React.FC = () => {
   };
 
   const filteredContracts = useMemo(() => {
+    const now = new Date();
+    
     // Filtrar contratos:
-    // 1. Sin PDF y no anulados
-    // 2. Con estado "Realizado", con PDF y Fecha PDF de menos de 30 días
+    // 1. Que hayan pasado más de 7 días desde la fecha de creación
+    // 2. Sin PDF y no anulados
+    // 3. Con estado "Realizado", con PDF y Fecha PDF de menos de 30 días
     let filtered = contracts.filter(c => {
+      // Debug específico para el contrato 945099198
+      if (c.Contrato === '945099198') {
+        console.log('=== Contrato 945099198 ===');
+        console.log('Created:', c.Created);
+        console.log('Fecha chatbot:', c['Fecha chatbot']);
+        console.log('Estado:', c.Chatbot);
+        console.log('PDF:', c.PDF);
+        console.log('Fecha PDF:', c['Fecha PDF']);
+      }
+      
+      // Verificar que hayan pasado más de 7 días desde la creación
+      const fechaCreacion = c.Created || c['Fecha chatbot'];
+      if (fechaCreacion) {
+        try {
+          const fecha = new Date(fechaCreacion);
+          const diffInDays = (now.getTime() - fecha.getTime()) / (1000 * 60 * 60 * 24);
+          
+          if (c.Contrato === '945099198') {
+            console.log('Días desde creación:', diffInDays);
+          }
+          
+          if (diffInDays <= 7) {
+            if (c.Contrato === '945099198') {
+              console.log('Rechazado: menos de 7 días');
+            }
+            return false; // No mostrar si han pasado 7 días o menos
+          }
+        } catch {
+          if (c.Contrato === '945099198') {
+            console.log('Rechazado: error parsing fecha');
+          }
+          return false;
+        }
+      } else {
+        if (c.Contrato === '945099198') {
+          console.log('Rechazado: no tiene fecha de creación');
+        }
+        return false; // No mostrar si no tiene fecha de creación
+      }
+      
       const hasPDF = c.PDF && Array.isArray(c.PDF) && c.PDF.length > 0;
       const isAnulado = c.Chatbot === 'Anulado';
       const isRealizado = c.Chatbot === 'Realizado';
       
-      // Caso 1: Sin PDF y no anulado
-      if (!hasPDF && !isAnulado) {
+      if (c.Contrato === '945099198') {
+        console.log('hasPDF:', hasPDF);
+        console.log('isAnulado:', isAnulado);
+        console.log('isRealizado:', isRealizado);
+      }
+      
+      // Excluir anulados siempre
+      if (isAnulado) {
+        if (c.Contrato === '945099198') {
+          console.log('Rechazado: está anulado');
+        }
+        return false;
+      }
+      
+      // Caso 1: Sin PDF (mostrar cualquier estado excepto Anulado)
+      if (!hasPDF) {
+        if (c.Contrato === '945099198') {
+          console.log('Aceptado: sin PDF y no anulado');
+        }
         return true;
       }
       
-      // Caso 2: Realizado con PDF reciente (menos de 30 días)
+      // Caso 2: Con PDF y estado Realizado, solo si la Fecha PDF es reciente (menos de 30 días)
       if (isRealizado && hasPDF && c['Fecha PDF']) {
         try {
           const fechaPDF = new Date(c['Fecha PDF']);
-          const now = new Date();
           const diffInDays = (now.getTime() - fechaPDF.getTime()) / (1000 * 60 * 60 * 24);
-          return diffInDays <= 30;
+          
+          if (c.Contrato === '945099198') {
+            console.log('Días desde PDF:', diffInDays);
+          }
+          
+          const result = diffInDays <= 30;
+          if (c.Contrato === '945099198') {
+            console.log(result ? 'Aceptado: Realizado con PDF reciente' : 'Rechazado: PDF antiguo');
+          }
+          return result;
         } catch {
+          if (c.Contrato === '945099198') {
+            console.log('Rechazado: error parsing fecha PDF');
+          }
           return false;
         }
       }
       
+      // Con PDF pero no Realizado, o Realizado sin Fecha PDF reciente -> no mostrar
+      if (c.Contrato === '945099198') {
+        console.log('Rechazado: tiene PDF pero no cumple criterios');
+      }
       return false;
     });
 
@@ -619,29 +696,76 @@ const Chatbot: React.FC = () => {
             className="relative w-full max-w-md bg-white rounded-2xl shadow-lg border border-gray-200 p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Editar Comentarios</h2>
-            <textarea
-              value={editingComments}
-              onChange={(e) => setEditingComments(e.target.value)}
-              rows={6}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm resize-none"
-              placeholder="Escribe tus anotaciones aquí..."
-            />
-            <div className="flex gap-2 mt-4">
-              <button
-                onClick={handleSaveComments}
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Comentarios</h2>
+            {editingComments && (
+              <div className="mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200 max-h-60 overflow-y-auto">
+                <p className="text-sm text-gray-900 whitespace-pre-line">{editingComments}</p>
+              </div>
+            )}
+            <div className="space-y-3">
+              <textarea
+                id="new-comment-chatbot"
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm resize-none"
+                placeholder="Escribe un nuevo comentario..."
                 disabled={saving}
-                className="flex-1 px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50"
-              >
-                {saving ? 'Guardando...' : 'Guardar'}
-              </button>
-              <button
-                onClick={() => setShowCommentsModal(false)}
-                disabled={saving}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-              >
-                Cancelar
-              </button>
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    const textarea = document.getElementById('new-comment-chatbot') as HTMLTextAreaElement;
+                    const newComment = textarea?.value?.trim();
+                    
+                    if (!newComment) {
+                      alert('Por favor escribe un comentario');
+                      return;
+                    }
+
+                    setSaving(true);
+                    try {
+                      const now = new Date();
+                      const day = String(now.getDate()).padStart(2, '0');
+                      const month = String(now.getMonth() + 1).padStart(2, '0');
+                      const year = now.getFullYear();
+                      const hours = String(now.getHours()).padStart(2, '0');
+                      const minutes = String(now.getMinutes()).padStart(2, '0');
+                      const formattedDate = `${day}/${month}/${year} ${hours}:${minutes}`;
+                      
+                      const userName = user?.name || 'Usuario';
+                      const formattedComment = `${formattedDate} - ${userName}: ${newComment}`;
+                      
+                      const updatedComments = editingComments 
+                        ? `${formattedComment}\n\n${editingComments}`
+                        : formattedComment;
+                      
+                      await airtableService.updateContractField(commentingContractId!, 'Comentarios', updatedComments);
+                      
+                      setContracts((prev) => prev.map((c) =>
+                        c.id === commentingContractId ? { ...c, Comentarios: updatedComments } : c
+                      ));
+                      
+                      setEditingComments(updatedComments);
+                      textarea.value = '';
+                    } catch (error) {
+                      console.error('Error:', error);
+                      alert('Error al guardar el comentario');
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Guardando...' : 'Agregar Comentario'}
+                </button>
+                <button
+                  onClick={() => setShowCommentsModal(false)}
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -384,16 +384,23 @@ const Reparaciones: React.FC = () => {
   // Filtrar reparaciones por término de búsqueda
   const filteredServices = useMemo(() => {
     const allowedStates = new Set(['Asignado', 'Aceptado', 'Citado']);
+    const isTecnico = user?.role === 'Técnico';
     const now = new Date();
     const HOURS_48_IN_MS = 48 * 60 * 60 * 1000;
 
-    // Mostrar registros con estado válido y que han pasado más de 48 horas desde fechaEstado
+    // Para técnicos: mostrar solo estados Asignado, Aceptado, Citado (sin filtro de tiempo)
+    // Para otros roles: mostrar registros con estado válido y que han pasado más de 48 horas desde fechaEstado
     let filtered = services.filter((service) => {
       const estadoValido = service.estado && allowedStates.has(service.estado);
       
       if (!estadoValido) return false;
       
-      // Verificar que han pasado más de 48 horas desde fechaEstado
+      // Si es técnico, solo filtrar por estado (sin restricción de tiempo)
+      if (isTecnico) {
+        return true;
+      }
+      
+      // Para otros roles: verificar que han pasado más de 48 horas desde fechaEstado
       if (!service.fechaEstado) return false;
       
       const fechaEstado = new Date(service.fechaEstado);
@@ -428,7 +435,7 @@ const Reparaciones: React.FC = () => {
       const dateB = b.fechaEstado ? new Date(b.fechaEstado).getTime() : 0;
       return dateB - dateA; // Más recientes primero
     });
-  }, [services, searchTerm]);
+  }, [services, searchTerm, user?.role]);
 
   const formatDateTime = (dateString?: string) => {
     if (!dateString) return '-';
@@ -711,34 +718,67 @@ const Reparaciones: React.FC = () => {
               {/* Sección de Comentarios */}
               <div className="border-t pt-4">
                 <p className="text-xs uppercase text-gray-500 mb-1">Comentarios</p>
-                <textarea
-                  data-autosize="true"
-                  defaultValue={selectedService.comentarios || ''}
-                  onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
-                    target.style.height = 'auto';
-                    target.style.height = target.scrollHeight + 'px';
-                  }}
-                  onBlur={async (e) => {
-                    const newValue = e.target.value;
-                    if (newValue === selectedService.comentarios) return;
-                    setSaving(true);
-                    try {
-                      await airtableService.updateServiceField(selectedService.id, 'Comentarios', newValue, 'Reparaciones');
-                      setServices((prev) => prev.map((s) => (s.id === selectedService.id ? { ...s, comentarios: newValue } : s)));
-                      setSelectedService((prev) => (prev && prev.id === selectedService.id ? { ...prev, comentarios: newValue } : prev));
-                    } catch (error) {
-                      console.error('Error:', error);
-                      alert('Error al guardar comentarios');
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm resize-none overflow-hidden"
-                  style={{ minHeight: '60px' }}
-                  disabled={saving}
-                  placeholder="Escribe comentarios..."
-                />
+                {selectedService.comentarios && (
+                  <div className="mb-2 p-3 bg-gray-50 rounded-lg border border-gray-200 max-h-60 overflow-y-auto">
+                    <p className="text-sm text-gray-900 whitespace-pre-line">{selectedService.comentarios}</p>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <textarea
+                    id={`new-comment-rep-${selectedService.id}`}
+                    placeholder="Escribe un nuevo comentario..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm resize-none"
+                    rows={3}
+                    disabled={saving}
+                  />
+                  <button
+                    onClick={async () => {
+                      const textarea = document.getElementById(`new-comment-rep-${selectedService.id}`) as HTMLTextAreaElement;
+                      const newComment = textarea?.value?.trim();
+                      
+                      if (!newComment) {
+                        alert('Por favor escribe un comentario');
+                        return;
+                      }
+
+                      setSaving(true);
+                      try {
+                        const now = new Date();
+                        const day = String(now.getDate()).padStart(2, '0');
+                        const month = String(now.getMonth() + 1).padStart(2, '0');
+                        const year = now.getFullYear();
+                        const hours = String(now.getHours()).padStart(2, '0');
+                        const minutes = String(now.getMinutes()).padStart(2, '0');
+                        const formattedDate = `${day}/${month}/${year} ${hours}:${minutes}`;
+                        
+                        const userName = user?.name || 'Usuario';
+                        const formattedComment = `${formattedDate} - ${userName}: ${newComment}`;
+                        
+                        const updatedComments = selectedService.comentarios 
+                          ? `${formattedComment}\n\n${selectedService.comentarios}`
+                          : formattedComment;
+                        
+                        await airtableService.updateServiceField(selectedService.id, 'Comentarios', updatedComments, 'Reparaciones');
+                        
+                        setServices((prev) => prev.map((s) => 
+                          s.id === selectedService.id ? {...s, comentarios: updatedComments} : s
+                        ));
+                        setSelectedService((prev) => prev && prev.id === selectedService.id ? {...prev, comentarios: updatedComments} : prev);
+                        
+                        textarea.value = '';
+                      } catch (error) {
+                        console.error('Error:', error);
+                        alert('Error al guardar el comentario');
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                    disabled={saving}
+                    className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-green transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                  >
+                    {saving ? 'Guardando...' : 'Agregar Comentario'}
+                  </button>
+                </div>
               </div>
 
               {/* Sección de Foto general del Formulario */}

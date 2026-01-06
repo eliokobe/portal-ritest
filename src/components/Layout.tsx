@@ -105,6 +105,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Panel Gráfico', href: '/panel-grafico', icon: BarChart3 },
         { name: 'Agenda', href: '/agenda', icon: Calendar },
         { name: 'Servicios', href: '/servicios', icon: Wrench },
+        { name: 'Reparaciones', href: '/seguimiento-tecnicos', icon: UserCheck },
         { name: 'Técnicos', href: '/tecnicos', icon: Users },
         { name: 'Envíos', href: '/envios', icon: Package },
       ],
@@ -155,7 +156,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   // Ocultar "Técnicos" en el sidebar para todos excepto Responsable
   // Ocultar "Técnicos" para todos excepto Responsable
-  // Ocultar "Seguimiento técnicos" para todos excepto Responsable y Administrativa
+  // Ocultar "Seguimiento técnicos" para todos excepto Responsable, Administrativa y Técnico
   const finalNavigationGroups: NavigationGroup[] = activeNavigationGroups.map((group) => ({
     ...group,
     items: group.items.filter((item) => {
@@ -163,8 +164,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       if (item.name === 'Técnicos' && user?.role !== 'Responsable') {
         return false;
       }
-      // Reparaciones solo para Responsable y Administrativa
-      if (item.name === 'Reparaciones' && user?.role !== 'Responsable' && user?.role !== 'Administrativa') {
+      // Reparaciones solo para Responsable, Administrativa y Técnico
+      if (item.name === 'Reparaciones' && user?.role !== 'Responsable' && user?.role !== 'Administrativa' && user?.role !== 'Técnico') {
         return false;
       }
       return true;

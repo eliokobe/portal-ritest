@@ -93,7 +93,7 @@ function App() {
               path="/seguimiento-tecnicos"
               element={
                 <RoleProtectedRoute
-                  allowedRoles={["Administrativa", "Responsable"]}
+                  allowedRoles={["Administrativa", "Responsable", "Técnico"]}
                   redirectTo="/panel-grafico"
                 >
                   <Layout>

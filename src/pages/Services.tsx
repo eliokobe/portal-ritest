@@ -99,6 +99,21 @@ const RESOLUCION_PRESUPUESTO_OPTIONS = [
   'Sin cobertura ya que supera los 3 años'
 ];
 
+const MOTIVO_TECNICO_OPTIONS = [
+  'Borna quemada',
+  'Diferencial monofásico averiado',
+  'Diferencial trifásico averiado',
+  'Sobretensiones monofásico averiado',
+  'Sobretensiones trifásico averiado',
+  'Cargador apagado',
+  'Carga en espera',
+  'Carga a menor potencia',
+  'Salta la luz del contador',
+  'No se conecta por Bluetooth',
+  'No reconoce el GDP',
+  'Otros'
+];
+
 const renderDetailValue = (value?: string) => {
   const cleaned = value?.toString().trim();
   return cleaned ? cleaned : 'Sin información';
@@ -143,6 +158,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   const [showResolucionModal, setShowResolucionModal] = useState(false);
   const [pendingEstadoChange, setPendingEstadoChange] = useState<{serviceId: string, newEstado: string} | null>(null);
   const [showCitaModal, setShowCitaModal] = useState(false);
+  const [showMotivoTecnicoModal, setShowMotivoTecnicoModal] = useState(false);
 
   // Determinar si el usuario es Gestora Técnica
   const isGestoraTecnica = user?.role === 'Gestora Técnica';
@@ -284,6 +300,12 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     if (newEstado === 'Citado') {
       setPendingEstadoChange({ serviceId: service.id, newEstado });
       setShowCitaModal(true);
+      return;
+    }
+
+    if (newEstado === 'Pendiente de asignar') {
+      setPendingEstadoChange({ serviceId: service.id, newEstado });
+      setShowMotivoTecnicoModal(true);
       return;
     }
 
@@ -568,9 +590,6 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
 
           // Contactado: solo si último cambio < 24 horas
           if (estado === 'Contactado' && isUltimoCambioRecent) return true;
-          
-          // Material enviado: si NO es estado "Entregado"
-          if (estado === 'Material enviado' && estadoEnvio !== 'Entregado') return true;
           
           // Cita interna: FUTURA
           if (isCitaInterna && cita) {
@@ -1615,34 +1634,73 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   {!isTramitacion && (
                     <div>
                       <p className="text-xs uppercase text-gray-500 mb-1">Comentarios</p>
-                      <textarea
-                        data-autosize="true"
-                        defaultValue={selectedService.comentarios || ''}
-                        onInput={(e) => {
-                          const target = e.target as HTMLTextAreaElement;
-                          target.style.height = 'auto';
-                          target.style.height = target.scrollHeight + 'px';
-                        }}
-                        onBlur={async (e) => {
-                          const newValue = e.target.value;
-                          if (newValue === selectedService.comentarios) return;
-                          setSaving(true);
-                          try {
-                            await airtableService.updateServiceComments(selectedService.id, newValue);
-                            setServices(services.map(s => s.id === selectedService.id ? {...s, comentarios: newValue} : s));
-                            setSelectedService({...selectedService, comentarios: newValue});
-                          } catch (error) {
-                            console.error('Error:', error);
-                            alert('Error al guardar');
-                          } finally {
-                            setSaving(false);
-                          }
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm resize-none overflow-hidden"
-                        style={{ minHeight: '60px' }}
-                        disabled={saving}
-                        placeholder="Escribe comentarios..."
-                      />
+                      {selectedService.comentarios && (
+                        <div className="mb-2 p-3 bg-gray-50 rounded-lg border border-gray-200 max-h-60 overflow-y-auto">
+                          <p className="text-sm text-gray-900 whitespace-pre-line">{selectedService.comentarios}</p>
+                        </div>
+                      )}
+                      <div className="space-y-2">
+                        <textarea
+                          id={`new-comment-${selectedService.id}`}
+                          placeholder="Escribe un nuevo comentario..."
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm resize-none"
+                          rows={3}
+                          disabled={saving}
+                        />
+                        <button
+                          onClick={async () => {
+                            const textarea = document.getElementById(`new-comment-${selectedService.id}`) as HTMLTextAreaElement;
+                            const newComment = textarea?.value?.trim();
+                            
+                            if (!newComment) {
+                              alert('Por favor escribe un comentario');
+                              return;
+                            }
+
+                            setSaving(true);
+                            try {
+                              // Obtener fecha y hora actual en formato DD/MM/YYYY HH:MM
+                              const now = new Date();
+                              const day = String(now.getDate()).padStart(2, '0');
+                              const month = String(now.getMonth() + 1).padStart(2, '0');
+                              const year = now.getFullYear();
+                              const hours = String(now.getHours()).padStart(2, '0');
+                              const minutes = String(now.getMinutes()).padStart(2, '0');
+                              const formattedDate = `${day}/${month}/${year} ${hours}:${minutes}`;
+                              
+                              // Formatear el nuevo comentario con fecha y usuario
+                              const userName = user?.name || 'Usuario';
+                              const formattedComment = `${formattedDate} - ${userName}: ${newComment}`;
+                              
+                              // Concatenar con comentarios existentes
+                              const updatedComments = selectedService.comentarios 
+                                ? `${formattedComment}\n\n${selectedService.comentarios}`
+                                : formattedComment;
+                              
+                              // Guardar en Airtable
+                              await airtableService.updateServiceComments(selectedService.id, updatedComments);
+                              
+                              // Actualizar el estado local
+                              setServices(services.map(s => 
+                                s.id === selectedService.id ? {...s, comentarios: updatedComments} : s
+                              ));
+                              setSelectedService({...selectedService, comentarios: updatedComments});
+                              
+                              // Limpiar el textarea
+                              textarea.value = '';
+                            } catch (error) {
+                              console.error('Error:', error);
+                              alert('Error al guardar el comentario');
+                            } finally {
+                              setSaving(false);
+                            }
+                          }}
+                          disabled={saving}
+                          className="px-4 py-2 bg-brand-primary text-white rounded-lg hover:bg-brand-green transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                        >
+                          {saving ? 'Guardando...' : 'Agregar Comentario'}
+                        </button>
+                      </div>
                     </div>
                   )}
                   {/* Cita técnico y Técnico - oculto para técnicos */}
@@ -2336,6 +2394,90 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
 
                       // Cerrar el modal
                       setShowResolucionModal(false);
+                      setPendingEstadoChange(null);
+                    } catch (error) {
+                      console.error('Error:', error);
+                      alert('Error al guardar');
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                  disabled={saving}
+                  className="w-full px-4 py-3 text-left border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm text-gray-900 font-medium"
+                >
+                  {opcion}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para seleccionar Motivo Técnico */}
+      {showMotivoTecnicoModal && pendingEstadoChange && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => {
+            setShowMotivoTecnicoModal(false);
+            setPendingEstadoChange(null);
+          }}
+        >
+          <div
+            className="relative w-full max-w-md bg-white rounded-2xl shadow-lg border border-gray-200 p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setShowMotivoTecnicoModal(false);
+                setPendingEstadoChange(null);
+              }}
+              className="absolute top-4 right-4 p-2 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
+              aria-label="Cerrar"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Seleccionar Motivo Técnico</h2>
+
+            <div className="space-y-3">
+              {MOTIVO_TECNICO_OPTIONS.map((opcion) => (
+                <button
+                  key={opcion}
+                  onClick={async () => {
+                    setSaving(true);
+                    try {
+                      // Actualizar el estado
+                      await airtableService.updateServiceStatus(
+                        pendingEstadoChange.serviceId,
+                        pendingEstadoChange.newEstado
+                      );
+                      
+                      // Actualizar el motivo técnico
+                      await airtableService.updateServiceField(
+                        pendingEstadoChange.serviceId,
+                        'Motivo técnico',
+                        opcion
+                      );
+
+                      // Actualizar el estado local
+                      const updatedServices = services.map((s) =>
+                        s.id === pendingEstadoChange.serviceId
+                          ? { ...s, estado: pendingEstadoChange.newEstado }
+                          : s
+                      );
+                      setServices(updatedServices);
+
+                      // Actualizar el servicio seleccionado
+                      if (selectedService && selectedService.id === pendingEstadoChange.serviceId) {
+                        setSelectedService({
+                          ...selectedService,
+                          estado: pendingEstadoChange.newEstado
+                        });
+                      }
+
+                      // Cerrar el modal
+                      setShowMotivoTecnicoModal(false);
                       setPendingEstadoChange(null);
                     } catch (error) {
                       console.error('Error:', error);
