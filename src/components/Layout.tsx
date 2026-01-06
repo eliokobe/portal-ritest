@@ -24,6 +24,7 @@ import {
   Calendar,
   UserCheck,
   Search,
+  Bot,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -90,14 +91,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   // Navegación para Asesora energética
   const navigationGroupsAsesora: NavigationGroup[] = [
     {
-      title: 'Asesoramiento',
       items: [
-        { name: 'Asesoramientos', href: '/asesoramientos', icon: Lightbulb },
-      ],
-    },
-    {
-      items: [
-        { name: 'Buscador', href: '/buscador', icon: Search },
+        { name: 'Chatbot', href: '/chatbot', icon: Bot },
       ],
     },
   ];

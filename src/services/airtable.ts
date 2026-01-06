@@ -1967,4 +1967,65 @@ export const airtableService = {
       throw error;
     }
   },
+
+  // Obtener contratos de chatbot
+  async getContracts(): Promise<any[]> {
+    try {
+      const CONTRACTS_BASE_ID = 'applcT2fcdNDpCRQ0'; // Base específica para contratos
+      const TABLE_NAME = 'tblG2iusherLVxgSv';
+      
+      const contractsApi = axios.create({
+        baseURL: `https://api.airtable.com/v0/${CONTRACTS_BASE_ID}`,
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      const all: any[] = [];
+      let offset: string | undefined;
+      
+      do {
+        const { data } = await contractsApi.get(`/${TABLE_NAME}`, {
+          params: { offset }
+        });
+        const airtableData = data as { records?: any[]; offset?: string };
+        all.push(...(airtableData.records ?? []));
+        offset = airtableData.offset;
+      } while (offset);
+
+      return all.map((record: any) => ({
+        id: record.id,
+        ...record.fields,
+      }));
+    } catch (error: any) {
+      console.error('Error fetching contracts:', error);
+      throw new Error(error.response?.data?.error || 'Error al obtener contratos');
+    }
+  },
+
+  // Actualizar campo de contrato
+  async updateContractField(contractId: string, fieldName: string, value: any): Promise<void> {
+    try {
+      const CONTRACTS_BASE_ID = 'applcT2fcdNDpCRQ0';
+      const TABLE_NAME = 'tblG2iusherLVxgSv';
+      
+      const contractsApi = axios.create({
+        baseURL: `https://api.airtable.com/v0/${CONTRACTS_BASE_ID}`,
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      await contractsApi.patch(`/${TABLE_NAME}/${contractId}`, {
+        fields: {
+          [fieldName]: value,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error updating contract field:', error);
+      throw new Error(error.response?.data?.error || 'Error al actualizar contrato');
+    }
+  },
 };   

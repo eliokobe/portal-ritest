@@ -18,8 +18,13 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      await login(email, password);
-      navigate('/servicios');
+      const userData = await login(email, password);
+      // Redirigir a Chatbot si es Asesora energética, si no a servicios
+      if (userData?.Puesto === 'Asesora energética') {
+        navigate('/chatbot');
+      } else {
+        navigate('/servicios');
+      }
     } catch {
       setError('Credenciales inválidas. Por favor, intenta de nuevo.');
     } finally {

@@ -20,6 +20,7 @@ import Email from './pages/Email';
 import Agenda from './pages/Agenda';
 import Reparaciones from './pages/Reparaciones';
 import Buscador from './pages/Buscador';
+import Chatbot from './pages/Chatbot';
 
 const DefaultRoute = () => {
   const { user } = useAuth();
@@ -209,6 +210,19 @@ function App() {
                     <Buscador />
                   </Layout>
                 </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/chatbot"
+              element={
+                <RoleProtectedRoute
+                  allowedRoles={["Asesora energética"]}
+                  redirectTo="/panel-grafico"
+                >
+                  <Layout>
+                    <Chatbot />
+                  </Layout>
+                </RoleProtectedRoute>
               }
             />
             <Route path="/" element={<ProtectedRoute><DefaultRoute /></ProtectedRoute>} />
