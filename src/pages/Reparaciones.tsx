@@ -201,7 +201,12 @@ const Reparaciones: React.FC = () => {
 
   const getTechnicianName = (service: Service): string => {
     if (!service) return '-';
-    if (typeof service.tecnico === 'string') return service.tecnico || '-';
+    if (!service.tecnico) return '-';
+    
+    if (typeof service.tecnico === 'string') {
+      return service.tecnico || '-';
+    }
+    
     if (Array.isArray(service.tecnico)) {
       const names = service.tecnico.map((id) => {
         const name = technicianMap[id];
@@ -212,6 +217,7 @@ const Reparaciones: React.FC = () => {
       }).filter(Boolean);
       return names.length > 0 ? names.join(', ') : '-';
     }
+    
     return '-';
   };
 
@@ -426,12 +432,13 @@ const Reparaciones: React.FC = () => {
     const term = searchTerm.trim().toLowerCase();
     if (term) {
       filtered = filtered.filter((service) => {
-        const matchesCliente = service.cliente?.toLowerCase().includes(term);
-        const matchesTelefono = service.telefono?.toLowerCase().includes(term);
-        const matchesEstado = service.estado?.toLowerCase().includes(term);
-        const matchesSeguimiento = service.seguimiento?.toLowerCase().includes(term);
-        const matchesTecnico = getTechnicianName(service).toLowerCase().includes(term);
-        const matchesExpediente = service.expediente?.toLowerCase().includes(term);
+        const matchesCliente = String(service.cliente || '').toLowerCase().includes(term);
+        const matchesTelefono = String(service.telefono || '').toLowerCase().includes(term);
+        const matchesEstado = String(service.estado || '').toLowerCase().includes(term);
+        const matchesSeguimiento = String(service.seguimiento || '').toLowerCase().includes(term);
+        const techName = getTechnicianName(service) || '';
+        const matchesTecnico = techName.toLowerCase().includes(term);
+        const matchesExpediente = String(service.expediente || '').toLowerCase().includes(term);
 
         return (
           matchesCliente ||
