@@ -1123,6 +1123,7 @@ export const airtableService = {
           formularioId: f['Formulario'],
           direccion: f['Dirección'] ?? f['Direccion'] ?? f['Address'],
           poblacion: f['Población'] ?? f['Poblacion'],
+          servicioId: f['Servicios'],
         };
       });
     } catch (error) {
@@ -2068,6 +2069,20 @@ export const airtableService = {
       console.error('Error uploading PDF to contract:', error);
       console.error('Error details:', error.response?.data);
       throw new Error(error.response?.data?.error?.message || error.message || 'Error al subir PDF');
+    }
+  },
+
+  // Obtener comentarios del servicio linkado en Reparaciones
+  async getServicioComentarios(servicioId: string): Promise<string | undefined> {
+    try {
+      if (!servicioId) return undefined;
+      
+      const { data } = await serviciosApi.get(`/${AIRTABLE_SERVICES_TABLE}/${servicioId}`);
+      const fields = (data as any)?.fields ?? {};
+      return fields['Comentarios'] || undefined;
+    } catch (error) {
+      console.error('Error fetching servicio comentarios:', error);
+      return undefined;
     }
   },
 };   

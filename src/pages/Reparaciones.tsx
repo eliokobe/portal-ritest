@@ -25,6 +25,8 @@ interface Service {
   formularioId?: string[];
   direccion?: string;
   poblacion?: string;
+  servicioId?: string[];
+  comentariosServicio?: string;
 }
 
 const STATUS_OPTIONS = [
@@ -167,11 +169,23 @@ const Reparaciones: React.FC = () => {
   useEffect(() => {
     if (selectedService) {
       loadFormulariosForService(selectedService);
+      loadServicioComentarios(selectedService);
     } else {
       setFormularios([]);
       setFallbackFormulario(null);
     }
   }, [selectedService]);
+
+  const loadServicioComentarios = async (service: Service) => {
+    if (service.servicioId && Array.isArray(service.servicioId) && service.servicioId.length > 0) {
+      try {
+        const comentarios = await airtableService.getServicioComentarios(service.servicioId[0]);
+        setSelectedService((prev) => prev && prev.id === service.id ? {...prev, comentariosServicio: comentarios} : prev);
+      } catch (error) {
+        console.error('Error cargando comentarios del servicio:', error);
+      }
+    }
+  };
 
   const technicianMap = useMemo(() => {
     const map = technicians.reduce<Record<string, string>>((acc, t) => {
@@ -604,11 +618,11 @@ const Reparaciones: React.FC = () => {
       {/* Modal de detalles */}
       {selectedService && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           onClick={() => setSelectedService(null)}
         >
           <div
-            className="relative w-full max-w-4xl bg-white rounded-2xl shadow-lg border border-gray-200 my-8"
+            className="relative w-full max-w-4xl bg-white rounded-2xl shadow-lg border border-gray-200 my-8 max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
@@ -642,7 +656,7 @@ const Reparaciones: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-6 space-y-6 bg-white rounded-2xl">
+            <div className="p-6 space-y-6 bg-white rounded-2xl overflow-y-auto">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">Detalle de la reparación</h2>
                 {selectedService.expediente && (
@@ -717,13 +731,37 @@ const Reparaciones: React.FC = () => {
 
               {/* Sección de Comentarios */}
               <div className="border-t pt-4">
-                <p className="text-xs uppercase text-gray-500 mb-1">Comentarios</p>
-                {selectedService.comentarios && (
-                  <div className="mb-2 p-3 bg-gray-50 rounded-lg border border-gray-200 max-h-60 overflow-y-auto">
-                    <p className="text-sm text-gray-900 whitespace-pre-line">{selectedService.comentarios}</p>
+                <p className="text-xs uppercase text-gray-500 mb-3 font-semibold">Comentarios</p>
+                
+                {/* Mostrar comentarios del servicio linkado */}
+                {selectedService.comentariosServicio && selectedService.comentariosServicio.trim() !== '' && (
+                  <div className="mb-4">
+                    <p className="text-xs text-green-700 mb-2 font-medium">Comentarios del Servicio:</p>
+                    <div className="p-4 bg-green-50 rounded-lg border border-green-200 max-h-40 overflow-y-auto">
+                      <p className="text-sm text-gray-900 whitespace-pre-line">{selectedService.comentariosServicio}</p>
+                    </div>
                   </div>
                 )}
+
+                {/* Mostrar comentarios de reparaciones */}
+                {selectedService.comentarios && selectedService.comentarios.trim() !== '' ? (
+                  <div className="mb-4">
+                    <p className="text-xs text-gray-600 mb-2 font-medium">Comentarios de Reparación:</p>
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 max-h-40 overflow-y-auto">
+                      <p className="text-sm text-gray-900 whitespace-pre-line">{selectedService.comentarios}</p>
+                    </div>
+                  </div>
+                ) : (
+                  !selectedService.comentariosServicio && (
+                    <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-sm text-blue-700">No hay comentarios previos</p>
+                    </div>
+                  )
+                )}
+
+                {/* Agregar nuevo comentario */}
                 <div className="space-y-2">
+                  <p className="text-xs text-gray-600 font-medium">Agregar nuevo comentario a la reparación:</p>
                   <textarea
                     id={`new-comment-rep-${selectedService.id}`}
                     placeholder="Escribe un nuevo comentario..."
