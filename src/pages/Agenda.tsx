@@ -12,6 +12,7 @@ interface Service {
   cita?: string;
   telefono?: string;
   conversationId?: string;
+  tecnico?: string;
 }
 
 interface AppointmentSlot {
@@ -41,8 +42,8 @@ const Agenda: React.FC = () => {
       // Obtener servicios filtrando por el email del usuario
       const allServices = await airtableService.getServices(undefined, undefined, user.email);
       
-      // Filtrar solo los que tienen cita
-      const withAppointments = allServices.filter(s => s.cita);
+      // Filtrar solo los que tienen cita, estado Citado y sin técnico asignado
+      const withAppointments = allServices.filter(s => s.cita && s.estado === 'Citado' && !s.tecnico);
       
       setServices(withAppointments);
     } catch (err) {

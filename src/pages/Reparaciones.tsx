@@ -797,11 +797,18 @@ const Reparaciones: React.FC = () => {
                     <div className="border-t pt-4">
                       <p className="text-xs uppercase text-gray-500 mb-2">Foto general</p>
                       <div className="flex justify-center">
-                        <img
-                          src={displayFotoGeneral[0].url}
-                          alt="Foto general"
-                          className="max-w-full max-h-96 rounded-lg shadow-md object-contain"
-                        />
+                        <a
+                          href={displayFotoGeneral[0].url}
+                          download="foto-general.jpg"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-6 py-3 bg-brand-primary text-white rounded-lg hover:bg-brand-green transition-colors font-medium inline-flex items-center gap-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                          Descargar Foto
+                        </a>
                       </div>
                     </div>
                   );

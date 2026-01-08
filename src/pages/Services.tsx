@@ -137,7 +137,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'requiere-accion' | 'en-espera'>('requiere-accion');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [detailsView, setDetailsView] = useState<'detalles' | 'formulario' | 'reparaciones'>('detalles');
+  const [detailsView, setDetailsView] = useState<'detalles' | 'formulario' | 'reparaciones' | 'fotos'>('detalles');
   const [formularios, setFormularios] = useState<any[]>([]);
   const [_fallbackFormulario, setFallbackFormulario] = useState<any | null>(null);
   const [selectedFormularioIndex, setSelectedFormularioIndex] = useState(0);
@@ -465,7 +465,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
         // Condición 1: Registros pendientes de tramitar
         const isPendiente = !s.tramitado &&
           !!s.accionIpartner && s.accionIpartner.trim() !== '' &&
-          s.ipartner !== 'Cancelado' && s.ipartner !== 'Finalizado';
+          s.ipartner !== 'Cancelado' && s.ipartner !== 'Facturado';
         
         // Condición 2: Estado = Finalizado, Ipartner no es Cancelado, Importe = 0
         const isFinalized = s.estado === 'Finalizado' && 
@@ -676,7 +676,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   // Cargar datos de reparaciones cuando se selecciona la vista en el modal de detalles
   useEffect(() => {
     const loadInlineRep = async () => {
-      if (detailsView !== 'reparaciones') return;
+      if (detailsView !== 'reparaciones' && detailsView !== 'fotos') return;
       if (!selectedService) {
         setReparaciones([]);
         setSelectedReparacionIndex(0);
@@ -1310,7 +1310,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
           onClick={handleCloseModal}
         >
           <div
-            className="relative w-full max-w-4xl bg-gray-50 rounded-2xl shadow-lg border border-gray-200 my-8 mx-auto"
+            className="relative w-full max-w-4xl bg-gray-50 rounded-2xl shadow-lg border border-gray-200 my-4 mx-auto"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
@@ -1345,7 +1345,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
             </div>
             {/* Tabs para cambiar la vista dentro del modal */}
             {!isTramitacion && (
-              <div className="flex items-center gap-2 border-b border-gray-200 pb-2 pt-6 px-6">
+              <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-gray-200 pb-2 pt-6 px-6 bg-gray-50">
                   <button
                     className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'detalles' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
                     onClick={() => setDetailsView('detalles')}
@@ -1359,18 +1359,26 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                     Formulario
                   </button>
                   {!isGestoraTecnica && (
-                    <button
-                      className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'reparaciones' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-                      onClick={() => setDetailsView('reparaciones')}
-                    >
-                      Reparaciones
-                    </button>
+                    <>
+                      <button
+                        className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'reparaciones' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                        onClick={() => setDetailsView('reparaciones')}
+                      >
+                        Reparaciones
+                      </button>
+                      <button
+                        className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'fotos' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                        onClick={() => setDetailsView('fotos')}
+                      >
+                        Fotos
+                      </button>
+                    </>
                   )}
                 </div>
             )}
             {/* Tabs para tramitaciones */}
             {isTramitacion && (
-              <div className="flex items-center gap-2 border-b border-gray-200 pb-2 pt-6 px-6">
+              <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-gray-200 pb-2 pt-6 px-6 bg-gray-50">
                   <button
                     className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'detalles' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
                     onClick={() => setDetailsView('detalles')}
@@ -2267,21 +2275,52 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                     <h3 className="text-sm font-semibold text-gray-700 mb-1">Número de serie</h3>
                     <p className="mt-1 text-sm text-gray-900">{renderDetailValue(reparaciones[selectedReparacionIndex]?.numeroSerie)}</p>
                   </div>
+                </div>
+              )}
+
+              {detailsView === 'fotos' && (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-900">Fotos de Reparaciones</h2>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Expediente {selectedService.expediente || 'sin expediente asignado'}
+                      </p>
+                    </div>
+                    {reparaciones.length > 1 && (
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-gray-500 uppercase">Seleccionar reparación:</label>
+                        <select
+                          value={selectedReparacionIndex}
+                          onChange={(e) => setSelectedReparacionIndex(parseInt(e.target.value))}
+                          className="px-3 py-1 border rounded-lg text-sm focus:ring-2 focus:ring-brand-primary"
+                        >
+                          {reparaciones.map((_, index) => (
+                            <option key={index} value={index}>Reparación {index + 1}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
 
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 mb-2">Fotos después</h3>
                     {reparaciones[selectedReparacionIndex]?.fotoGeneral && Array.isArray(reparaciones[selectedReparacionIndex].fotoGeneral) && reparaciones[selectedReparacionIndex].fotoGeneral.length > 0 ? (
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
                         {reparaciones[selectedReparacionIndex].fotoGeneral.map((attachment: AirtableAttachment, idx: number) => (
-                          <div key={idx} className="relative group">
-                            <img
-                              src={attachment.thumbnails?.large?.url || attachment.url}
-                              alt={attachment.filename}
-                              className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
-                              onClick={() => window.open(attachment.url, '_blank')}
-                            />
-                            <p className="text-xs text-gray-500 mt-1 truncate">{attachment.filename}</p>
-                          </div>
+                          <a
+                            key={idx}
+                            href={attachment.url}
+                            download={attachment.filename}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between px-4 py-3 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                          >
+                            <span className="text-sm text-gray-900 truncate">{attachment.filename}</span>
+                            <button className="ml-4 px-3 py-1 bg-brand-primary text-white text-xs rounded hover:bg-brand-hover transition-colors">
+                              Descargar
+                            </button>
+                          </a>
                         ))}
                       </div>
                     ) : (
@@ -2292,17 +2331,21 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 mb-2">Foto de la etiqueta</h3>
                     {reparaciones[selectedReparacionIndex]?.fotoEtiqueta && Array.isArray(reparaciones[selectedReparacionIndex].fotoEtiqueta) && reparaciones[selectedReparacionIndex].fotoEtiqueta.length > 0 ? (
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
                         {reparaciones[selectedReparacionIndex].fotoEtiqueta.map((attachment: AirtableAttachment, idx: number) => (
-                          <div key={idx} className="relative group">
-                            <img
-                              src={attachment.thumbnails?.large?.url || attachment.url}
-                              alt={attachment.filename}
-                              className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
-                              onClick={() => window.open(attachment.url, '_blank')}
-                            />
-                            <p className="text-xs text-gray-500 mt-1 truncate">{attachment.filename}</p>
-                          </div>
+                          <a
+                            key={idx}
+                            href={attachment.url}
+                            download={attachment.filename}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between px-4 py-3 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                          >
+                            <span className="text-sm text-gray-900 truncate">{attachment.filename}</span>
+                            <button className="ml-4 px-3 py-1 bg-brand-primary text-white text-xs rounded hover:bg-brand-hover transition-colors">
+                              Descargar
+                            </button>
+                          </a>
                         ))}
                       </div>
                     ) : (
@@ -2416,14 +2459,14 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
       {/* Modal para seleccionar Motivo Técnico */}
       {showMotivoTecnicoModal && pendingEstadoChange && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 overflow-y-auto"
           onClick={() => {
             setShowMotivoTecnicoModal(false);
             setPendingEstadoChange(null);
           }}
         >
           <div
-            className="relative w-full max-w-md bg-white rounded-2xl shadow-lg border border-gray-200 p-6"
+            className="relative w-full max-w-3xl bg-white rounded-2xl shadow-lg border border-gray-200 p-6 my-8"
             onClick={(event) => event.stopPropagation()}
           >
             <button
@@ -2440,7 +2483,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
 
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Seleccionar Motivo Técnico</h2>
 
-            <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
               {MOTIVO_TECNICO_OPTIONS.map((opcion) => (
                 <button
                   key={opcion}
