@@ -869,6 +869,46 @@ export const airtableService = {
       if (Object.keys(fields).length === 0) return;
 
       await serviciosApi.patch(`/${AIRTABLE_ENVIOS_TABLE}/${envioId}`, { fields });
+
+      // Si se está marcando como "Entregado", actualizar el servicio vinculado
+      if (updates.estado === 'Entregado') {
+        try {
+          // Obtener la información completa del envío para verificar el producto
+          const { data } = await serviciosApi.get(`/${AIRTABLE_ENVIOS_TABLE}/${envioId}`);
+          const envioData = (data as any)?.fields;
+          
+          // Verificar el producto (lookup puede venir como array o string)
+          const productoRaw = envioData?.['Producto'];
+          const producto = Array.isArray(productoRaw) ? productoRaw[0] : productoRaw;
+          
+          console.log(`[Airtable] Producto detectado: "${producto}" (tipo: ${typeof producto}, raw:`, productoRaw, ')');
+          
+          const esSoportePulsar = producto === 'Soporte Pulsar Plus' || producto === 'Soporte Pulsar Max';
+          
+          // Obtener el ID del servicio vinculado
+          const servicioId = envioData?.['Servicio']?.[0]; // El servicio es un linked record, viene como array
+          
+          if (servicioId) {
+            if (esSoportePulsar) {
+              // Si es Soporte Pulsar Plus o Max, actualizar a "Finalizado" y "Resolución visita"
+              await serviciosApi.patch(`/${AIRTABLE_SERVICES_TABLE}/${servicioId}`, {
+                fields: {
+                  'Estado': 'Finalizado',
+                  'Resolución visita': 'Reset y actualización',
+                },
+              });
+              console.log(`[Airtable] Servicio ${servicioId} actualizado a "Finalizado" con resolución "Reset y actualización" tras entrega de "${producto}"`);
+            } else {
+              // Si no es Soporte Pulsar, actualizar a "Pendiente de asignar"
+              await this.updateServiceStatus(servicioId, 'Pendiente de asignar');
+              console.log(`[Airtable] Servicio ${servicioId} actualizado a "Pendiente de asignar" tras entrega del envío ${envioId} (producto: "${producto}")`);
+            }
+          }
+        } catch (error) {
+          console.error('[Airtable] Error al actualizar el servicio vinculado:', error);
+          // No lanzamos el error para no interrumpir la actualización del envío
+        }
+      }
     } catch (error) {
       console.error('Error updating envío:', error);
       throw error;
@@ -1285,6 +1325,25 @@ export const airtableService = {
     } catch (error) {
       console.error('Error fetching technicians:', error);
       return [];
+    }
+  },
+
+  // Obtener un técnico por ID
+  async getTechnicianById(technicianId: string): Promise<import('../types').Tecnico | null> {
+    try {
+      const response = await serviciosApi.get(`/Técnicos/${technicianId}`);
+      const f = response.data.fields ?? {};
+      return {
+        id: response.data.id,
+        nombre: f['Nombre'] ?? f['Name'],
+        provincia: f['Provincia'] ?? f['Province'],
+        estado: f['Estado'] ?? f['Status'],
+        telefono: f['Teléfono'] ?? f['Telefono'] ?? f['Phone'],
+        observaciones: f['Observaciones'] ?? f['Observacion'] ?? f['Notes'],
+      };
+    } catch (error) {
+      console.error('Error fetching technician by ID:', error);
+      return null;
     }
   },
 

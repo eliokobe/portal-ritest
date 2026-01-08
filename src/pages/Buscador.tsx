@@ -55,12 +55,14 @@ const Buscador: React.FC = () => {
   const [searched, setSearched] = useState(false);
   const [tecnicos, setTecnicos] = useState<{ id: string; nombre: string }[]>([]);
   const [formularios, setFormularios] = useState<any[]>([]);
+  const [tecnicoNombre, setTecnicoNombre] = useState<string>('');
 
   // Cargar técnicos
   useEffect(() => {
     const loadTecnicos = async () => {
       try {
         const data = await airtableService.getTechnicians();
+        console.log('Técnicos cargados:', data);
         setTecnicos(data.filter(t => t.nombre !== undefined) as { id: string; nombre: string; }[]);
       } catch (error) {
         console.error('Error loading técnicos:', error);
@@ -85,10 +87,68 @@ const Buscador: React.FC = () => {
   useEffect(() => {
     if (selectedService) {
       loadFormulariosForService(selectedService);
+      loadTecnicoNombre(selectedService);
     } else {
       setFormularios([]);
+      setTecnicoNombre('');
     }
-  }, [selectedService]);
+  }, [selectedService, tecnicos]);
+
+  const loadTecnicoNombre = (service: Service) => {
+    console.log('=== Cargando técnico ===');
+    console.log('trabajadorId:', service.trabajadorId);
+    console.log('tecnico:', service.tecnico);
+    console.log('Técnicos disponibles:', tecnicos.length);
+    
+    // Primero intentar con trabajadorId
+    if (service.trabajadorId && service.trabajadorId.length > 0) {
+      const tecnicoId = service.trabajadorId[0];
+      console.log('Buscando técnico con trabajadorId:', tecnicoId);
+      const tecnicoEncontrado = tecnicos.find(t => t.id === tecnicoId);
+      
+      if (tecnicoEncontrado) {
+        console.log('Nombre del técnico:', tecnicoEncontrado.nombre);
+        setTecnicoNombre(tecnicoEncontrado.nombre);
+        return;
+      }
+    }
+    
+    // Si no, intentar con el campo tecnico (que puede ser un array de IDs)
+    if (service.tecnico) {
+      let tecnicoId: string | undefined;
+      
+      // Si es un array, tomar el primer elemento
+      if (Array.isArray(service.tecnico)) {
+        tecnicoId = service.tecnico[0];
+      } else if (typeof service.tecnico === 'string') {
+        // Si es string y parece un record ID, usarlo directamente
+        if (service.tecnico.startsWith('rec')) {
+          tecnicoId = service.tecnico;
+        }
+      }
+      
+      if (tecnicoId) {
+        console.log('Buscando técnico con ID del campo tecnico:', tecnicoId);
+        const tecnicoEncontrado = tecnicos.find(t => t.id === tecnicoId);
+        console.log('Técnico encontrado:', tecnicoEncontrado);
+        
+        if (tecnicoEncontrado) {
+          console.log('Nombre del técnico:', tecnicoEncontrado.nombre);
+          setTecnicoNombre(tecnicoEncontrado.nombre);
+          return;
+        }
+      }
+      
+      // Si tecnico es un string normal (nombre), usarlo directamente
+      if (typeof service.tecnico === 'string' && !service.tecnico.startsWith('rec')) {
+        setTecnicoNombre(service.tecnico);
+        return;
+      }
+    }
+    
+    console.log('No se encontró técnico');
+    setTecnicoNombre('Sin información');
+  };
 
   const loadFormulariosForService = async (service: Service | null) => {
     const formularioIds = service?.formularioId;
@@ -433,14 +493,10 @@ const Buscador: React.FC = () => {
                     <p className="text-sm text-gray-900 mt-1">{formatDateTime(selectedService.citaTecnico)}</p>
                   </div>
                 )}
-                {selectedService.trabajadorId && selectedService.trabajadorId.length > 0 && (
-                  <div>
-                    <p className="text-xs uppercase text-gray-500">Técnico</p>
-                    <p className="text-sm text-gray-900 mt-1">
-                      {tecnicos.find(t => t.id === selectedService.trabajadorId?.[0])?.nombre || 'Sin información'}
-                    </p>
-                  </div>
-                )}
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Técnico</p>
+                  <p className="text-sm text-gray-900 mt-1">{tecnicoNombre || 'Sin información'}</p>
+                </div>
                 {selectedService.numeroSerie && (
                   <div>
                     <p className="text-xs uppercase text-gray-500">Número de serie</p>
