@@ -455,6 +455,13 @@ const Buscador: React.FC = () => {
                 )}
               </div>
 
+              {selectedService.descripcion && (
+                <div className="border-t pt-4">
+                  <p className="text-xs uppercase text-gray-500 mb-1">Descripción</p>
+                  <p className="text-sm text-gray-900 whitespace-pre-line">{selectedService.descripcion}</p>
+                </div>
+              )}
+
               {selectedService.accionIpartner && (
                 <div className="border-t pt-4">
                   <p className="text-xs uppercase text-gray-500 mb-1">Acción Ipartner</p>

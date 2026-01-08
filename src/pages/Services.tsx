@@ -137,7 +137,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'requiere-accion' | 'en-espera'>('requiere-accion');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [detailsView, setDetailsView] = useState<'detalles' | 'formulario' | 'reparaciones'>('detalles');
+  const [detailsView, setDetailsView] = useState<'detalles' | 'formulario' | 'reparaciones' | 'fotos'>('detalles');
   const [formularios, setFormularios] = useState<any[]>([]);
   const [_fallbackFormulario, setFallbackFormulario] = useState<any | null>(null);
   const [selectedFormularioIndex, setSelectedFormularioIndex] = useState(0);
@@ -665,7 +665,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   // Cargar datos de formulario cuando se selecciona la vista en el modal de detalles
   useEffect(() => {
     const loadInlineForm = async () => {
-      const shouldLoad = (isTramitacion && detailsView === 'detalles') || (!isTramitacion && detailsView === 'formulario');
+      const shouldLoad = (isTramitacion && (detailsView === 'detalles' || detailsView === 'fotos')) || (!isTramitacion && detailsView === 'formulario');
       if (!shouldLoad) return;
 
       await loadFormulariosForService(selectedService);
@@ -676,7 +676,8 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   // Cargar datos de reparaciones cuando se selecciona la vista en el modal de detalles
   useEffect(() => {
     const loadInlineRep = async () => {
-      if (detailsView !== 'reparaciones') return;
+      // Cargar reparaciones para la vista de reparaciones o para la vista de fotos (en tramitaciones)
+      if (detailsView !== 'reparaciones' && !(isTramitacion && detailsView === 'fotos')) return;
       if (!selectedService) {
         setReparaciones([]);
         setSelectedReparacionIndex(0);
@@ -709,7 +710,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
       }
     };
     loadInlineRep();
-  }, [detailsView, selectedService?.id]);
+  }, [detailsView, selectedService?.id, isTramitacion]);
 
   // Cargar formularios y reparaciones cuando se abre modal de tramitaciones
   useEffect(() => {
@@ -1377,6 +1378,12 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   >
                     Detalles
                   </button>
+                  <button
+                    className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'fotos' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                    onClick={() => setDetailsView('fotos')}
+                  >
+                    Fotos
+                  </button>
                 </div>
             )}
             
@@ -1521,66 +1528,10 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
               </div>
               )}
 
-              {isTramitacion && (
+              {isTramitacion && detailsView === 'detalles' && (
                 <div className="w-full">
                   <p className="text-xs uppercase text-gray-500">Acción Ipartner</p>
                   <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.accionIpartner)}</p>
-                </div>
-              )}
-              {isTramitacion && detailsView === 'detalles' && (formularios.length > 0 || _fallbackFormulario) && (
-                <div className="space-y-6">
-                  {/* Fotos del formulario o fallback */}
-                  {(() => {
-                    // Determinar qué formulario usar
-                    const formulario = formularios.length > 0 ? formularios[0] : null;
-                    const fotoGeneral = formulario?.['Foto general'];
-                    const hasPhoto = Array.isArray(fotoGeneral) && fotoGeneral.length > 0;
-                    
-                    // Si hay formulario pero no tiene foto general, usar fallback
-                    const displayFormulario = formulario && !hasPhoto ? _fallbackFormulario : formulario;
-                    const fotosFormulario = displayFormulario?.['Foto general'] && Array.isArray(displayFormulario['Foto general']) && displayFormulario['Foto general'].length > 0
-                      ? displayFormulario['Foto general']
-                      : null;
-                    const fotosEtiqueta = displayFormulario?.['Foto etiqueta'] && Array.isArray(displayFormulario['Foto etiqueta']) && displayFormulario['Foto etiqueta'].length > 0
-                      ? displayFormulario['Foto etiqueta']
-                      : null;
-
-                    return fotosFormulario || fotosEtiqueta ? (
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Fotos del servicio</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                          {/* Foto general */}
-                          {fotosFormulario && fotosFormulario.map((file: any, idx: number) => (
-                            <div key={`general-${idx}`} className="space-y-2">
-                              <p className="text-xs font-medium text-gray-600">Foto general</p>
-                              {file.thumbnails?.large?.url && (
-                                <img
-                                  src={file.thumbnails.large.url}
-                                  alt="Foto general"
-                                  className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
-                                  onClick={() => window.open(file.url, '_blank')}
-                                />
-                              )}
-                            </div>
-                          ))}
-                          {/* Foto etiqueta */}
-                          {fotosEtiqueta && fotosEtiqueta.map((file: any, idx: number) => (
-                            <div key={`etiqueta-${idx}`} className="space-y-2">
-                              <p className="text-xs font-medium text-gray-600">Foto etiqueta</p>
-                              {file.thumbnails?.large?.url && (
-                                <img
-                                  src={file.thumbnails.large.url}
-                                  alt="Foto etiqueta"
-                                  className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
-                                  onClick={() => window.open(file.url, '_blank')}
-                                />
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null;
-                  })()}
                 </div>
               )}
               
@@ -2270,6 +2221,156 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                 </div>
               )}
 
+              {/* Vista de Fotos - Solo para tramitaciones */}
+              {detailsView === 'fotos' && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">Fotos</h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Expediente {selectedService.expediente || 'sin expediente asignado'}
+                    </p>
+                  </div>
+
+                  {(() => {
+                    // Recolectar todas las fotos del formulario
+                    const formulario = formularios.length > 0 ? formularios[0] : null;
+                    const fotoGeneral = formulario?.['Foto general'];
+                    const hasPhoto = Array.isArray(fotoGeneral) && fotoGeneral.length > 0;
+                    
+                    // Si hay formulario pero no tiene foto general, usar fallback
+                    const displayFormulario = formulario && !hasPhoto ? _fallbackFormulario : formulario;
+                    
+                    const fotosFormularioGeneral = displayFormulario?.['Foto general'] && Array.isArray(displayFormulario['Foto general']) && displayFormulario['Foto general'].length > 0
+                      ? displayFormulario['Foto general']
+                      : [];
+                    const fotosFormularioEtiqueta = displayFormulario?.['Foto etiqueta'] && Array.isArray(displayFormulario['Foto etiqueta']) && displayFormulario['Foto etiqueta'].length > 0
+                      ? displayFormulario['Foto etiqueta']
+                      : [];
+                    const fotosFormularioRoto = displayFormulario?.['Foto roto'] && Array.isArray(displayFormulario['Foto roto']) && displayFormulario['Foto roto'].length > 0
+                      ? displayFormulario['Foto roto']
+                      : [];
+                    const fotosFormularioCuadro = displayFormulario?.['Foto cuadro'] && Array.isArray(displayFormulario['Foto cuadro']) && displayFormulario['Foto cuadro'].length > 0
+                      ? displayFormulario['Foto cuadro']
+                      : [];
+
+                    // Recolectar todas las fotos de las reparaciones
+                    const fotosReparaciones: Array<{ foto: any; tipo: string; reparacionNum: number }> = [];
+                    reparaciones.forEach((reparacion, idx) => {
+                      // Foto principal de reparación
+                      if (reparacion.Foto && Array.isArray(reparacion.Foto) && reparacion.Foto.length > 0) {
+                        reparacion.Foto.forEach((foto: any) => {
+                          fotosReparaciones.push({ foto, tipo: 'Foto reparación', reparacionNum: idx + 1 });
+                        });
+                      } else if (reparacion.foto && Array.isArray(reparacion.foto) && reparacion.foto.length > 0) {
+                        reparacion.foto.forEach((foto: any) => {
+                          fotosReparaciones.push({ foto, tipo: 'Foto reparación', reparacionNum: idx + 1 });
+                        });
+                      }
+                      
+                      // Foto de la etiqueta de reparación
+                      if (reparacion['Foto de la etiqueta'] && Array.isArray(reparacion['Foto de la etiqueta']) && reparacion['Foto de la etiqueta'].length > 0) {
+                        reparacion['Foto de la etiqueta'].forEach((foto: any) => {
+                          fotosReparaciones.push({ foto, tipo: 'Foto etiqueta reparación', reparacionNum: idx + 1 });
+                        });
+                      } else if (reparacion.fotoEtiqueta && Array.isArray(reparacion.fotoEtiqueta) && reparacion.fotoEtiqueta.length > 0) {
+                        reparacion.fotoEtiqueta.forEach((foto: any) => {
+                          fotosReparaciones.push({ foto, tipo: 'Foto etiqueta reparación', reparacionNum: idx + 1 });
+                        });
+                      }
+                    });
+
+                    // Verificar si hay al menos una foto para mostrar
+                    const hayFotos = fotosFormularioGeneral.length > 0 || 
+                                     fotosFormularioEtiqueta.length > 0 || 
+                                     fotosFormularioRoto.length > 0 || 
+                                     fotosFormularioCuadro.length > 0 || 
+                                     fotosReparaciones.length > 0;
+
+                    return hayFotos ? (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {/* Fotos del formulario - Foto general */}
+                        {fotosFormularioGeneral.map((file: any, idx: number) => (
+                          <div key={`form-general-${idx}`} className="space-y-2">
+                            <p className="text-xs font-medium text-gray-600">Foto general (Formulario)</p>
+                            {file.thumbnails?.large?.url && (
+                              <img
+                                src={file.thumbnails.large.url}
+                                alt="Foto general"
+                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => window.open(file.url, '_blank')}
+                              />
+                            )}
+                          </div>
+                        ))}
+                        
+                        {/* Fotos del formulario - Foto etiqueta */}
+                        {fotosFormularioEtiqueta.map((file: any, idx: number) => (
+                          <div key={`form-etiqueta-${idx}`} className="space-y-2">
+                            <p className="text-xs font-medium text-gray-600">Foto etiqueta (Formulario)</p>
+                            {file.thumbnails?.large?.url && (
+                              <img
+                                src={file.thumbnails.large.url}
+                                alt="Foto etiqueta"
+                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => window.open(file.url, '_blank')}
+                              />
+                            )}
+                          </div>
+                        ))}
+                        
+                        {/* Fotos del formulario - Foto roto */}
+                        {fotosFormularioRoto.map((file: any, idx: number) => (
+                          <div key={`form-roto-${idx}`} className="space-y-2">
+                            <p className="text-xs font-medium text-gray-600">Foto roto (Formulario)</p>
+                            {file.thumbnails?.large?.url && (
+                              <img
+                                src={file.thumbnails.large.url}
+                                alt="Foto roto"
+                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => window.open(file.url, '_blank')}
+                              />
+                            )}
+                          </div>
+                        ))}
+                        
+                        {/* Fotos del formulario - Foto cuadro */}
+                        {fotosFormularioCuadro.map((file: any, idx: number) => (
+                          <div key={`form-cuadro-${idx}`} className="space-y-2">
+                            <p className="text-xs font-medium text-gray-600">Foto cuadro (Formulario)</p>
+                            {file.thumbnails?.large?.url && (
+                              <img
+                                src={file.thumbnails.large.url}
+                                alt="Foto cuadro"
+                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => window.open(file.url, '_blank')}
+                              />
+                            )}
+                          </div>
+                        ))}
+
+                        {/* Fotos de las reparaciones */}
+                        {fotosReparaciones.map((item, idx) => (
+                          <div key={`rep-${idx}`} className="space-y-2">
+                            <p className="text-xs font-medium text-gray-600">{item.tipo} (Reparación {item.reparacionNum})</p>
+                            {item.foto.thumbnails?.large?.url && (
+                              <img
+                                src={item.foto.thumbnails.large.url}
+                                alt={item.tipo}
+                                className="w-full h-48 object-cover rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => window.open(item.foto.url, '_blank')}
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <p className="text-gray-500">No hay fotos disponibles para este servicio</p>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
 
             </div>
           </div>
