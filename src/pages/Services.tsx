@@ -137,7 +137,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'requiere-accion' | 'en-espera'>('requiere-accion');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [detailsView, setDetailsView] = useState<'detalles' | 'formulario' | 'reparaciones' | 'fotos'>('detalles');
+  const [detailsView, setDetailsView] = useState<'detalles' | 'formulario' | 'reparaciones'>('detalles');
   const [formularios, setFormularios] = useState<any[]>([]);
   const [_fallbackFormulario, setFallbackFormulario] = useState<any | null>(null);
   const [selectedFormularioIndex, setSelectedFormularioIndex] = useState(0);
@@ -676,7 +676,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   // Cargar datos de reparaciones cuando se selecciona la vista en el modal de detalles
   useEffect(() => {
     const loadInlineRep = async () => {
-      if (detailsView !== 'reparaciones' && detailsView !== 'fotos') return;
+      if (detailsView !== 'reparaciones') return;
       if (!selectedService) {
         setReparaciones([]);
         setSelectedReparacionIndex(0);
@@ -1345,7 +1345,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
             </div>
             {/* Tabs para cambiar la vista dentro del modal */}
             {!isTramitacion && (
-              <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-gray-200 pb-2 pt-6 px-6 bg-gray-50">
+              <div className="flex items-center gap-2 border-b border-gray-200 pb-2 pt-6 px-6 bg-gray-50 rounded-t-2xl">
                   <button
                     className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'detalles' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
                     onClick={() => setDetailsView('detalles')}
@@ -1359,26 +1359,18 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                     Formulario
                   </button>
                   {!isGestoraTecnica && (
-                    <>
-                      <button
-                        className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'reparaciones' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-                        onClick={() => setDetailsView('reparaciones')}
-                      >
-                        Reparaciones
-                      </button>
-                      <button
-                        className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'fotos' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
-                        onClick={() => setDetailsView('fotos')}
-                      >
-                        Fotos
-                      </button>
-                    </>
+                    <button
+                      className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'reparaciones' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                      onClick={() => setDetailsView('reparaciones')}
+                    >
+                      Reparaciones
+                    </button>
                   )}
                 </div>
             )}
             {/* Tabs para tramitaciones */}
             {isTramitacion && (
-              <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-gray-200 pb-2 pt-6 px-6 bg-gray-50">
+              <div className="flex items-center gap-2 border-b border-gray-200 pb-2 pt-6 px-6 bg-gray-50 rounded-t-2xl">
                   <button
                     className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'detalles' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
                     onClick={() => setDetailsView('detalles')}
@@ -2278,82 +2270,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                 </div>
               )}
 
-              {detailsView === 'fotos' && (
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-xl font-semibold text-gray-900">Fotos de Reparaciones</h2>
-                      <p className="text-sm text-gray-500 mt-1">
-                        Expediente {selectedService.expediente || 'sin expediente asignado'}
-                      </p>
-                    </div>
-                    {reparaciones.length > 1 && (
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-gray-500 uppercase">Seleccionar reparación:</label>
-                        <select
-                          value={selectedReparacionIndex}
-                          onChange={(e) => setSelectedReparacionIndex(parseInt(e.target.value))}
-                          className="px-3 py-1 border rounded-lg text-sm focus:ring-2 focus:ring-brand-primary"
-                        >
-                          {reparaciones.map((_, index) => (
-                            <option key={index} value={index}>Reparación {index + 1}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
 
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Fotos después</h3>
-                    {reparaciones[selectedReparacionIndex]?.fotoGeneral && Array.isArray(reparaciones[selectedReparacionIndex].fotoGeneral) && reparaciones[selectedReparacionIndex].fotoGeneral.length > 0 ? (
-                      <div className="space-y-2">
-                        {reparaciones[selectedReparacionIndex].fotoGeneral.map((attachment: AirtableAttachment, idx: number) => (
-                          <a
-                            key={idx}
-                            href={attachment.url}
-                            download={attachment.filename}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-between px-4 py-3 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                          >
-                            <span className="text-sm text-gray-900 truncate">{attachment.filename}</span>
-                            <button className="ml-4 px-3 py-1 bg-brand-primary text-white text-xs rounded hover:bg-brand-hover transition-colors">
-                              Descargar
-                            </button>
-                          </a>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-500">Sin fotos</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Foto de la etiqueta</h3>
-                    {reparaciones[selectedReparacionIndex]?.fotoEtiqueta && Array.isArray(reparaciones[selectedReparacionIndex].fotoEtiqueta) && reparaciones[selectedReparacionIndex].fotoEtiqueta.length > 0 ? (
-                      <div className="space-y-2">
-                        {reparaciones[selectedReparacionIndex].fotoEtiqueta.map((attachment: AirtableAttachment, idx: number) => (
-                          <a
-                            key={idx}
-                            href={attachment.url}
-                            download={attachment.filename}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-between px-4 py-3 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                          >
-                            <span className="text-sm text-gray-900 truncate">{attachment.filename}</span>
-                            <button className="ml-4 px-3 py-1 bg-brand-primary text-white text-xs rounded hover:bg-brand-hover transition-colors">
-                              Descargar
-                            </button>
-                          </a>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-gray-500">Sin fotos</p>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
