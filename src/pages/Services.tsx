@@ -88,7 +88,7 @@ const RESOLUCION_CANCELADO_OPTIONS = [
 ];
 
 const RESOLUCION_FINALIZADO_OPTIONS = [
-  'Liberación cuenta wallbox',
+  'Liberación cuenta',
   'Reset y actualización',
   'Configuración del cargador'
 ];

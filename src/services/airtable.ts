@@ -154,6 +154,7 @@ type ServicioListado = {
   accionIpartner?: string;
   ipartner?: string;
   seguimiento?: string;
+  resolucionVisita?: string;
 };
 
 const mapFormularioRecord = (r: any) => {
@@ -331,6 +332,7 @@ async function fetchServicesByTable(params: {
         accionIpartner: f['Acción Ipartner'] ?? f['Accion Ipartner'],
         ipartner: f['Ipartner'],
         seguimiento: f['Seguimiento'],
+        resolucionVisita: f['Resolución visita'] ?? f['Resolucion visita'],
       };
     });
 
