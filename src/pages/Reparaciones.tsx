@@ -403,7 +403,7 @@ const Reparaciones: React.FC = () => {
 
   // Filtrar reparaciones por término de búsqueda
   const filteredServices = useMemo(() => {
-    const allowedStates = new Set(['Asignado', 'Aceptado', 'Citado']);
+    const allowedStates = new Set(['Asignado', 'Aceptado', 'Citado', 'Rechazado']);
     const isTecnico = user?.role === 'Técnico';
     const now = new Date();
     const HOURS_48_IN_MS = 48 * 60 * 60 * 1000;

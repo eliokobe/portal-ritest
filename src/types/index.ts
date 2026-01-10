@@ -104,6 +104,7 @@ export interface Envio {
   material?: string;
   producto?: string; // Solo lectura (lookup)
   fechaCambio?: string; // Solo lectura (timestamp)
+  creacion?: string; // Solo lectura (timestamp de creación)
   cliente?: string;
   direccion?: string;
   poblacion?: string;

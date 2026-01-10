@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Package, Plus, X, ExternalLink, Phone, MessageCircle } from 'lucide-react';
 import { airtableService } from '../services/airtable';
+import { supabaseService } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Envio } from '../types';
 import { getStatusColors } from '../utils/statusColors';
@@ -463,18 +464,49 @@ export default function Envios() {
                         value={envio.estado || ''}
                         onChange={(e) => {
                           const newValue = e.target.value;
+                          console.log('[Envios] Estado onChange:', { 
+                            envioId: envio.id,
+                            oldValue: envio.estado, 
+                            newValue,
+                            seguimiento: envio.seguimiento,
+                            creacion: envio.creacion
+                          });
                           if (!newValue || newValue === envio.estado) return;
                           setSaving(true);
                           airtableService.updateEnvio(envio.id, { estado: newValue })
                             .then(() => {
+                              console.log('[Envios] Estado actualizado en Airtable');
                               setEnvios((prev) =>
                                 prev.map((e) =>
                                   e.id === envio.id ? { ...e, estado: newValue } : e
                                 )
                               );
+                              // Si se marca como "Recogida enviada", trackear en Supabase
+                              if (newValue === 'Recogida enviada') {
+                                console.log('[Envios] Es Recogida enviada, verificando seguimiento:', envio.seguimiento);
+                                // Usar seguimiento, o si no está, usar número de recogida o número regular
+                                const identificador = envio.seguimiento || 
+                                                     (envio.numeroRecogida ? String(envio.numeroRecogida) : undefined) ||
+                                                     envio.numero;
+                                
+                                if (identificador) {
+                                  console.log('[Envios] Llamando a trackRecogida con:', {
+                                    identificador,
+                                    creacion: envio.creacion,
+                                    enviado: new Date().toISOString()
+                                  });
+                                  supabaseService.trackRecogida(
+                                    identificador,
+                                    envio.creacion,
+                                    new Date().toISOString()
+                                  );
+                                } else {
+                                  console.warn('[Envios] No hay identificador (seguimiento, número de recogida o número) para este envío');
+                                }
+                              }
                             })
                             .catch((error) => {
-                              console.error('Error updating estado:', error);
+                              console.error('[Envios] Error updating estado:', error);
                               alert('Error al actualizar el estado');
                             })
                             .finally(() => {

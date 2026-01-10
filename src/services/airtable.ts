@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import axios from 'axios';
 import { User, DashboardStats } from '../types';
+import { supabaseService } from './supabase';
 
 // Base ID fijo (no es secreto). Si se define VITE_AIRTABLE_BASE_ID la sobreescribe.
 const AIRTABLE_BASE_ID = import.meta.env.VITE_AIRTABLE_BASE_ID || 'appRMClMob8KPNooU';
@@ -562,20 +563,13 @@ export const airtableService = {
         const fechaSincronizacion = f['Fecha sincronización'] ?? f['Fecha sincronizacion'];
         const accionIpartner = f['Acción Ipartner'];
         const ipartner = f['Ipartner'];
-        const importe = f['Importe'];
-        const estado = f['Estado'];
         
-        // Condición 1: Registros pendientes de tramitar
+        // Registros pendientes de tramitar
         const isPendiente = !tramitado &&
           accionIpartner && (typeof accionIpartner === 'string' ? accionIpartner.trim() !== '' : accionIpartner.length > 0) &&
           ipartner !== 'Cancelado' && ipartner !== 'Finalizado';
         
-        // Condición 2: Estado = Finalizado, Ipartner no es Cancelado, Importe = 0
-        const isFinalized = estado === 'Finalizado' && 
-          ipartner !== 'Cancelado' &&
-          (importe === 0 || importe === null || importe === undefined);
-        
-        if (isPendiente || isFinalized) {
+        if (isPendiente) {
           unsynchronizedCount++;
         }
         
@@ -599,6 +593,129 @@ export const airtableService = {
         synchronizedTodayCount: 0,
       };
     }
+  },
+
+  // Obtener estadísticas de tiempo de tramitación (en horas) por día
+  async getTramitacionTimeStats(): Promise<{
+    dailyData: { date: string; avgHours: number; count: number }[];
+  }> {
+    // Primero intentar obtener desde Supabase
+    const supabaseStats = await supabaseService.getTramitacionStats();
+    
+    // Si Supabase tiene datos, usarlos
+    if (supabaseStats.dailyData.length > 0) {
+      console.log('Using Supabase data for tramitacion stats');
+      return supabaseStats;
+    }
+    
+    // Fallback: usar datos de Airtable (para compatibilidad con datos antiguos)
+    console.log('Falling back to Airtable data for tramitacion stats');
+    try {
+      const records = await fetchAllServicios(AIRTABLE_SERVICES_TABLE, { pageSize: 100 });
+      
+      // Agrupar por fecha de sincronización
+      const groupedByDay: Record<string, { totalHours: number; count: number }> = {};
+      
+      records.forEach((r: any) => {
+        const f = r.fields ?? {};
+        const tramitado = f['Tramitado'];
+        const fechaSincronizacion = f['Fecha sincronización'] ?? f['Fecha sincronizacion'];
+        const fechaRegistro = f['Fecha de Registro'] ?? f['Fecha registro'] ?? f['Fecha de registro'];
+        const ultimoCambio = f['Último cambio'] ?? f['Ultima modificacion'];
+        
+        // Para registros tramitados, usar Fecha sincronización si existe, sino Último cambio
+        const fechaTramitacion = fechaSincronizacion || ultimoCambio;
+        
+        // Solo considerar registros tramitados con ambas fechas
+        if (tramitado && fechaTramitacion && fechaRegistro) {
+          const syncDate = new Date(fechaTramitacion);
+          const registerDate = new Date(fechaRegistro);
+          
+          // Validar que las fechas sean válidas
+          if (isNaN(syncDate.getTime()) || isNaN(registerDate.getTime())) {
+            return;
+          }
+          
+          // Calcular diferencia en horas
+          const diffMs = syncDate.getTime() - registerDate.getTime();
+          const diffHours = diffMs / (1000 * 60 * 60);
+          
+          // Solo incluir si la diferencia es positiva y razonable (menos de 30 días)
+          if (diffHours > 0 && diffHours < 720) {
+            // Agrupar por día de sincronización
+            const dayKey = syncDate.toISOString().split('T')[0];
+            
+            if (!groupedByDay[dayKey]) {
+              groupedByDay[dayKey] = { totalHours: 0, count: 0 };
+            }
+            
+            groupedByDay[dayKey].totalHours += diffHours;
+            groupedByDay[dayKey].count++;
+          }
+        }
+      });
+      
+      // Convertir a array y calcular promedios
+      const dailyData = Object.entries(groupedByDay)
+        .map(([date, data]) => ({
+          date,
+          avgHours: Math.round((data.totalHours / data.count) * 10) / 10, // Redondear a 1 decimal
+          count: data.count,
+        }))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(-30); // Últimos 30 días
+      
+      return {
+        dailyData,
+      };
+    } catch (error) {
+      console.error('Error fetching tramitacion time stats:', error);
+      return {
+        dailyData: [],
+      };
+    }
+  },
+
+  // Obtener estadísticas de tiempo de recogida (en horas) por día
+  async getRecogidaTimeStats(): Promise<{
+    dailyData: { date: string; avgHours: number; count: number }[];
+  }> {
+    // Intentar obtener desde Supabase
+    console.log('[Airtable] Obteniendo estadísticas de recogidas...');
+    const supabaseStats = await supabaseService.getRecogidaStats();
+    
+    console.log('[Airtable] Estadísticas de recogidas obtenidas:', supabaseStats);
+    
+    // Si Supabase tiene datos, usarlos
+    if (supabaseStats.dailyData.length > 0) {
+      console.log('Using Supabase data for recogida stats');
+      return supabaseStats;
+    }
+    
+    // Si no hay datos en Supabase, retornar array vacío
+    console.log('No recogida stats available');
+    return { dailyData: [] };
+  },
+
+  // Obtener estadísticas de tiempo de asesoramientos (en horas) por día
+  async getAsesoramientoTimeStats(): Promise<{
+    dailyData: { date: string; avgHours: number; count: number }[];
+  }> {
+    // Intentar obtener desde Supabase
+    console.log('[Airtable] Obteniendo estadísticas de asesoramientos...');
+    const supabaseStats = await supabaseService.getAsesoramientoStats();
+    
+    console.log('[Airtable] Estadísticas de asesoramientos obtenidas:', supabaseStats);
+    
+    // Si Supabase tiene datos, usarlos
+    if (supabaseStats.dailyData.length > 0) {
+      console.log('Using Supabase data for asesoramiento stats');
+      return supabaseStats;
+    }
+    
+    // Si no hay datos en Supabase, retornar array vacío
+    console.log('No asesoramiento stats available');
+    return { dailyData: [] };
   },
 
   // Obtener estadísticas del dashboard (desde tabla Servicios)
@@ -783,6 +900,7 @@ export const airtableService = {
     material?: string;
     producto?: string;
     fechaCambio?: string;
+    creacion?: string;
     transporte?: string;
     catalogo?: string;
     comentarios?: string;
@@ -817,6 +935,7 @@ export const airtableService = {
           material: Array.isArray(materialField) ? materialField[0] : materialField,
           producto: f['Producto'] ?? f['Modelo'],
           fechaCambio: f['Fecha Cambio'] ?? f['Last Modified'] ?? r.createdTime,
+          creacion: f['Creación'] ?? f['Creacion'] ?? r.createdTime,
           transporte: f['Transporte'],
           catalogo: Array.isArray(catalogoField) ? catalogoField[0] : catalogoField,
           comentarios: f['Comentarios'],
@@ -1187,7 +1306,54 @@ export const airtableService = {
   },
 
   async setTramitacionTramitado(recordId: string, value: boolean): Promise<void> {
-    return this.updateServiceField(recordId, 'Tramitado', value, AIRTABLE_SERVICES_TABLE);
+    try {
+      // Primero obtener los datos del registro para Supabase
+      let expediente: string | undefined;
+      let fechaCierre: string | undefined;
+      
+      try {
+        const { data } = await serviciosApi.get(`/${AIRTABLE_SERVICES_TABLE}/${recordId}`);
+        expediente = data?.fields?.['Expediente'] ?? data?.fields?.['Número'];
+        fechaCierre = data?.fields?.['Fecha cierre'] ?? data?.fields?.['Fecha Cierre'];
+      } catch (err) {
+        console.warn('No se pudo obtener los datos del registro:', err);
+      }
+      
+      const fields: Record<string, any> = {
+        'Tramitado': value,
+      };
+      
+      // Si se marca como tramitado, actualizar la fecha de sincronización
+      if (value === true) {
+        const fechaTramitacion = new Date().toISOString();
+        fields['Fecha sincronización'] = fechaTramitacion;
+        
+        // Crear/actualizar en Supabase si tenemos el expediente
+        if (expediente && expediente.trim() !== '') {
+          // Usar Fecha cierre como fecha de creación (cuando entró en Tramitaciones)
+          supabaseService.trackTramitacion(expediente, fechaCierre, fechaTramitacion).catch(err => {
+            console.error('Error tracking tramitacion in Supabase:', err);
+          });
+        }
+      }
+      
+      await serviciosApi.patch(`/${AIRTABLE_SERVICES_TABLE}/${recordId}`, {
+        fields,
+      });
+    } catch (error) {
+      console.error('Error updating tramitado:', error);
+      throw error;
+    }
+  },
+
+  // Helper para trackear tramitación desde el cambio de Ipartner
+  async trackTramitacionSupabase(expediente: string, fechaCierre?: string, fechaTramitacion?: string): Promise<void> {
+    try {
+      await supabaseService.trackTramitacion(expediente, fechaCierre, fechaTramitacion);
+    } catch (error) {
+      console.error('Error tracking tramitacion in Supabase:', error);
+      // No lanzar el error para no interrumpir el flujo del usuario
+    }
   },
 
   // Actualizar comentarios de un servicio
@@ -1476,10 +1642,45 @@ export const airtableService = {
   // Actualizar registro
   async updateRegistro(registroId: string, updates: { estado?: string; cita?: string; comentarios?: string; tramitado?: boolean; ipartner?: string }): Promise<void> {
     try {
+      // Primero obtener los datos del registro para Supabase
+      let expediente: string | undefined;
+      let fechaCreacion: string | undefined;
+      
+      try {
+        const { data } = await registrosApi.get(`/Registros/${registroId}`);
+        const expedienteRaw = data?.fields?.['Expediente'];
+        // Convertir expediente a string si es número
+        expediente = expedienteRaw != null ? String(expedienteRaw) : undefined;
+        fechaCreacion = data?.fields?.['Creación'];
+        console.log('[updateRegistro] Datos obtenidos:', { expediente, fechaCreacion, estado: updates.estado });
+      } catch (err) {
+        console.warn('No se pudo obtener los datos del registro:', err);
+      }
+      
       const fields: Record<string, any> = {};
       
       if (updates.estado !== undefined) {
         fields['Estado'] = updates.estado;
+        
+        // Si el estado cambia a Informe, Ilocalizable o No interesado, trackear en Supabase
+        const estadosParaTrackear = ['Informe', 'Ilocalizable', 'No interesado'];
+        console.log('[updateRegistro] Verificando tracking:', {
+          estado: updates.estado,
+          esEstadoParaTrackear: estadosParaTrackear.includes(updates.estado),
+          tieneExpediente: !!expediente,
+          expedienteValor: expediente,
+          noVacio: expediente ? expediente.trim() !== '' : false
+        });
+        
+        if (estadosParaTrackear.includes(updates.estado) && expediente && expediente.trim() !== '') {
+          console.log('[updateRegistro] Iniciando tracking de asesoramiento:', expediente);
+          const fechaInforme = new Date().toISOString();
+          supabaseService.trackAsesoramiento(expediente, fechaCreacion, fechaInforme).catch(err => {
+            console.error('Error tracking asesoramiento in Supabase:', err);
+          });
+        } else {
+          console.log('[updateRegistro] No se trackea asesoramiento - condiciones no cumplidas');
+        }
       }
       
       if (updates.cita !== undefined) {
@@ -1508,11 +1709,34 @@ export const airtableService = {
   // Actualizar estado de una llamada (en tabla Registros)
   async updateCall(callId: string, estado: string): Promise<void> {
     try {
+      // Primero obtener los datos del registro para Supabase
+      let expediente: string | undefined;
+      let fechaCreacion: string | undefined;
+      
+      try {
+        const { data } = await registrosApi.get(`/Registros/${callId}`);
+        const expedienteRaw = data?.fields?.['Expediente'];
+        // Convertir expediente a string si es número
+        expediente = expedienteRaw != null ? String(expedienteRaw) : undefined;
+        fechaCreacion = data?.fields?.['Creación'];
+      } catch (err) {
+        console.warn('No se pudo obtener los datos del registro:', err);
+      }
+      
       await registrosApi.patch(`/Registros/${callId}`, {
         fields: {
           'Estado': estado,
         },
       });
+      
+      // Si el estado cambia a Informe, Ilocalizable o No interesado, trackear en Supabase
+      const estadosParaTrackear = ['Informe', 'Ilocalizable', 'No interesado'];
+      if (estadosParaTrackear.includes(estado) && expediente && expediente.trim() !== '') {
+        const fechaInforme = new Date().toISOString();
+        supabaseService.trackAsesoramiento(expediente, fechaCreacion, fechaInforme).catch(err => {
+          console.error('Error tracking asesoramiento in Supabase:', err);
+        });
+      }
     } catch (error) {
       console.error('Error updating call status:', error);
       throw error;
@@ -1583,6 +1807,57 @@ export const airtableService = {
         totalRegistros: 0,
         informesToday: 0,
       };
+    }
+  },
+
+  // Obtener estadísticas de estados de asesoramientos para gráfico de donut
+  async getAsesoramientosEstadosStats(): Promise<{
+    estadosData: { name: string; value: number; percentage: number }[];
+  }> {
+    try {
+      const records = await fetchAllRegistros('Registros', { pageSize: 100 });
+      
+      // Obtener el mes y año actual
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      
+      // Estados específicos a mostrar
+      const estadosPermitidos = ['No interesado', 'Ilocalizable', 'Informe'];
+      
+      const estadosCounts: Record<string, number> = {};
+      let totalValidos = 0;
+      
+      records.forEach((r: any) => {
+        const f = r.fields ?? {};
+        const estado = f['Estado'];
+        const fecha = f['Fecha'];
+        
+        // Solo incluir registros del mes actual y con estados específicos
+        if (fecha && estado && estadosPermitidos.includes(estado)) {
+          const fechaRegistro = new Date(fecha);
+          const esDelMesActual = fechaRegistro.getMonth() === currentMonth && fechaRegistro.getFullYear() === currentYear;
+          
+          if (esDelMesActual) {
+            estadosCounts[estado] = (estadosCounts[estado] || 0) + 1;
+            totalValidos++;
+          }
+        }
+      });
+      
+      // Convertir a array y calcular porcentajes
+      const estadosData = Object.entries(estadosCounts)
+        .map(([name, value]) => ({
+          name,
+          value,
+          percentage: Math.round((value / totalValidos) * 100 * 10) / 10, // Redondear a 1 decimal
+        }))
+        .sort((a, b) => b.value - a.value); // Ordenar por valor descendente
+      
+      return { estadosData };
+    } catch (error) {
+      console.error('Error fetching asesoramientos estados stats:', error);
+      return { estadosData: [] };
     }
   },
 

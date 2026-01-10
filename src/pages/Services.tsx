@@ -465,17 +465,12 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     } else if (isTramitacion) {
       // Para tramitación: filtrar según condiciones específicas (aplica a TODOS los usuarios)
       servicesWithAllowedStates = servicesWithAllowedStates.filter((s) => {
-        // Condición 1: Registros pendientes de tramitar
+        // Registros pendientes de tramitar
         const isPendiente = !s.tramitado &&
           !!s.accionIpartner && s.accionIpartner.trim() !== '' &&
           s.ipartner !== 'Cancelado' && s.ipartner !== 'Facturado';
         
-        // Condición 2: Estado = Finalizado, Ipartner no es Cancelado, Importe = 0
-        const isFinalized = s.estado === 'Finalizado' && 
-          s.ipartner !== 'Cancelado' &&
-          (s.importe === 0 || s.importe === null || s.importe === undefined);
-        
-        return isPendiente || isFinalized;
+        return isPendiente;
       });
     } else {
       // Para servicios: mostrar todo salvo Finalizado/Cancelado/Sin contactar
@@ -1189,6 +1184,19 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                               setSaving(true);
                               try {
                                 await airtableService.updateServiceField(service.id, 'Ipartner', newValue);
+                                
+                                // Trackear en Supabase cuando se cambia Ipartner
+                                // (la automatización de Airtable marcará como tramitado)
+                                if (service.expediente) {
+                                  const fechaCierre = service.ultimoCambio; // o la fecha que corresponda
+                                  const fechaTramitacion = new Date().toISOString();
+                                  await airtableService.trackTramitacionSupabase(
+                                    service.expediente,
+                                    fechaCierre,
+                                    fechaTramitacion
+                                  );
+                                }
+                                
                                 const updatedServices = services.map((s) =>
                                   s.id === service.id ? { ...s, ipartner: newValue } : s
                                 );
