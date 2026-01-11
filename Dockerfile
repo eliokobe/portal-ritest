@@ -2,12 +2,15 @@ FROM node:20-bookworm-slim as builder
 
 WORKDIR /app
 
-# --- Añadir estas 4 líneas ---
-ARG VITE_AIRTABLE_BASE_ID
-ARG VITE_AIRTABLE_API_KEY
-ENV VITE_AIRTABLE_BASE_ID=$VITE_AIRTABLE_BASE_ID
-ENV VITE_AIRTABLE_API_KEY=$VITE_AIRTABLE_API_KEY
-# ------------------------------
+# Build arguments - Digital Ocean las inyecta durante el build
+ARG VITE_BACKEND_URL
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+
+# Convertir a environment variables para el build
+ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
 
 # Actualizamos npm a una versión donde el bug de dependencias opcionales de Rollup está mitigado
 RUN npm install -g npm@11.5.2
