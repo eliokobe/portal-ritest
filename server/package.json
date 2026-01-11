@@ -1,17 +1,26 @@
 {
   "name": "portal-backend",
   "version": "1.0.0",
-  "type": "module",
-  "description": "Backend proxy para Airtable API",
+  "description": "Backend seguro con autenticación para Portal Ritest",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "node --watch index.js"
+    "dev": "nodemon index.js"
   },
+  "keywords": ["airtable", "proxy", "authentication", "supabase"],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "express": "^4.18.2",
+    "@supabase/supabase-js": "^2.39.0",
+    "axios": "^1.6.5",
     "cors": "^2.8.5",
-    "axios": "^1.11.0",
-    "dotenv": "^16.3.1"
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.x"
   }
 }

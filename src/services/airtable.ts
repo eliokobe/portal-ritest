@@ -3,37 +3,62 @@ import axios from 'axios';
 import { User, DashboardStats } from '../types';
 import { supabaseService } from './supabase';
 
-// URL del backend proxy - configurada por variable de entorno
+// Backend URL - todas las peticiones van al backend seguro
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
-// Nombres de tablas configurables
+// Ya NO usamos VITE_AIRTABLE_API_KEY - está en el backend
+// Base IDs (públicos, no son secretos)
+const AIRTABLE_BASE_ID = import.meta.env.VITE_AIRTABLE_BASE_ID || 'appRMClMob8KPNooU';
+const SERVICIOS_BASE_ID = import.meta.env.VITE_AIRTABLE_SERVICES_BASE_ID || 'appX3CBiSmPy4119D';
+
+// Nombres de tablas
 const AIRTABLE_WORKERS_TABLE = import.meta.env.VITE_AIRTABLE_WORKERS_TABLE || 'Trabajadores';
 const AIRTABLE_SERVICES_TABLE = import.meta.env.VITE_AIRTABLE_SERVICES_TABLE || 'Servicios';
 const AIRTABLE_TRAMITACIONES_TABLE = import.meta.env.VITE_AIRTABLE_TRAMITACIONES_TABLE || 'Tramitaciones';
 const AIRTABLE_ENVIOS_TABLE = import.meta.env.VITE_AIRTABLE_ENVIOS_TABLE || 'Envíos';
 
-// Debug logs
-console.log('[Airtable] Configuración:');
+console.log('[Airtable] Configuración segura:');
 console.log('- BACKEND_URL:', BACKEND_URL);
-console.log('- Usando proxy seguro para Airtable ✓');
+console.log('- Autenticación: Supabase JWT');
 
-// Cliente para la base principal (a través del proxy backend)
+// Función para obtener el token de autenticación
+async function getAuthToken(): Promise<string | null> {
+  try {
+    const { data } = await supabaseService.getSession();
+    return data.session?.access_token || null;
+  } catch (error) {
+    console.error('Error obteniendo token:', error);
+    return null;
+  }
+}
+
+// Cliente para peticiones a la base principal (via backend)
 const airtableApi = axios.create({
   baseURL: `${BACKEND_URL}/api/airtable`,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  withCredentials: false,
+  timeout: 30000,
 });
 
-// Cliente para la base de servicios (a través del proxy backend)
+// Cliente para peticiones a la base de servicios (via backend)
 const serviciosApi = axios.create({
   baseURL: `${BACKEND_URL}/api/servicios`,
-  headers: {
-    'Content-Type': 'application/json',
-  },
   timeout: 30000,
-  withCredentials: false,
+});
+
+// Interceptor para añadir token de autenticación a todas las peticiones
+airtableApi.interceptors.request.use(async (config) => {
+  const token = await getAuthToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+serviciosApi.interceptors.request.use(async (config) => {
+  const token = await getAuthToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 type ServiciosFieldSample = {
@@ -59,14 +84,14 @@ async function inferServiciosFieldSample(tableName: string): Promise<ServiciosFi
   }
 }
 
-// Cliente para la base de registros (a través del proxy backend)
-// Nota: Necesitarás agregar este endpoint en el servidor si usas esta base
+// Segunda base de Airtable para Registros
+const REGISTROS_BASE_ID = 'applcT2fcdNDpCRQ0';
 const registrosApi = axios.create({
-  baseURL: `${BACKEND_URL}/api/registros`,
+  baseURL: `https://api.airtable.com/v0/${REGISTROS_BASE_ID}`,
   headers: {
+    'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
     'Content-Type': 'application/json',
   },
-  withCredentials: false,
 });
 
 // Helper para escapar strings en fórmulas de Airtable

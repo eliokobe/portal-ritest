@@ -2,13 +2,12 @@ FROM node:20-bookworm-slim as builder
 
 WORKDIR /app
 
-# Variables de entorno para el frontend (solo la URL del backend)
-ARG VITE_BACKEND_URL
-ENV VITE_BACKEND_URL=$VITE_BACKEND_URL
-
-# ⚠️ YA NO SE NECESITAN ESTAS VARIABLES - LA API KEY ESTÁ EN EL BACKEND
-# ARG VITE_AIRTABLE_BASE_ID
-# ARG VITE_AIRTABLE_API_KEY
+# --- Añadir estas 4 líneas ---
+ARG VITE_AIRTABLE_BASE_ID
+ARG VITE_AIRTABLE_API_KEY
+ENV VITE_AIRTABLE_BASE_ID=$VITE_AIRTABLE_BASE_ID
+ENV VITE_AIRTABLE_API_KEY=$VITE_AIRTABLE_API_KEY
+# ------------------------------
 
 # Actualizamos npm a una versión donde el bug de dependencias opcionales de Rollup está mitigado
 RUN npm install -g npm@11.5.2

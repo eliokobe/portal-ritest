@@ -1,79 +1,98 @@
-name: sonrisia-portal
-region: nyc
+name: portal-ritest
+region: ams
 
-# Configuración de rutas (ingress)
+alerts:
+- rule: DEPLOYMENT_FAILED
+- rule: DOMAIN_FAILED
+
+domains:
+- domain: portal.ritest.es
+  type: PRIMARY
+
+features:
+- buildpack-stack=ubuntu-22
+
 ingress:
   rules:
-    - match:
-        path:
-          prefix: /api
-      component:
-        name: backend
-    - match:
-        path:
-          prefix: /
-      component:
-        name: web
+  - component:
+      name: backend
+    match:
+      path:
+        prefix: /api
+  - component:
+      name: portal-ritest
+    match:
+      path:
+        prefix: /
 
-# Componente 1: Backend (API Proxy Seguro)
-# La API key está SOLO aquí, nunca se envía al navegador
+# Backend (API Proxy) - Aquí está la API key SEGURA
 services:
-  - name: backend
-    github:
-      repo: tu-usuario/tu-repo
-      branch: main
-      deploy_on_push: true
-    source_dir: server
-    build_command: npm install
-    run_command: npm start
-    environment_slug: node-js
-    instance_count: 1
-    instance_size_slug: basic-xxs
-    
-    envs:
-      - key: AIRTABLE_API_KEY
-        scope: RUN_TIME
-        type: SECRET
-      - key: AIRTABLE_BASE_ID
-        scope: RUN_TIME
-        value: appRMClMob8KPNooU
-      - key: AIRTABLE_SERVICES_BASE_ID
-        scope: RUN_TIME
-        value: appX3CBiSmPy4119D
-      - key: AIRTABLE_REGISTROS_BASE_ID
-        scope: RUN_TIME
-        value: applcT2fcdNDpCRQ0
-      - key: CLIENT_URL
-        scope: RUN_TIME
-        value: ${APP_URL}
-    
-    health_check:
-      http_path: /api/health
-    
-    routes:
-      - path: /api
+- name: backend
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: eliokobe/ritest
+  source_dir: server
+  build_command: npm install
+  run_command: npm start
+  environment_slug: node-js
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  
+  envs:
+  - key: AIRTABLE_API_KEY
+    scope: RUN_TIME
+    type: SECRET
+  - key: AIRTABLE_BASE_ID
+    scope: RUN_TIME
+    value: appRMClMob8KPNooU
+  - key: AIRTABLE_SERVICES_BASE_ID
+    scope: RUN_TIME
+    value: appX3CBiSmPy4119D
+  - key: AIRTABLE_REGISTROS_BASE_ID
+    scope: RUN_TIME
+    value: applcT2fcdNDpCRQ0
+  - key: CLIENT_URL
+    scope: RUN_TIME
+    value: https://portal.ritest.es
+  - key: SUPABASE_URL
+    scope: RUN_TIME
+    value: https://bmnwfimrcblnvmkbflwn.supabase.co
+  - key: SUPABASE_ANON_KEY
+    scope: RUN_TIME
+    value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtbndmaW1yY2JsbnZta2JmbHduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNTc4NDQsImV4cCI6MjA4MzYzMzg0NH0.Xdeil2_IPMFjprhFG7yoIwshqIhntNNZ3Hc6jEj6KjM
+  
+  health_check:
+    http_path: /api/health
 
-# Componente 2: Frontend (Static Site)
-# Ya NO tiene VITE_AIRTABLE_API_KEY
-static_sites:
-  - name: web
-    github:
-      repo: tu-usuario/tu-repo
-      branch: main
-      deploy_on_push: true
-    build_command: npm install && npm run build
-    output_dir: dist
-    
-    envs:
-      - key: VITE_BACKEND_URL
-        scope: BUILD_TIME
-        value: ${_self.PUBLIC_URL}/api
-      - key: VITE_SUPABASE_URL
-        scope: BUILD_TIME
-        value: https://bmnwfimrcblnvmkbflwn.supabase.co
-      - key: VITE_SUPABASE_ANON_KEY
-        scope: BUILD_TIME
-        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtbndmaW1yY2JsbnZta2JmbHduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNTc4NDQsImV4cCI6MjA4MzYzMzg0NH0.Xdeil2_IPMFjprhFG7yoIwshqIhntNNZ3Hc6jEj6KjM
-    
-    routes:
-      - path: /
+# Frontend (Static Site) - SIN API key
+- name: portal-ritest
+  dockerfile_path: /Dockerfile
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: eliokobe/ritest
+  http_port: 80
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  source_dir: /
+  
+  envs:
+  - key: VITE_BACKEND_URL
+    scope: RUN_AND_BUILD_TIME
+    value: https://portal.ritest.es/api
+  - key: VITE_AIRTABLE_BASE_ID
+    scope: RUN_AND_BUILD_TIME
+    value: appX3CBiSmPy4119D
+  - key: VITE_AIRTABLE_SERVICES_BASE_ID
+    scope: RUN_AND_BUILD_TIME
+    value: appX3CBiSmPy4119D
+  - key: VITE_AIRTABLE_WORKERS_TABLE
+    scope: RUN_AND_BUILD_TIME
+    value: Trabajadores
+  - key: VITE_SUPABASE_URL
+    scope: RUN_AND_BUILD_TIME
+    value: https://bmnwfimrcblnvmkbflwn.supabase.co
+  - key: VITE_SUPABASE_ANON_KEY
+    scope: RUN_AND_BUILD_TIME
+    value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtbndmaW1yY2JsbnZta2JmbHduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNTc4NDQsImV4cCI6MjA4MzYzMzg0NH0.Xdeil2_IPMFjprhFG7yoIwshqIhntNNZ3Hc6jEj6KjM

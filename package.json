@@ -8,13 +8,10 @@
   },
   "scripts": {
     "dev": "vite",
-    "dev:backend": "cd server && npm install && npm run dev",
-    "dev:all": "npm run dev:backend & npm run dev",
     "build": "vite build",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "start": "serve -s dist -l $PORT",
-    "postinstall": "cd server && npm install"
+    "start": "serve -s dist -l $PORT"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1",
