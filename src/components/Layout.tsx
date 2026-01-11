@@ -71,13 +71,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Reparaciones', href: '/seguimiento-tecnicos', icon: UserCheck },
         { name: 'Técnicos', href: '/tecnicos', icon: Users },
         { name: 'Envíos', href: '/envios', icon: Package },
-        { name: 'Ipas', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
-      ],
-    },
-    {
-      title: 'Asesoramiento',
-      items: [
         { name: 'Asesoramientos', href: '/asesoramientos', icon: Lightbulb },
+        { name: 'Ipartner', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
       ],
     },
     {
@@ -129,13 +124,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Reparaciones', href: '/seguimiento-tecnicos', icon: UserCheck },
         { name: 'Técnicos', href: '/tecnicos', icon: Users },
         { name: 'Envíos', href: '/envios', icon: Package },
-        { name: 'Ipas', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
+        { name: 'Asesoramientos', href: '/asesoramientos', icon: Lightbulb },
+        { name: 'Ipartner', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
       ],
     },
     {
-      title: 'Asesoramiento',
       items: [
-        { name: 'Asesoramientos', href: '/asesoramientos', icon: Lightbulb },
         { name: 'Informe', href: '/informe', icon: FileText, external: true },
       ],
     },

@@ -33,7 +33,7 @@ class SupabaseService {
   /**
    * Crear un registro cuando un expediente entra en tramitaciones
    */
-  async createTramitacion(numero: string): Promise<void> {
+  async createTramitacion(número: string): Promise<void> {
     if (!this.isEnabled()) return;
 
     try {
@@ -41,13 +41,13 @@ class SupabaseService {
       const { data: existing } = await supabase!
         .from('tramitaciones')
         .select('id, tramitación')
-        .eq('número', numero)
+        .eq('número', número)
         .is('tramitación', null)
         .single();
 
       // Si ya existe un registro sin tramitar, no crear uno nuevo
       if (existing) {
-        console.log(`Tramitación ya existe para número ${numero}, omitiendo creación`);
+        console.log(`Tramitación ya existe para número ${número}, omitiendo creación`);
         return;
       }
 
@@ -55,13 +55,13 @@ class SupabaseService {
       const { error } = await supabase!
         .from('tramitaciones')
         .insert({
-          número: numero,
+          número: número,
         });
 
       if (error) {
-        console.error('Error creating tramitacion:', error);
+        console.error('Error creating tramitación:', error);
       } else {
-        console.log(`Tramitación creada para número ${numero}`);
+        console.log(`Tramitación creada para número ${número}`);
       }
     } catch (error) {
       console.error('Error in createTramitacion:', error);
@@ -75,7 +75,7 @@ class SupabaseService {
    * @param fechaCreacion - Fecha cierre de Airtable (timezone Madrid UTC+1, formato ISO)
    * @param fechaTramitacion - Fecha de tramitación (timestamp actual)
    */
-  async trackTramitacion(numero: string, fechaCreacion?: string, fechaTramitacion?: string): Promise<void> {
+  async trackTramitacion(número: string, fechaCreacion?: string, fechaTramitacion?: string): Promise<void> {
     if (!this.isEnabled()) return;
 
     try {
@@ -89,7 +89,7 @@ class SupabaseService {
       const tramitacionDate = fechaTramitacion ? addOneHour(fechaTramitacion) : addOneHour(new Date().toISOString());
       const creacionDate = fechaCreacion ? addOneHour(fechaCreacion) : addOneHour(new Date().toISOString());
 
-      console.log(`[Supabase] Tracking tramitación: ${numero}`, {
+      console.log(`[Supabase] Tracking tramitación: ${número}`, {
         fechaCreacionOriginal: fechaCreacion,
         fechaCreacionAjustada: creacionDate,
         fechaTramitacionOriginal: fechaTramitacion,
@@ -97,14 +97,18 @@ class SupabaseService {
       });
 
       // Buscar registro existente sin tramitar
-      const { data: existing } = await supabase!
+      const { data: existing, error: selectError } = await supabase!
         .from('tramitaciones')
         .select('id')
-        .eq('número', numero)
+        .eq('número', número)
         .is('tramitación', null)
         .order('creación', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
+
+      if (selectError) {
+        console.error('Error buscando tramitación existente:', selectError);
+      }
 
       if (existing) {
         // Actualizar registro existente con la fecha de tramitación
@@ -116,9 +120,9 @@ class SupabaseService {
           .eq('id', existing.id);
 
         if (error) {
-          console.error('Error updating existing tramitacion:', error);
+          console.error('Error updating existing tramitación:', error);
         } else {
-          console.log(`Tramitación actualizada para número ${numero}`);
+          console.log(`Tramitación actualizada para número ${número}`);
         }
       } else {
         // No existe registro previo, crear uno nuevo con ambas fechas
@@ -127,7 +131,7 @@ class SupabaseService {
         const { error } = await supabase!
           .from('tramitaciones')
           .insert({
-            número: numero,
+            número: número,
             creación: creacionDate,
             tramitación: tramitacionDate,
           });
@@ -135,7 +139,7 @@ class SupabaseService {
         if (error) {
           console.error('Error creating tramitacion record:', error);
         } else {
-          console.log(`Tramitación trackeada para número ${numero}`);
+          console.log(`Tramitación trackeada para número ${número}`);
         }
       }
     } catch (error) {
@@ -146,7 +150,7 @@ class SupabaseService {
   /**
    * Actualizar la fecha de tramitación cuando se marca como tramitado
    */
-  async completeTramitacion(numero: string): Promise<void> {
+  async completeTramitacion(número: string): Promise<void> {
     if (!this.isEnabled()) return;
 
     try {
@@ -154,30 +158,32 @@ class SupabaseService {
       const { data: records } = await supabase!
         .from('tramitaciones')
         .select('id')
-        .eq('número', numero)
+        .eq('número', número)
         .is('tramitación', null)
         .order('creación', { ascending: false })
         .limit(1);
 
       if (!records || records.length === 0) {
-        console.log(`No se encontró tramitación pendiente para número ${numero}`);
+        console.log(`No se encontró tramitación pendiente para número ${número}`);
         return;
       }
 
       const recordId = records[0].id;
 
-      // Actualizar con la fecha de tramitación
+      // Actualizar con la fecha de tramitación (+1 hora para Madrid)
+      const now = new Date();
+      now.setHours(now.getHours() + 1);
       const { error } = await supabase!
         .from('tramitaciones')
         .update({
-          tramitación: new Date().toISOString(),
+          tramitación: now.toISOString(),
         })
         .eq('id', recordId);
 
       if (error) {
-        console.error('Error updating tramitacion:', error);
+        console.error('Error updating tramitación:', error);
       } else {
-        console.log(`Tramitación completada para número ${numero}`);
+        console.log(`Tramitación completada para número ${número}`);
       }
     } catch (error) {
       console.error('Error in completeTramitacion:', error);
@@ -383,21 +389,21 @@ class SupabaseService {
   /**
    * Crear un registro cuando un envío entra en estado de recogida
    */
-  async createRecogida(numero: string): Promise<void> {
+  async createRecogida(número: string): Promise<void> {
     if (!this.isEnabled()) return;
 
     try {
-      // Verificar si ya existe un registro para este número sin fecha de envío
+      // Verificar si ya existe un registro para este número sin fecha de tramitado
       const { data: existing } = await supabase!
         .from('recogidas')
         .select('id, enviado')
-        .eq('número', numero)
-        .is('enviado', null)
+        .eq('número', número)
+        .is('tramitado', null)
         .single();
 
-      // Si ya existe un registro sin enviar, no crear uno nuevo
+      // Si ya existe un registro sin tramitar, no crear uno nuevo
       if (existing) {
-        console.log(`Recogida ya existe para número ${numero}, omitiendo creación`);
+        console.log(`Recogida ya existe para número ${número}, omitiendo creación`);
         return;
       }
 
@@ -405,13 +411,13 @@ class SupabaseService {
       const { error } = await supabase!
         .from('recogidas')
         .insert({
-          número: numero,
+          número: número,
         });
 
       if (error) {
         console.error('Error creating recogida:', error);
       } else {
-        console.log(`Recogida creada para número ${numero}`);
+        console.log(`Recogida creada para número ${número}`);
       }
     } catch (error) {
       console.error('Error in createRecogida:', error);
@@ -419,40 +425,42 @@ class SupabaseService {
   }
 
   /**
-   * Actualizar la fecha de envío cuando se marca como "Recogida enviada"
+   * Actualizar la fecha de tramitado cuando se marca como "Recogida enviada"
    */
-  async completeRecogida(numero: string): Promise<void> {
+  async completeRecogida(número: string): Promise<void> {
     if (!this.isEnabled()) return;
 
     try {
-      // Buscar el registro más reciente sin fecha de envío
+      // Buscar el registro más reciente sin fecha de tramitado
       const { data: records } = await supabase!
         .from('recogidas')
         .select('id')
-        .eq('número', numero)
-        .is('enviado', null)
+        .eq('número', número)
+        .is('tramitado', null)
         .order('creación', { ascending: false })
         .limit(1);
 
       if (!records || records.length === 0) {
-        console.log(`No se encontró recogida pendiente para número ${numero}`);
+        console.log(`No se encontró recogida pendiente para número ${número}`);
         return;
       }
 
       const recordId = records[0].id;
 
-      // Actualizar con la fecha de envío
+      // Actualizar con la fecha de tramitado (+1 hora para Madrid)
+      const now = new Date();
+      now.setHours(now.getHours() + 1);
       const { error } = await supabase!
         .from('recogidas')
         .update({
-          enviado: new Date().toISOString(),
+          tramitado: now.toISOString(),
         })
         .eq('id', recordId);
 
       if (error) {
         console.error('Error updating recogida:', error);
       } else {
-        console.log(`Recogida completada para número ${numero}`);
+        console.log(`Recogida completada para número ${número}`);
       }
     } catch (error) {
       console.error('Error in completeRecogida:', error);
@@ -463,10 +471,10 @@ class SupabaseService {
    * Trackear recogida completa (crear registro con ambas fechas o actualizar si existe)
    * @param numero - Número del envío
    * @param fechaCreacion - Fecha de creación (cuando entró en estado de recogida)
-   * @param fechaEnviado - Fecha de envío (cuando se marcó como recogida enviada)
+   * @param fechaTramitado - Fecha de envío (cuando se marcó como recogida enviada)
    */
-  async trackRecogida(numero: string, fechaCreacion?: string, fechaEnviado?: string): Promise<void> {
-    console.log('[Supabase.trackRecogida] Llamado con:', { numero, fechaCreacion, fechaEnviado });
+  async trackRecogida(número: string, fechaCreacion?: string, fechaTramitado?: string): Promise<void> {
+    console.log('[Supabase.trackRecogida] Llamado con:', { número, fechaCreacion, fechaTramitado });
     
     if (!this.isEnabled()) {
       console.warn('[Supabase.trackRecogida] Supabase no está habilitado');
@@ -474,52 +482,61 @@ class SupabaseService {
     }
 
     try {
-      const enviadoDate = fechaEnviado ? new Date(fechaEnviado).toISOString() : new Date().toISOString();
-      const creacionDate = fechaCreacion ? new Date(fechaCreacion).toISOString() : new Date().toISOString();
+      // Sumar 1 hora a ambas fechas para ajustar a la hora de Madrid
+      const addOneHour = (dateStr: string): string => {
+        const date = new Date(dateStr);
+        date.setHours(date.getHours() + 1);
+        return date.toISOString();
+      };
 
-      console.log(`[Supabase] Tracking recogida: ${numero}`, {
-        fechaCreacion: creacionDate,
-        fechaEnviado: enviadoDate
+      const tramitadoDate = fechaTramitado ? addOneHour(fechaTramitado) : addOneHour(new Date().toISOString());
+      const creacionDate = fechaCreacion ? addOneHour(fechaCreacion) : addOneHour(new Date().toISOString());
+
+      console.log(`[Supabase] Tracking recogida: ${número}`, {
+        fechaCreacionOriginal: fechaCreacion,
+        fechaCreacionAjustada: creacionDate,
+        fechaTramitadoOriginal: fechaTramitado,
+        fechaTramitadoAjustada: tramitadoDate
       });
 
-      // Buscar registro existente sin enviar
+      // Buscar registro existente sin tramitar
       const { data: existing } = await supabase!
         .from('recogidas')
         .select('id')
-        .eq('número', numero)
-        .is('enviado', null)
+        .eq('número', número)
+        .is('tramitado', null)
         .order('creación', { ascending: false })
         .limit(1)
         .single();
 
       if (existing) {
-        // Actualizar registro existente con la fecha de envío
+        // Actualizar registro existente con la fecha de tramitado
         const { error } = await supabase!
           .from('recogidas')
           .update({
-            enviado: enviadoDate,
+            tramitado: tramitadoDate,
           })
           .eq('id', existing.id);
 
         if (error) {
           console.error('[Supabase] Error updating existing recogida:', error);
         } else {
-          console.log(`[Supabase] Recogida actualizada para número ${numero}`);
+          console.log(`[Supabase] Recogida actualizada para número ${número}`);
         }
       } else {
         // No existe registro previo, crear uno nuevo con ambas fechas
         const { error } = await supabase!
           .from('recogidas')
           .insert({
-            número: numero,
+            número: número,
             creación: creacionDate,
-            enviado: enviadoDate,
+            tramitado: tramitadoDate,
           });
 
         if (error) {
           console.error('[Supabase] Error creating recogida record:', error);
         } else {
-          console.log(`[Supabase] Recogida trackeada para número ${numero}`);
+          console.log(`[Supabase] Recogida trackeada para número ${número}`);
         }
       }
     } catch (error) {
@@ -534,8 +551,8 @@ class SupabaseService {
    * @param fechaCreacion - Fecha de creación del registro en Airtable (columna "Creación")
    * @param fechaInforme - Fecha cuando se marca el estado (timestamp actual)
    */
-  async trackAsesoramiento(numero: string, fechaCreacion?: string, fechaInforme?: string): Promise<void> {
-    console.log('[Supabase.trackAsesoramiento] Llamado con:', { numero, fechaCreacion, fechaInforme });
+  async trackAsesoramiento(número: string, fechaCreacion?: string, fechaInforme?: string): Promise<void> {
+    console.log('[Supabase.trackAsesoramiento] Llamado con:', { número, fechaCreacion, fechaInforme });
     
     if (!this.isEnabled()) {
       console.warn('[Supabase.trackAsesoramiento] Supabase no está habilitado');
@@ -553,7 +570,7 @@ class SupabaseService {
       const informeDate = fechaInforme ? addOneHour(fechaInforme) : addOneHour(new Date().toISOString());
       const creacionDate = fechaCreacion ? addOneHour(fechaCreacion) : addOneHour(new Date().toISOString());
 
-      console.log(`[Supabase] Tracking asesoramiento: ${numero}`, {
+      console.log(`[Supabase] Tracking asesoramiento: ${número}`, {
         fechaCreacionOriginal: fechaCreacion,
         fechaCreacionAjustada: creacionDate,
         fechaInformeOriginal: fechaInforme,
@@ -564,7 +581,7 @@ class SupabaseService {
       const { data: existing } = await supabase!
         .from('asesoramientos')
         .select('id')
-        .eq('número', numero)
+        .eq('número', número)
         .is('informe', null)
         .order('creación', { ascending: false })
         .limit(1);
@@ -582,14 +599,14 @@ class SupabaseService {
         if (error) {
           console.error('[Supabase] Error updating existing asesoramiento:', error);
         } else {
-          console.log(`[Supabase] Asesoramiento actualizado para número ${numero}`);
+          console.log(`[Supabase] Asesoramiento actualizado para número ${número}`);
         }
       } else {
         // No existe registro previo, crear uno nuevo con ambas fechas
         const { error } = await supabase!
           .from('asesoramientos')
           .insert({
-            número: numero,
+            número: número,
             creación: creacionDate,
             informe: informeDate,
           });
@@ -597,7 +614,7 @@ class SupabaseService {
         if (error) {
           console.error('[Supabase] Error creating asesoramiento record:', error);
         } else {
-          console.log(`[Supabase] Asesoramiento trackeado para número ${numero}`);
+          console.log(`[Supabase] Asesoramiento trackeado para número ${número}`);
         }
       }
     } catch (error) {

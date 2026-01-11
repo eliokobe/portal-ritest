@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Search, X, XCircle, MessageCircle, Phone } from 'lucide-react';
 import { airtableService } from '../services/airtable';
+import { supabaseService } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { getStatusColors } from '../utils/statusColors';
 
@@ -74,6 +75,7 @@ const Reparaciones: React.FC = () => {
   const [technicians, setTechnicians] = useState<{ id: string; nombre?: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<'requiere-accion' | 'en-espera'>('requiere-accion');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -390,9 +392,63 @@ const Reparaciones: React.FC = () => {
     if (!service || newSeguimiento === service.seguimiento) return;
     setSaving(true);
     try {
+      // Guardar la fecha de seguimiento ANTERIOR antes de actualizar (se perderá al actualizar el campo)
+      const fechaSeguimientoAnterior = service.fechaSeguimiento;
+      console.log('[Reparaciones] Fecha seguimiento anterior:', fechaSeguimientoAnterior);
+      
       await airtableService.updateServiceField(service.id, 'Seguimiento', newSeguimiento, 'Reparaciones');
       setServices((prev) => prev.map((s) => (s.id === service.id ? { ...s, seguimiento: newSeguimiento } : s)));
       setSelectedService((prev) => (prev && prev.id === service.id ? { ...prev, seguimiento: newSeguimiento } : prev));
+      
+      // Crear registro en tramitaciones de Supabase si hay servicioId
+      console.log('[Reparaciones] Verificando servicioId para tramitación:', service.servicioId);
+      if (service.servicioId && service.servicioId.length > 0) {
+        try {
+          // Obtener el expediente del servicio relacionado
+          console.log('[Reparaciones] Obteniendo datos del servicio:', service.servicioId[0]);
+          const servicioData = await airtableService.getServicioData(service.servicioId[0]);
+          console.log('[Reparaciones] Datos del servicio recibidos:', servicioData);
+          
+          const expediente = servicioData?.fields?.['Expediente'] || servicioData?.fields?.['expediente'];
+          console.log('[Reparaciones] Expediente encontrado:', expediente);
+          
+          if (expediente) {
+            // La fecha de tramitado es la fecha actual (cuando se marca el seguimiento)
+            const fechaTramitado = new Date().toISOString();
+            
+            // La fecha de creación depende del tipo de seguimiento
+            let fechaCreacion = fechaTramitado;
+            
+            if (newSeguimiento === 'Primera llamada') {
+              // Primera llamada: Los servicios aparecen en tramitaciones 2 días después de la Fecha Estado
+              if (service.fechaEstado) {
+                const fechaEstadoDate = new Date(service.fechaEstado);
+                fechaEstadoDate.setDate(fechaEstadoDate.getDate() + 2); // Añadir 2 días
+                fechaCreacion = fechaEstadoDate.toISOString();
+              }
+            } else if (newSeguimiento === 'Segunda llamada' || newSeguimiento === 'Whatsapp' || newSeguimiento === 'Ilocalizable') {
+              // Segunda llamada, Whatsapp o Ilocalizable: creación = Fecha seguimiento anterior + 4h
+              if (fechaSeguimientoAnterior) {
+                const fechaSeguimientoDate = new Date(fechaSeguimientoAnterior);
+                fechaSeguimientoDate.setHours(fechaSeguimientoDate.getHours() + 4);
+                fechaCreacion = fechaSeguimientoDate.toISOString();
+                console.log('[Reparaciones] Usando fecha seguimiento anterior + 4h:', fechaSeguimientoAnterior, '->', fechaCreacion);
+              }
+            }
+            
+            console.log('[Reparaciones] Creando tramitación con seguimiento:', newSeguimiento, { expediente, fechaCreacion, fechaTramitado });
+            await supabaseService.trackTramitacion(expediente, fechaCreacion, fechaTramitado);
+            console.log(`[Reparaciones] Registro creado en tramitaciones para expediente ${expediente}`);
+          } else {
+            console.log('[Reparaciones] No se encontró expediente en el servicio');
+          }
+        } catch (error) {
+          console.error('[Reparaciones] Error creando registro en tramitaciones:', error);
+          // No mostramos error al usuario ya que el seguimiento se guardó correctamente
+        }
+      } else {
+        console.log('[Reparaciones] No hay servicioId vinculado a esta reparación');
+      }
     } catch (err) {
       console.error('Reparaciones - Error actualizando seguimiento:', err);
       alert('Error al actualizar el seguimiento');
@@ -403,10 +459,12 @@ const Reparaciones: React.FC = () => {
 
   // Filtrar reparaciones por término de búsqueda
   const filteredServices = useMemo(() => {
-    const allowedStates = new Set(['Asignado', 'Aceptado', 'Citado', 'Rechazado']);
+    const allowedStates = new Set(['Asignado', 'Aceptado', 'Citado']);
     const isTecnico = user?.role === 'Técnico';
+    const isAdministrativa = user?.role === 'Administrativa';
     const now = new Date();
     const HOURS_48_IN_MS = 48 * 60 * 60 * 1000;
+    const HOURS_4_IN_MS = 4 * 60 * 60 * 1000;
 
     // Para técnicos: mostrar solo estados Asignado, Aceptado, Citado (sin filtro de tiempo)
     // Para otros roles: mostrar registros con estado válido y que han pasado más de 48 horas desde fechaEstado
@@ -414,6 +472,12 @@ const Reparaciones: React.FC = () => {
       const estadoValido = service.estado && allowedStates.has(service.estado);
       
       if (!estadoValido) return false;
+      
+      // Excluir si tiene una cita futura
+      if (service.cita) {
+        const citaDate = new Date(service.cita);
+        if (citaDate > now) return false;
+      }
       
       // Si es técnico, solo filtrar por estado (sin restricción de tiempo)
       if (isTecnico) {
@@ -426,7 +490,31 @@ const Reparaciones: React.FC = () => {
       const fechaEstado = new Date(service.fechaEstado);
       const timeDiff = now.getTime() - fechaEstado.getTime();
       
-      return timeDiff > HOURS_48_IN_MS;
+      if (timeDiff <= HOURS_48_IN_MS) return false;
+      
+      // Filtrado por pestañas solo para Administrativa
+      if (isAdministrativa) {
+        if (activeTab === 'requiere-accion') {
+          // Requiere acción: Fecha seguimiento con más de 4 horas
+          if (service.fechaSeguimiento) {
+            const fechaSeguimiento = new Date(service.fechaSeguimiento);
+            const timeSinceSeguimiento = now.getTime() - fechaSeguimiento.getTime();
+            return timeSinceSeguimiento > HOURS_4_IN_MS;
+          }
+          // Si no tiene fecha de seguimiento, no aparece en requiere acción
+          return false;
+        }
+        
+        if (activeTab === 'en-espera') {
+          // En espera: Sin fecha de seguimiento o con menos de 4 horas
+          if (!service.fechaSeguimiento) return true;
+          const fechaSeguimiento = new Date(service.fechaSeguimiento);
+          const timeSinceSeguimiento = now.getTime() - fechaSeguimiento.getTime();
+          return timeSinceSeguimiento <= HOURS_4_IN_MS;
+        }
+      }
+      
+      return true;
     });
 
     const term = searchTerm.trim().toLowerCase();
@@ -456,7 +544,7 @@ const Reparaciones: React.FC = () => {
       const dateB = b.fechaEstado ? new Date(b.fechaEstado).getTime() : 0;
       return dateB - dateA; // Más recientes primero
     });
-  }, [services, searchTerm, user?.role]);
+  }, [services, searchTerm, user?.role, activeTab]);
 
   const formatDateTime = (dateString?: string) => {
     if (!dateString) return '-';
@@ -477,9 +565,12 @@ const Reparaciones: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
-        <p className="ml-4 text-gray-600">Cargando seguimiento de técnicos...</p>
+      <div className="flex flex-col items-center justify-center h-64">
+        <div className="relative w-16 h-16 mb-4">
+          <div className="absolute inset-0 border-4 border-green-100 rounded-full"></div>
+          <div className="absolute inset-0 border-4 border-transparent border-t-green-600 rounded-full animate-spin"></div>
+        </div>
+        <p className="text-gray-600 font-medium">Cargando reparaciones...</p>
       </div>
     );
   }
@@ -522,6 +613,33 @@ const Reparaciones: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {user?.role === 'Administrativa' && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="flex border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab('requiere-accion')}
+              className={`flex-1 px-6 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'requiere-accion'
+                  ? 'bg-brand-primary text-white border-b-2 border-brand-primary'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-brand-primary'
+              }`}
+            >
+              Requiere Acción
+            </button>
+            <button
+              onClick={() => setActiveTab('en-espera')}
+              className={`flex-1 px-6 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'en-espera'
+                  ? 'bg-brand-primary text-white border-b-2 border-brand-primary'
+                  : 'text-gray-700 hover:bg-gray-50 hover:text-brand-primary'
+              }`}
+            >
+              En Espera
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">

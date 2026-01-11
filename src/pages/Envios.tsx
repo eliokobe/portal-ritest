@@ -20,6 +20,7 @@ const GESTORA_OPERATIVA_FILTROS = [
 
 const TRACKING_BASE = 'https://app.cttexpress.com/Forms/Destinatarios.aspx?c=00828000964&r=IL88P';
 const ESTADO_OPTIONS = ['Envío creado', 'Listo para enviar', 'Enviado', 'Entregado', 'Devuelto', 'Reclamado', 'Recogida hecha', 'Pendiente recogida', 'Recogida enviada'];
+const SEGUIMIENTO_OPTIONS = ['Email enviado'];
 
 const normalizeText = (value?: string | number) => (value ?? '').toString().toLowerCase();
 const normalizeExpediente = (value?: string | number) => (value ?? '').toString().replace(/\s+/g, '').toLowerCase();
@@ -199,10 +200,41 @@ export default function Envios() {
     });
   };
 
+  // Función para calcular horas laborables (excluyendo fines de semana)
+  const calculateBusinessHours = (startDate: Date, endDate: Date): number => {
+    let hours = 0;
+    const current = new Date(startDate);
+    
+    while (current < endDate) {
+      const dayOfWeek = current.getDay();
+      // Solo contar si es día laboral (lunes=1 a viernes=5)
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        hours++;
+      }
+      current.setHours(current.getHours() + 1);
+    }
+    
+    return hours;
+  };
+
   const filteredEnvios = envios.filter(envio => {
     // Excluir envíos con estados finalizados
     const estadosExcluidos = ['Entregado', 'Devuelto', 'Recogida hecha'];
     if (envio.estado && estadosExcluidos.includes(envio.estado)) return false;
+    
+    // Excluir envíos con seguimiento "Email enviado"
+    if (envio.seguimiento === 'Email enviado') return false;
+    
+    const now = new Date();
+    
+    // Filtrar por fecha de envío (más de 48 horas laborables)
+    if (envio.fechaEnvio) {
+      const fechaEnvio = new Date(envio.fechaEnvio);
+      const businessHours = calculateBusinessHours(fechaEnvio, now);
+      
+      // Solo mostrar si han pasado más de 48 horas laborables
+      if (businessHours <= 48) return false;
+    }
     
     if (!searchTerm) return true;
     const needle = searchTerm.toLowerCase();
@@ -244,8 +276,12 @@ export default function Envios() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
+      <div className="flex flex-col items-center justify-center h-64">
+        <div className="relative w-16 h-16 mb-4">
+          <div className="absolute inset-0 border-4 border-green-100 rounded-full"></div>
+          <div className="absolute inset-0 border-4 border-transparent border-t-green-600 rounded-full animate-spin"></div>
+        </div>
+        <p className="text-gray-600 font-medium">Cargando envíos...</p>
       </div>
     );
   }
@@ -403,7 +439,7 @@ export default function Envios() {
                   Producto
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Fecha Cambio
+                  Seguimiento
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Detalles
@@ -554,9 +590,63 @@ export default function Envios() {
                     <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
                       {envio.producto || '-'}
                     </td>
-                    {/* Fecha Cambio (solo lectura) */}
-                    <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
-                      {formatDate(envio.fechaCambio)}
+                    {/* Seguimiento */}
+                    <td className="px-4 py-3 text-sm whitespace-nowrap">
+                      <select
+                        value={envio.seguimiento || ''}
+                        onChange={async (e) => {
+                          const newValue = e.target.value;
+                          setSaving(true);
+                          try {
+                            await handleSave(envio.id, 'seguimiento', newValue);
+                            
+                            // Crear registro en recogidas de Supabase
+                            if (envio.numero && newValue) {
+                              console.log('[Envios] Creando registro en recogidas para:', envio.numero, 'Seguimiento:', newValue);
+                              
+                              // Email enviado: creación = Fecha de envío + 48h + 1h
+                              let fechaCreacion: string;
+                              if (envio.fechaEnvio) {
+                                const fechaEnvio = new Date(envio.fechaEnvio);
+                                fechaEnvio.setHours(fechaEnvio.getHours() + 48 + 1);
+                                fechaCreacion = fechaEnvio.toISOString();
+                                console.log('[Envios] Fecha envío:', envio.fechaEnvio, '+ 49h =', fechaCreacion);
+                              } else {
+                                console.warn('[Envios] No hay fecha de envío, usando fecha actual');
+                                fechaCreacion = new Date().toISOString();
+                              }
+                              
+                              // Fecha tramitado = fecha actual (cuando se marca seguimiento)
+                              const fechaTramitado = new Date().toISOString();
+                              
+                              console.log('[Envios] Fechas calculadas:', { fechaCreacion, fechaTramitado });
+                              await supabaseService.trackRecogida(envio.numero, fechaCreacion, fechaTramitado);
+                              console.log('[Envios] Registro creado en recogidas');
+                            } else {
+                              console.warn('[Envios] No hay número o seguimiento para crear registro en recogidas');
+                            }
+                          } catch (error) {
+                            console.error('[Envios] Error updating seguimiento:', error);
+                            alert('Error al actualizar el seguimiento');
+                          } finally {
+                            setSaving(false);
+                          }
+                        }}
+                        disabled={saving}
+                        className="py-1 px-3 text-xs font-semibold rounded-full cursor-pointer hover:opacity-80 transition-opacity border border-gray-300 text-center bg-white text-gray-700"
+                        style={{ 
+                          appearance: 'none', 
+                          backgroundImage: 'none',
+                          width: `${(envio.seguimiento || 'Sin seguimiento').length + 4}ch`,
+                          paddingLeft: '0.75rem',
+                          paddingRight: '0.75rem'
+                        }}
+                      >
+                        <option value="">Seleccionar...</option>
+                        {SEGUIMIENTO_OPTIONS.map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
                     </td>
                     {/* Detalles */}
                     <td className="px-4 py-3 text-center">

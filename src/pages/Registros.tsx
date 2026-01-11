@@ -313,6 +313,9 @@ export default function Registros() {
     // Si está Citado, debe tener PDF relleno
     const isCitadoWithoutPdf = registro.estado === 'Citado' && (!registro.pdf || registro.pdf.length === 0);
 
+    // Excluir si: Estado=Informe y PDF vacío
+    const isInformeWithoutPdf = registro.estado === 'Informe' && (!registro.pdf || registro.pdf.length === 0);
+
     // Excluir si: Estado=Informe, Ipartner=Citado, Fecha Ipartner hace menos de una semana, y PDF vacío
     const isInformeWithRecentCitedIpartnerAndNoPdf = 
       registro.estado === 'Informe' && 
@@ -326,13 +329,17 @@ export default function Registros() {
         return fechaIpartner > sevenDaysAgo;
       })();
 
-    return matchesSearch && !isIpartnerExcluded && !isCitadoWithoutPdf && !isInformeWithRecentCitedIpartnerAndNoPdf;
+    return matchesSearch && !isIpartnerExcluded && !isCitadoWithoutPdf && !isInformeWithoutPdf && !isInformeWithRecentCitedIpartnerAndNoPdf;
   });
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
+      <div className="flex flex-col items-center justify-center h-64">
+        <div className="relative w-16 h-16 mb-4">
+          <div className="absolute inset-0 border-4 border-green-100 rounded-full"></div>
+          <div className="absolute inset-0 border-4 border-transparent border-t-green-600 rounded-full animate-spin"></div>
+        </div>
+        <p className="text-gray-600 font-medium">Cargando asesoramientos...</p>
       </div>
     );
   }
@@ -388,8 +395,10 @@ export default function Registros() {
                     <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">
                       {registro.contrato || '-'}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
-                      {registro.nombre || '-'}
+                    <td className="px-4 py-3 text-sm text-gray-900 w-48">
+                      <div className="max-w-[12rem] truncate" title={registro.nombre}>
+                        {registro.nombre || '-'}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
                       {registro.telefono || '-'}

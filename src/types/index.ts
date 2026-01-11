@@ -101,6 +101,8 @@ export interface Envio {
   catalogo?: string;
   comentarios?: string;
   fechaEnvio?: string;
+  fechaEstado?: string;
+  fechaSeguimiento?: string;
   material?: string;
   producto?: string; // Solo lectura (lookup)
   fechaCambio?: string; // Solo lectura (timestamp)

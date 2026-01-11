@@ -549,48 +549,121 @@ export const airtableService = {
   async getAdminDashboardStats(): Promise<{
     unsynchronizedCount: number;
     synchronizedTodayCount: number;
+    enviosPendientesCount: number;
+    reparacionesPendientesCount: number;
   }> {
     try {
-      const records = await fetchAllServicios(AIRTABLE_SERVICES_TABLE, { pageSize: 100 });
-      const today = new Date().toISOString().split('T')[0];
+      const enviosRecords = await fetchAllServicios(AIRTABLE_ENVIOS_TABLE, { pageSize: 100 });
+      const reparacionesRecords = await fetchAllServicios('Reparaciones', { pageSize: 100 });
       
-      let unsynchronizedCount = 0;
-      let synchronizedTodayCount = 0;
+      // Obtener tramitaciones usando el mismo método que usa la página Tramitacion
+      const allTramitaciones = await fetchServicesByTable({ 
+        tableName: AIRTABLE_SERVICES_TABLE, 
+        onlyUnsynced: true 
+      });
       
-      records.forEach((r: any) => {
-        const f = r.fields ?? {};
-        const tramitado = f['Tramitado'];
-        const fechaSincronizacion = f['Fecha sincronización'] ?? f['Fecha sincronizacion'];
-        const accionIpartner = f['Acción Ipartner'];
-        const ipartner = f['Ipartner'];
-        
+      // Aplicar el mismo filtro que usa la página Services.tsx para tramitaciones
+      const tramitacionesFiltradas = allTramitaciones.filter((s: any) => {
         // Registros pendientes de tramitar
-        const isPendiente = !tramitado &&
-          accionIpartner && (typeof accionIpartner === 'string' ? accionIpartner.trim() !== '' : accionIpartner.length > 0) &&
-          ipartner !== 'Cancelado' && ipartner !== 'Finalizado';
+        const isPendiente = !s.tramitado &&
+          !!s.accionIpartner && s.accionIpartner.trim() !== '' &&
+          s.ipartner !== 'Cancelado' && s.ipartner !== 'Facturado';
         
-        if (isPendiente) {
-          unsynchronizedCount++;
+        return isPendiente;
+      });
+      
+      const unsynchronizedCount = tramitacionesFiltradas.length;
+      
+      // Función para calcular horas laborables (excluyendo fines de semana)
+      const calculateBusinessHours = (startDate: Date, endDate: Date): number => {
+        let hours = 0;
+        const current = new Date(startDate);
+        
+        while (current < endDate) {
+          const dayOfWeek = current.getDay();
+          // Solo contar si es día laboral (lunes=1 a viernes=5)
+          if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            hours++;
+          }
+          current.setHours(current.getHours() + 1);
         }
         
-        // Tramitados hoy (Tramitado true y fecha de sincronización hoy)
-        if (tramitado === true && fechaSincronizacion) {
-          const syncDate = new Date(fechaSincronizacion).toISOString().split('T')[0];
-          if (syncDate === today) {
-            synchronizedTodayCount++;
+        return hours;
+      };
+      
+      // Contar envíos pendientes con los mismos filtros que la tabla Envíos
+      const estadosExcluidos = ['Entregado', 'Devuelto', 'Recogida hecha'];
+      const now = new Date();
+      let enviosPendientesCount = 0;
+      
+      enviosRecords.forEach((r: any) => {
+        const f = r.fields ?? {};
+        const estado = f['Estado'];
+        const seguimiento = f['Seguimiento'];
+        const fechaEnvio = f['Fecha de envío'] ?? f['Fecha Envío'] ?? f['Fecha envio'];
+        
+        // Excluir estados finalizados
+        if (estado && estadosExcluidos.includes(estado)) return;
+        
+        // Excluir si tiene seguimiento "Email enviado"
+        if (seguimiento === 'Email enviado') return;
+        
+        // Filtrar por fecha de envío (más de 48 horas laborables)
+        if (fechaEnvio) {
+          const fechaEnvioDate = new Date(fechaEnvio);
+          const businessHours = calculateBusinessHours(fechaEnvioDate, now);
+          
+          // Solo contar si han pasado más de 48 horas laborables
+          if (businessHours > 48) {
+            enviosPendientesCount++;
           }
+        }
+      });
+      
+      // Contar reparaciones pendientes con los mismos filtros que la página Reparaciones
+      const allowedStates = ['Asignado', 'Aceptado', 'Citado'];
+      const HOURS_48_IN_MS = 48 * 60 * 60 * 1000;
+      
+      let reparacionesPendientesCount = 0;
+      reparacionesRecords.forEach((r: any) => {
+        const f = r.fields ?? {};
+        const estado = f['Estado'];
+        const fechaEstado = f['Fecha estado'] ?? f['Fecha Estado'];
+        const cita = f['Cita'];
+        
+        // Verificar estado válido
+        if (!estado || !allowedStates.includes(estado)) return;
+        
+        // Excluir si tiene una cita futura
+        if (cita) {
+          const citaDate = new Date(cita);
+          if (citaDate > now) return;
+        }
+        
+        // Verificar que han pasado más de 48 horas desde fechaEstado (para rol Administrativa)
+        if (!fechaEstado) return;
+        
+        const fechaEstadoDate = new Date(fechaEstado);
+        const timeDiff = now.getTime() - fechaEstadoDate.getTime();
+        
+        if (timeDiff > HOURS_48_IN_MS) {
+          reparacionesPendientesCount++;
         }
       });
       
       return {
         unsynchronizedCount,
-        synchronizedTodayCount,
+        synchronizedTodayCount: 0, // Ya no se usa pero se mantiene por compatibilidad
+        enviosPendientesCount,
+        reparacionesPendientesCount,
       };
     } catch (error) {
       console.error('Error fetching admin dashboard stats:', error);
       return {
         unsynchronizedCount: 0,
         synchronizedTodayCount: 0,
+        enviosPendientesCount: 0,
+        reparacionesPendientesCount: 0,
       };
     }
   },
@@ -897,6 +970,8 @@ export const airtableService = {
     servicio?: string;
     estado?: string;
     fechaEnvio?: string;
+    fechaEstado?: string;
+    fechaSeguimiento?: string;
     material?: string;
     producto?: string;
     fechaCambio?: string;
@@ -932,6 +1007,8 @@ export const airtableService = {
           servicio: Array.isArray(servicioField) ? servicioField[0] : servicioField,
           estado: f['Estado'],
           fechaEnvio: f['Fecha de envío'] ?? f['Fecha Envío'] ?? f['Fecha envio'],
+          fechaEstado: f['Fecha estado'] ?? f['Fecha Estado'],
+          fechaSeguimiento: f['Fecha seguimiento'] ?? f['Fecha Seguimiento'],
           material: Array.isArray(materialField) ? materialField[0] : materialField,
           producto: f['Producto'] ?? f['Modelo'],
           fechaCambio: f['Fecha Cambio'] ?? f['Last Modified'] ?? r.createdTime,
@@ -962,6 +1039,7 @@ export const airtableService = {
         numeroRecogida: 'Número de recogida',
         servicio: 'Servicio',
         estado: 'Estado',
+        seguimiento: 'Seguimiento',
         fechaEnvio: 'Fecha de envío',
         material: 'Inventario',
         transporte: 'Transporte',
@@ -1768,6 +1846,9 @@ export const airtableService = {
         const isIpartnerExcluded = ipartner && ipartnerExcluidos.includes(ipartner);
         const isCitadoWithoutPdf = estado === 'Citado' && (!pdf || pdf.length === 0);
         
+        // Excluir si: Estado=Informe y PDF vacío
+        const isInformeWithoutPdf = estado === 'Informe' && (!pdf || pdf.length === 0);
+        
         // Excluir si: Estado=Informe, Ipartner=Citado, Fecha Ipartner hace menos de una semana, y PDF vacío
         const isInformeWithRecentCitedIpartnerAndNoPdf = 
           estado === 'Informe' && 
@@ -1781,7 +1862,7 @@ export const airtableService = {
             return fecha > sevenDaysAgo;
           })();
         
-        const shouldShow = !isIpartnerExcluded && !isCitadoWithoutPdf && !isInformeWithRecentCitedIpartnerAndNoPdf;
+        const shouldShow = !isIpartnerExcluded && !isCitadoWithoutPdf && !isInformeWithoutPdf && !isInformeWithRecentCitedIpartnerAndNoPdf;
         
         // Contar registros válidos
         if (shouldShow && !tramitado) {
@@ -2419,6 +2500,19 @@ export const airtableService = {
     } catch (error) {
       console.error('Error fetching servicio comentarios:', error);
       return undefined;
+    }
+  },
+
+  // Obtener datos completos del servicio
+  async getServicioData(servicioId: string): Promise<any> {
+    try {
+      if (!servicioId) return null;
+      
+      const { data } = await serviciosApi.get(`/${AIRTABLE_SERVICES_TABLE}/${servicioId}`);
+      return data;
+    } catch (error) {
+      console.error('Error fetching servicio data:', error);
+      return null;
     }
   },
 };   

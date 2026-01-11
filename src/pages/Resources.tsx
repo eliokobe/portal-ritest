@@ -46,8 +46,12 @@ const Resources = () => {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-primary"></div>
+        <div className="flex flex-col items-center justify-center h-64">
+          <div className="relative w-16 h-16 mb-4">
+            <div className="absolute inset-0 border-4 border-green-100 rounded-full"></div>
+            <div className="absolute inset-0 border-4 border-transparent border-t-green-600 rounded-full animate-spin"></div>
+          </div>
+          <p className="text-gray-600 font-medium">Cargando recursos...</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
