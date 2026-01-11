@@ -85,7 +85,16 @@ function createAirtableClient(baseId) {
 }
 
 // Health check (sin autenticación)
+// Ambas rutas para compatibilidad con configuración anterior
 app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    authenticated: false
+  });
+});
+
+app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
