@@ -16,7 +16,6 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Configuración de Airtable
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID || 'appRMClMob8KPNooU';
 const SERVICIOS_BASE_ID = process.env.AIRTABLE_SERVICES_BASE_ID || 'appX3CBiSmPy4119D';
 const REGISTROS_BASE_ID = process.env.AIRTABLE_REGISTROS_BASE_ID || 'applcT2fcdNDpCRQ0';
 
@@ -29,19 +28,26 @@ app.use(cors({
 
 app.use(express.json());
 
-// Rate Limiting - 100 peticiones por 15 minutos por IP
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { error: 'Demasiadas peticiones, intenta más tarde' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-app.use('/api', limiter);
+// Rate Limiting desactivado (el equipo trabaja mucho)
+// Si necesitas activarlo en el futuro, descomenta:
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 1000,
+//   message: { error: 'Demasiadas peticiones, intenta más tarde' },
+//   standardHeaders: true,
+//   legacyHeaders: false,
+// });
+// app.use('/api', limiter);
 
 // Middleware de autenticación con Supabase
+// Permite login sin autenticación para el endpoint de Trabajadores
 async function authenticateUser(req, res, next) {
+  // Permitir login sin autenticación
+  if (req.path === '/api/servicios/Trabajadores' && req.method === 'GET') {
+    console.log('🔓 Permitiendo acceso sin autenticación para login');
+    return next();
+  }
+
   try {
     const authHeader = req.headers.authorization;
     
@@ -100,7 +106,9 @@ app.get('/api/auth/check', authenticateUser, (req, res) => {
 });
 
 // Endpoint de login - SIN autenticación (permite login inicial)
+// DEBE estar ANTES del endpoint genérico de servicios
 app.get('/api/servicios/Trabajadores', async (req, res) => {
+  console.log('🔓 Login endpoint (sin autenticación) - Trabajadores');
   try {
     const client = createAirtableClient(SERVICIOS_BASE_ID);
     const config = {
@@ -119,31 +127,9 @@ app.get('/api/servicios/Trabajadores', async (req, res) => {
   }
 });
 
-// Proxy para base principal de Airtable - CON AUTENTICACIÓN
-app.all('/api/airtable/:tableName*', authenticateUser, async (req, res) => {
-  try {
-    const { tableName } = req.params;
-    const path = req.params[0] || '';
-    const client = createAirtableClient(AIRTABLE_BASE_ID);
-    
-    const config = {
-      method: req.method,
-      url: `/${tableName}${path}`,
-      params: req.query,
-      data: req.body
-    };
-
-    const response = await client.request(config);
-    res.json(response.data);
-  } catch (error) {
-    console.error('Error en proxy Airtable:', error.response?.data || error.message);
-    res.status(error.response?.status || 500).json({
-      error: error.response?.data || error.message
-    });
-  }
-});
-
 // Proxy para base de servicios - CON AUTENTICACIÓN
+// Este endpoint genérico NO debe coincidir con /Trabajadores porque está después
+// Proxy para base de servicios - CON AUTENTICACIÓN (excepto Trabajadores para login)
 app.all('/api/servicios/:tableName*', authenticateUser, async (req, res) => {
   try {
     const { tableName } = req.params;
@@ -203,7 +189,7 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`🚀 Servidor backend seguro ejecutándose en puerto ${PORT}`);
   console.log(`🔒 Autenticación: Activada (Supabase JWT)`);
-  console.log(`⏱️  Rate Limiting: 100 req/15min`);
+  console.log(`⏱️  Rate Limiting: DESACTIVADO`);
   console.log(`🌐 CORS: ${CLIENT_URL}`);
   if (!AIRTABLE_API_KEY) {
     console.error('⚠️  ADVERTENCIA: AIRTABLE_API_KEY no configurada');

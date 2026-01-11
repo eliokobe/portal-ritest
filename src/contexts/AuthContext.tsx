@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, AuthContextType } from '../types';
 import { airtableService } from '../services/airtable';
+import { supabaseService } from '../services/supabase';
 import Cookies from 'js-cookie';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -57,23 +58,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
+      // 1. Autenticar con Airtable
       const authenticatedUser = await airtableService.authenticateUser(email, password);
       console.log('Authenticated user from Airtable:', authenticatedUser);
-      if (authenticatedUser) {
-        // Asegurar logoUrl si no vino en authenticateUser
-        let enriched = authenticatedUser;
-        if (!enriched.logoUrl) {
-          const logo = await airtableService.getClientLogo(enriched.id);
-          if (logo) {
-            enriched = { ...enriched, logoUrl: logo } as User;
-          }
-        }
-        console.log('Final enriched user:', enriched);
-        setUser(enriched);
-        Cookies.set('ritest_user', JSON.stringify(enriched), { expires: 7 });
-      } else {
+      if (!authenticatedUser) {
         throw new Error('Credenciales inválidas');
       }
+
+      // 2. Crear sesión en Supabase para obtener JWT token
+      const { data: supabaseData, error: supabaseError } = await supabaseService.supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (supabaseError) {
+        console.warn('Error creando sesión en Supabase:', supabaseError);
+        // Continuar sin Supabase - el usuario está autenticado en Airtable
+      } else {
+        console.log('Sesión Supabase creada:', supabaseData.session?.access_token ? 'Token obtenido' : 'Sin token');
+      }
+
+      // 3. Asegurar logoUrl
+      let enriched = authenticatedUser;
+      if (!enriched.logoUrl) {
+        const logo = await airtableService.getClientLogo(enriched.id);
+        if (logo) {
+          enriched = { ...enriched, logoUrl: logo } as User;
+        }
+      }
+      
+      console.log('Final enriched user:', enriched);
+      setUser(enriched);
+      Cookies.set('ritest_user', JSON.stringify(enriched), { expires: 7 });
     } finally {
       setLoading(false);
     }
