@@ -43,7 +43,7 @@ app.use(express.json());
 // Permite login sin autenticación para el endpoint de Trabajadores
 async function authenticateUser(req, res, next) {
   // Permitir login sin autenticación
-  if (req.path === '/api/servicios/Trabajadores' && req.method === 'GET') {
+  if (req.path === '/servicios/Trabajadores' && req.method === 'GET') {
     console.log('🔓 Permitiendo acceso sin autenticación para login');
     return next();
   }
@@ -85,7 +85,7 @@ function createAirtableClient(baseId) {
 }
 
 // Health check (sin autenticación)
-app.get('/api/health', (req, res) => {
+app.get('/health', (req, res) => {
   res.json({ 
     status: 'ok', 
     timestamp: new Date().toISOString(),
@@ -94,7 +94,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Endpoint de prueba de autenticación
-app.get('/api/auth/check', authenticateUser, (req, res) => {
+app.get('/auth/check', authenticateUser, (req, res) => {
   res.json({
     authenticated: true,
     user: {
@@ -107,7 +107,7 @@ app.get('/api/auth/check', authenticateUser, (req, res) => {
 
 // Endpoint de login - SIN autenticación (permite login inicial)
 // DEBE estar ANTES del endpoint genérico de servicios
-app.get('/api/servicios/Trabajadores', async (req, res) => {
+app.get('/servicios/Trabajadores', async (req, res) => {
   console.log('🔓 Login endpoint (sin autenticación) - Trabajadores');
   try {
     const client = createAirtableClient(SERVICIOS_BASE_ID);
@@ -130,7 +130,7 @@ app.get('/api/servicios/Trabajadores', async (req, res) => {
 // Proxy para base de servicios - CON AUTENTICACIÓN
 // Este endpoint genérico NO debe coincidir con /Trabajadores porque está después
 // Proxy para base de servicios - CON AUTENTICACIÓN (excepto Trabajadores para login)
-app.all('/api/servicios/:tableName*', authenticateUser, async (req, res) => {
+app.all('/servicios/:tableName*', authenticateUser, async (req, res) => {
   try {
     const { tableName } = req.params;
     const path = req.params[0] || '';
@@ -154,7 +154,7 @@ app.all('/api/servicios/:tableName*', authenticateUser, async (req, res) => {
 });
 
 // Proxy para base de registros - CON AUTENTICACIÓN
-app.all('/api/registros/:tableName*', authenticateUser, async (req, res) => {
+app.all('/registros/:tableName*', authenticateUser, async (req, res) => {
   try {
     const { tableName } = req.params;
     const path = req.params[0] || '';

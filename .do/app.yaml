@@ -60,7 +60,7 @@ services:
     value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtbndmaW1yY2JsbnZta2JmbHduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNTc4NDQsImV4cCI6MjA4MzYzMzg0NH0.Xdeil2_IPMFjprhFG7yoIwshqIhntNNZ3Hc6jEj6KjM
   
   health_check:
-    http_path: /api/health
+    http_path: /health
 
 # Frontend (Static Site) - SIN API key
 - name: portal-ritest
