@@ -43,9 +43,6 @@ services:
   - key: AIRTABLE_API_KEY
     scope: RUN_TIME
     type: SECRET
-  - key: AIRTABLE_BASE_ID
-    scope: RUN_TIME
-    value: appRMClMob8KPNooU
   - key: AIRTABLE_SERVICES_BASE_ID
     scope: RUN_TIME
     value: appX3CBiSmPy4119D
@@ -80,16 +77,7 @@ services:
   envs:
   - key: VITE_BACKEND_URL
     scope: RUN_AND_BUILD_TIME
-    value: https://portal.ritest.es/api
-  - key: VITE_AIRTABLE_BASE_ID
-    scope: RUN_AND_BUILD_TIME
-    value: appX3CBiSmPy4119D
-  - key: VITE_AIRTABLE_SERVICES_BASE_ID
-    scope: RUN_AND_BUILD_TIME
-    value: appX3CBiSmPy4119D
-  - key: VITE_AIRTABLE_WORKERS_TABLE
-    scope: RUN_AND_BUILD_TIME
-    value: Trabajadores
+    value: https://portal.ritest.es
   - key: VITE_SUPABASE_URL
     scope: RUN_AND_BUILD_TIME
     value: https://bmnwfimrcblnvmkbflwn.supabase.co
