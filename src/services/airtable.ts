@@ -84,14 +84,19 @@ async function inferServiciosFieldSample(tableName: string): Promise<ServiciosFi
   }
 }
 
-// Segunda base de Airtable para Registros
-const REGISTROS_BASE_ID = 'applcT2fcdNDpCRQ0';
+// Cliente para peticiones a la base de registros (via backend)
 const registrosApi = axios.create({
-  baseURL: `https://api.airtable.com/v0/${REGISTROS_BASE_ID}`,
-  headers: {
-    'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-    'Content-Type': 'application/json',
-  },
+  baseURL: `${BACKEND_URL}/api/registros`,
+  timeout: 30000,
+});
+
+// Interceptor para añadir token de autenticación
+registrosApi.interceptors.request.use(async (config) => {
+  const token = await getAuthToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
 });
 
 // Helper para escapar strings en fórmulas de Airtable
@@ -2743,22 +2748,13 @@ export const airtableService = {
   // Obtener contratos de chatbot
   async getContracts(): Promise<any[]> {
     try {
-      const CONTRACTS_BASE_ID = 'applcT2fcdNDpCRQ0'; // Base específica para contratos
       const TABLE_NAME = 'tblG2iusherLVxgSv';
-      
-      const contractsApi = axios.create({
-        baseURL: `https://api.airtable.com/v0/${CONTRACTS_BASE_ID}`,
-        headers: {
-          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      });
       
       const all: any[] = [];
       let offset: string | undefined;
       
       do {
-        const { data } = await contractsApi.get(`/${TABLE_NAME}`, {
+        const { data } = await registrosApi.get(`/${TABLE_NAME}`, {
           params: { offset }
         });
         const airtableData = data as { records?: any[]; offset?: string };
@@ -2779,18 +2775,9 @@ export const airtableService = {
   // Actualizar campo de contrato
   async updateContractField(contractId: string, fieldName: string, value: any): Promise<void> {
     try {
-      const CONTRACTS_BASE_ID = 'applcT2fcdNDpCRQ0';
       const TABLE_NAME = 'tblG2iusherLVxgSv';
       
-      const contractsApi = axios.create({
-        baseURL: `https://api.airtable.com/v0/${CONTRACTS_BASE_ID}`,
-        headers: {
-          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      await contractsApi.patch(`/${TABLE_NAME}/${contractId}`, {
+      await registrosApi.patch(`/${TABLE_NAME}/${contractId}`, {
         fields: {
           [fieldName]: value,
         },
@@ -2822,6 +2809,7 @@ export const airtableService = {
       // Usar el endpoint específico de Airtable para subir attachments
       const uploadUrl = `https://content.airtable.com/v0/${CONTRACTS_BASE_ID}/${contractId}/PDF/uploadAttachment`;
       
+      const token = await getAuthToken();
       await axios.post(
         uploadUrl,
         {
@@ -2831,7 +2819,7 @@ export const airtableService = {
         },
         {
           headers: {
-            'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+            'Authorization': token ? `Bearer ${token}` : '',
             'Content-Type': 'application/json',
           },
         }
