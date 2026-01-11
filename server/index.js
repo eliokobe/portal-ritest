@@ -99,6 +99,26 @@ app.get('/api/auth/check', authenticateUser, (req, res) => {
   });
 });
 
+// Endpoint de login - SIN autenticación (permite login inicial)
+app.get('/api/servicios/Trabajadores', async (req, res) => {
+  try {
+    const client = createAirtableClient(SERVICIOS_BASE_ID);
+    const config = {
+      method: 'GET',
+      url: '/Trabajadores',
+      params: req.query
+    };
+
+    const response = await client.request(config);
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error en login Trabajadores:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message
+    });
+  }
+});
+
 // Proxy para base principal de Airtable - CON AUTENTICACIÓN
 app.all('/api/airtable/:tableName*', authenticateUser, async (req, res) => {
   try {
