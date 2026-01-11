@@ -1,23 +1,59 @@
 name: sonrisia-portal
+region: nyc
+
+# Componente 1: Backend (API Proxy Seguro)
+# La API key está SOLO aquí, nunca se envía al navegador
 services:
-  - name: web
-    source_dir: /
+  - name: backend
     github:
       repo: tu-usuario/tu-repo
       branch: main
-    dockerfile_path: Dockerfile
-    http_port: 80
+      deploy_on_push: true
+    source_dir: server
+    build_command: npm install
+    run_command: npm start
+    environment_slug: node-js
     instance_count: 1
     instance_size_slug: basic-xxs
-    health_check:
-      http_path: /
+    
     envs:
-      - key: VITE_AIRTABLE_BASE_ID
-        scope: BUILD_TIME
-        type: SECRET
-      - key: VITE_AIRTABLE_API_KEY
-        scope: BUILD_TIME
-        type: SECRET
-      - key: NODE_ENV
+      - key: AIRTABLE_API_KEY
         scope: RUN_TIME
-        value: production
+        type: SECRET
+      - key: AIRTABLE_BASE_ID
+        scope: RUN_TIME
+        value: appRMClMob8KPNooU
+      - key: AIRTABLE_SERVICES_BASE_ID
+        scope: RUN_TIME
+        value: appX3CBiSmPy4119D
+      - key: AIRTABLE_REGISTROS_BASE_ID
+        scope: RUN_TIME
+        value: applcT2fcdNDpCRQ0
+      - key: CLIENT_URL
+        scope: RUN_TIME
+        value: ${APP_URL}
+    
+    health_check:
+      http_path: /api/health
+
+# Componente 2: Frontend (Static Site)
+# Ya NO tiene VITE_AIRTABLE_API_KEY
+static_sites:
+  - name: web
+    github:
+      repo: tu-usuario/tu-repo
+      branch: main
+      deploy_on_push: true
+    build_command: npm install && npm run build
+    output_dir: dist
+    
+    envs:
+      - key: VITE_BACKEND_URL
+        scope: BUILD_TIME
+        value: ${backend.PUBLIC_URL}
+      - key: VITE_SUPABASE_URL
+        scope: BUILD_TIME
+        value: https://bmnwfimrcblnvmkbflwn.supabase.co
+      - key: VITE_SUPABASE_ANON_KEY
+        scope: BUILD_TIME
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtbndmaW1yY2JsbnZta2JmbHduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNTc4NDQsImV4cCI6MjA4MzYzMzg0NH0.Xdeil2_IPMFjprhFG7yoIwshqIhntNNZ3Hc6jEj6KjM
