@@ -1,23 +1,60 @@
 name: sonrisia-portal
+region: nyc
+
+# Componente 1: Servidor Backend (API Proxy Seguro)
 services:
-  - name: web
-    source_dir: /
+  - name: backend
     github:
-      repo: tu-usuario/tu-repo
       branch: main
-    dockerfile_path: Dockerfile
-    http_port: 80
+      deploy_on_push: true
+      repo: tu-usuario/tu-repo
+    source_dir: server
+    build_command: npm install
+    run_command: npm start
+    environment_slug: node-js
     instance_count: 1
     instance_size_slug: basic-xxs
-    health_check:
-      http_path: /
+    
+    # Variables de entorno del backend
     envs:
-      - key: VITE_AIRTABLE_BASE_ID
-        scope: BUILD_TIME
-        type: SECRET
-      - key: VITE_AIRTABLE_API_KEY
-        scope: BUILD_TIME
-        type: SECRET
-      - key: NODE_ENV
+      - key: AIRTABLE_API_KEY
         scope: RUN_TIME
-        value: production
+        type: SECRET
+        # Configura este valor en la interfaz de Digital Ocean
+      - key: AIRTABLE_BASE_ID
+        value: appRMClMob8KPNooU
+        scope: RUN_TIME
+      - key: AIRTABLE_SERVICES_BASE_ID
+        value: appX3CBiSmPy4119D
+        scope: RUN_TIME
+      - key: AIRTABLE_REGISTROS_BASE_ID
+        value: applcT2fcdNDpCRQ0
+        scope: RUN_TIME
+      - key: CLIENT_URL
+        value: ${APP_URL}
+        scope: RUN_TIME
+    
+    health_check:
+      http_path: /api/health
+
+# Componente 2: Frontend (Static Site)
+static_sites:
+  - name: frontend
+    github:
+      branch: main
+      deploy_on_push: true
+      repo: tu-usuario/tu-repo
+    build_command: npm install && npm run build
+    output_dir: dist
+    
+    # Variables de entorno del frontend
+    envs:
+      - key: VITE_BACKEND_URL
+        value: ${backend.PUBLIC_URL}
+        scope: BUILD_TIME
+      - key: VITE_SUPABASE_URL
+        value: https://bmnwfimrcblnvmkbflwn.supabase.co
+        scope: BUILD_TIME
+      - key: VITE_SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtbndmaW1yY2JsbnZta2JmbHduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNTc4NDQsImV4cCI6MjA4MzYzMzg0NH0.Xdeil2_IPMFjprhFG7yoIwshqIhntNNZ3Hc6jEj6KjM
+        scope: BUILD_TIME

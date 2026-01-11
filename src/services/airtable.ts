@@ -3,50 +3,37 @@ import axios from 'axios';
 import { User, DashboardStats } from '../types';
 import { supabaseService } from './supabase';
 
-// Base ID fijo (no es secreto). Si se define VITE_AIRTABLE_BASE_ID la sobreescribe.
-const AIRTABLE_BASE_ID = import.meta.env.VITE_AIRTABLE_BASE_ID || 'appRMClMob8KPNooU';
-// API Key solo por variable de entorno (no hardcodear). Placeholder si falta.
-const AIRTABLE_API_KEY = import.meta.env.VITE_AIRTABLE_API_KEY || 'your-api-key';
-// Base de Servicios y Trabajadores (misma base)
-const SERVICIOS_BASE_ID = import.meta.env.VITE_AIRTABLE_SERVICES_BASE_ID || 'appX3CBiSmPy4119D';
-// Nombre de la tabla de trabajadores. Se puede sobreescribir con VITE_AIRTABLE_WORKERS_TABLE, pero por defecto es 'Trabajadores'
-const AIRTABLE_WORKERS_TABLE = import.meta.env.VITE_AIRTABLE_WORKERS_TABLE || 'Trabajadores';
-// Nombre de la tabla de servicios. Se puede sobreescribir con VITE_AIRTABLE_SERVICES_TABLE, pero por defecto es 'Servicios'
-const AIRTABLE_SERVICES_TABLE = import.meta.env.VITE_AIRTABLE_SERVICES_TABLE || 'Servicios';
-// Nombre de la tabla de tramitaciones. Por defecto 'Tramitaciones'
-const AIRTABLE_TRAMITACIONES_TABLE = import.meta.env.VITE_AIRTABLE_TRAMITACIONES_TABLE || 'Tramitaciones';
-// Nombre de la tabla de envios. Por defecto 'Envíos'
-const AIRTABLE_ENVIOS_TABLE = import.meta.env.VITE_AIRTABLE_ENVIOS_TABLE || 'Envíos';
+// URL del backend proxy - configurada por variable de entorno
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
-if (AIRTABLE_BASE_ID === 'your-base-id') {
-  // Build sin sustituir env -> avisamos en runtime
-  console.error('[Airtable] Falta VITE_AIRTABLE_BASE_ID en build; usando placeholder');
-}
-if (AIRTABLE_API_KEY === 'your-api-key') {
-  console.error('[Airtable] Falta VITE_AIRTABLE_API_KEY (no habrá acceso a Airtable)');
-}
+// Nombres de tablas configurables
+const AIRTABLE_WORKERS_TABLE = import.meta.env.VITE_AIRTABLE_WORKERS_TABLE || 'Trabajadores';
+const AIRTABLE_SERVICES_TABLE = import.meta.env.VITE_AIRTABLE_SERVICES_TABLE || 'Servicios';
+const AIRTABLE_TRAMITACIONES_TABLE = import.meta.env.VITE_AIRTABLE_TRAMITACIONES_TABLE || 'Tramitaciones';
+const AIRTABLE_ENVIOS_TABLE = import.meta.env.VITE_AIRTABLE_ENVIOS_TABLE || 'Envíos';
 
 // Debug logs
 console.log('[Airtable] Configuración:');
-console.log('- AIRTABLE_BASE_ID:', AIRTABLE_BASE_ID);
-console.log('- AIRTABLE_API_KEY:', AIRTABLE_API_KEY ? 'Configurado' : 'Falta');
-console.log('- SERVICIOS_BASE_ID:', SERVICIOS_BASE_ID);
+console.log('- BACKEND_URL:', BACKEND_URL);
+console.log('- Usando proxy seguro para Airtable ✓');
 
+// Cliente para la base principal (a través del proxy backend)
 const airtableApi = axios.create({
-  baseURL: `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}`,
+  baseURL: `${BACKEND_URL}/api/airtable`,
   headers: {
-    'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
     'Content-Type': 'application/json',
   },
+  withCredentials: false,
 });
 
+// Cliente para la base de servicios (a través del proxy backend)
 const serviciosApi = axios.create({
-  baseURL: `https://api.airtable.com/v0/${SERVICIOS_BASE_ID}`,
+  baseURL: `${BACKEND_URL}/api/servicios`,
   headers: {
-    'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30 segundos de timeout
+  timeout: 30000,
+  withCredentials: false,
 });
 
 type ServiciosFieldSample = {
@@ -72,14 +59,14 @@ async function inferServiciosFieldSample(tableName: string): Promise<ServiciosFi
   }
 }
 
-// Segunda base de Airtable para Registros
-const REGISTROS_BASE_ID = 'applcT2fcdNDpCRQ0';
+// Cliente para la base de registros (a través del proxy backend)
+// Nota: Necesitarás agregar este endpoint en el servidor si usas esta base
 const registrosApi = axios.create({
-  baseURL: `https://api.airtable.com/v0/${REGISTROS_BASE_ID}`,
+  baseURL: `${BACKEND_URL}/api/registros`,
   headers: {
-    'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
     'Content-Type': 'application/json',
   },
+  withCredentials: false,
 });
 
 // Helper para escapar strings en fórmulas de Airtable
