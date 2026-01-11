@@ -1,6 +1,7 @@
 import React, { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { Search, Info, X, XCircle, Phone, MessageCircle } from 'lucide-react';
 import { airtableService } from '../services/airtable';
+import { supabaseService } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { getStatusColors, getIpartnerColors } from '../utils/statusColors';
 
@@ -140,7 +141,8 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'requiere-accion' | 'en-espera'>('requiere-accion');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [detailsView, setDetailsView] = useState<'detalles' | 'formulario' | 'reparaciones' | 'fotos'>('detalles');
+  const [detailsView, setDetailsView] = useState<'detalles' | 'formulario' | 'reparaciones' | 'fotos' | 'historial'>('detalles');
+  const [historialServicios, setHistorialServicios] = useState<Service[]>([]);
   const [formularios, setFormularios] = useState<any[]>([]);
   const [_fallbackFormulario, setFallbackFormulario] = useState<any | null>(null);
   const [selectedFormularioIndex, setSelectedFormularioIndex] = useState(0);
@@ -549,7 +551,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
         
         if (activeTab === 'requiere-accion') {
           // Estados activos que siempre requieren acción
-          const estadosActivos = ['Sin contactar', 'Llamado', 'Pendiente de presupuesto', 'Pendiente de asignar', 'Formulario completado', 'Pendiente técnico', 'Pendiente de material'];
+          const estadosActivos = ['Sin contactar', 'Llamado', 'Pendiente de presupuesto', 'Pendiente de asignar', 'Formulario completado', 'Pendiente técnico', 'Pendiente de material', 'Presupuesto enviado'];
           if (estado && estadosActivos.includes(estado)) return true;
 
           // Contactado: solo si último cambio > 24 horas
@@ -1381,6 +1383,21 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                       Reparaciones
                     </button>
                   )}
+                  <button
+                    className={`px-3 py-1.5 text-sm rounded-md ${detailsView === 'historial' ? 'bg-brand-primary text-white' : 'text-gray-700 hover:bg-gray-100'}`}
+                    onClick={async () => {
+                      setDetailsView('historial');
+                      if (selectedService?.telefono) {
+                        const allServices = await airtableService.getServices();
+                        const historial = allServices.filter(s => 
+                          s.telefono === selectedService.telefono && s.id !== selectedService.id
+                        );
+                        setHistorialServicios(historial);
+                      }
+                    }}
+                  >
+                    Historial
+                  </button>
                 </div>
             )}
             {/* Tabs para tramitaciones */}
@@ -2386,6 +2403,78 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                 </div>
               )}
 
+              {/* Vista de historial */}
+              {detailsView === 'historial' && (
+                <div className="space-y-6">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900">Historial de servicios</h2>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Servicios asociados al teléfono {selectedService.telefono}
+                    </p>
+                  </div>
+
+                  {historialServicios.length > 0 ? (
+                    <div className="space-y-4">
+                      {historialServicios.map((servicio) => (
+                        <div
+                          key={servicio.id}
+                          className="bg-white border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors cursor-pointer"
+                          onClick={() => {
+                            setSelectedService(servicio);
+                            setDetailsView('detalles');
+                            setHistorialServicios([]);
+                          }}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-gray-900">
+                                {servicio.expediente || 'Sin expediente'}
+                              </p>
+                              <span
+                                className={`px-2 py-0.5 text-xs rounded-full ${
+                                  getStatusColors(servicio.estado || '').bg
+                                } ${getStatusColors(servicio.estado || '').text}`}
+                              >
+                                {servicio.estado || 'Sin estado'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              {servicio.fechaRegistro
+                                ? new Date(servicio.fechaRegistro).toLocaleDateString('es-ES')
+                                : 'Sin fecha'}
+                            </p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            <div>
+                              <p className="text-gray-500">Nombre</p>
+                              <p className="text-gray-900">{servicio.nombre || '-'}</p>
+                            </div>
+                            <div>
+                              <p className="text-gray-500">Dirección</p>
+                              <p className="text-gray-900">{servicio.direccion || '-'}</p>
+                            </div>
+                            {servicio.descripcion && (
+                              <div className="col-span-2">
+                                <p className="text-gray-500">Descripción</p>
+                                <p className="text-gray-900 line-clamp-2">{servicio.descripcion}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500">
+                        {selectedService.telefono 
+                          ? 'No hay más servicios asociados a este teléfono'
+                          : 'Este servicio no tiene teléfono registrado'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
           </div>
         </div>
@@ -2531,9 +2620,18 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                       // Actualizar el motivo técnico
                       await airtableService.updateServiceField(
                         pendingEstadoChange.serviceId,
-                        'Motivo técnico',
+                        'motivoTecnico',
                         opcion
                       );
+
+                      // Crear registro en Supabase para tracking de resolución
+                      const service = services.find(s => s.id === pendingEstadoChange.serviceId);
+                      if (service?.expediente && service?.fechaRegistro) {
+                        await supabaseService.createResolutionRecord(
+                          service.expediente,
+                          service.fechaRegistro
+                        );
+                      }
 
                       // Actualizar el estado local
                       const updatedServices = services.map((s) =>

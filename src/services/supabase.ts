@@ -707,6 +707,186 @@ class SupabaseService {
       return { dailyData: [] };
     }
   }
+
+  /**
+   * Obtener porcentaje de casos gestionados en 24h por semana
+   */
+  async getCasosGestionados24h(): Promise<{
+    weeklyData: { week: string; percentage24h: number; totalCases: number }[];
+  }> {
+    if (!this.isEnabled()) {
+      console.warn('[Supabase.getCasosGestionados24h] Supabase no disponible');
+      return { weeklyData: [] };
+    }
+
+    try {
+      console.log('[Supabase.getCasosGestionados24h] Obteniendo datos de resoluciones_remotas...');
+      
+      // Primera semana completa de 2026: lunes 5 de enero
+      const firstMonday2026 = new Date('2026-01-05T00:00:00');
+      
+      // Obtener todos los registros de la tabla resoluciones_remotas
+      const { data: records, error } = await supabase!
+        .from('resoluciones_remotas')
+        .select('*')
+        .gte('creación', firstMonday2026.toISOString())
+        .order('creación', { ascending: true });
+
+      if (error) {
+        console.error('[Supabase.getCasosGestionados24h] Error al obtener datos:', error);
+        return { weeklyData: [] };
+      }
+
+      console.log(`[Supabase.getCasosGestionados24h] Registros obtenidos: ${records?.length || 0}`);
+
+      if (!records || records.length === 0) {
+        return { weeklyData: [] };
+      }
+
+      // Función para obtener el inicio de la semana (lunes)
+      const getWeekStart = (date: Date): string => {
+        const d = new Date(date);
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(d.setDate(diff));
+        monday.setHours(0, 0, 0, 0);
+        
+        const year = monday.getFullYear();
+        const month = String(monday.getMonth() + 1).padStart(2, '0');
+        const dayStr = String(monday.getDate()).padStart(2, '0');
+        return `${year}-${month}-${dayStr}`;
+      };
+
+      // Generar semanas desde la primera semana completa hasta ahora
+      const now = new Date();
+      const weekKeys: string[] = [];
+      let currentMonday = new Date(firstMonday2026);
+      
+      while (currentMonday <= now) {
+        const year = currentMonday.getFullYear();
+        const month = String(currentMonday.getMonth() + 1).padStart(2, '0');
+        const day = String(currentMonday.getDate()).padStart(2, '0');
+        weekKeys.push(`${year}-${month}-${day}`);
+        
+        currentMonday = new Date(currentMonday.getTime() + 7 * 24 * 60 * 60 * 1000);
+      }
+
+      // Mapas para contar casos por semana
+      const weekDataMap = new Map(weekKeys.map(k => [k, { within24h: 0, total: 0 }]));
+
+      records.forEach((record: any) => {
+        const creación = record.creación ? new Date(record.creación) : null;
+        const resolución = record.resolución ? new Date(record.resolución) : null;
+        const número = record.número; // Número de Airtable
+
+        if (creación && resolución && creación >= firstMonday2026 && número) {
+          const weekStart = getWeekStart(creación);
+
+          if (weekDataMap.has(weekStart)) {
+            const data = weekDataMap.get(weekStart)!;
+            data.total++;
+
+            // Calcular diferencia en horas
+            const diffMs = resolución.getTime() - creación.getTime();
+            const diffHours = diffMs / (1000 * 60 * 60);
+
+            // Si la resolución fue en menos de 24 horas
+            if (diffHours <= 24) {
+              data.within24h++;
+            }
+          }
+        }
+      });
+
+      // Calcular porcentajes por semana
+      const weeklyData = weekKeys.map(weekStart => {
+        const data = weekDataMap.get(weekStart)!;
+        const percentage24h = data.total > 0 
+          ? Math.round((data.within24h / data.total) * 100) 
+          : 0;
+        
+        return {
+          week: weekStart,
+          percentage24h,
+          totalCases: data.total,
+        };
+      });
+
+      console.log('[Supabase.getCasosGestionados24h] Datos procesados:', weeklyData);
+      
+      return { weeklyData };
+    } catch (error) {
+      console.error('[Supabase.getCasosGestionados24h] Error:', error);
+      return { weeklyData: [] };
+    }
+  }
+
+  /**
+   * Crear un registro de resolución cuando se resuelve un caso
+   * @param numero - Número de expediente
+   * @param fechaCreacion - Fecha de creación del caso (desde Airtable)
+   */
+  async createResolutionRecord(numero: string, fechaCreacion?: string): Promise<void> {
+    if (!this.isEnabled()) return;
+
+    try {
+      const resolucionDate = new Date().toISOString();
+      const creacionDate = fechaCreacion || new Date().toISOString();
+
+      console.log(`[Supabase] Creando registro de resolución: ${numero}`, {
+        creación: creacionDate,
+        resolución: resolucionDate
+      });
+
+      const { error } = await supabase!
+        .from('resoluciones_remotas')
+        .insert({
+          número: numero,
+          creación: creacionDate,
+          resolución: resolucionDate
+        });
+
+      if (error) {
+        console.error('[Supabase] Error creando registro de resolución:', error);
+      } else {
+        console.log(`[Supabase] Registro de resolución creado para ${numero}`);
+      }
+    } catch (error) {
+      console.error('[Supabase] Error en createResolutionRecord:', error);
+    }
+  }
+
+  /**
+   * Obtener registros de resolución del mes actual
+   * @param monthStart - Fecha de inicio del mes
+   */
+  async getResolutionRecordsByMonth(monthStart: Date): Promise<any[]> {
+    if (!this.isEnabled()) return [];
+
+    try {
+      const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0, 23, 59, 59);
+      
+      console.log(`[Supabase] Obteniendo registros de resolución desde ${monthStart.toISOString()} hasta ${monthEnd.toISOString()}`);
+
+      const { data: records, error } = await supabase!
+        .from('resoluciones_remotas')
+        .select('*')
+        .gte('resolución', monthStart.toISOString())
+        .lte('resolución', monthEnd.toISOString())
+        .not('número', 'is', null);
+
+      if (error) {
+        console.error('[Supabase] Error obteniendo registros de resolución:', error);
+        return [];
+      }
+
+      console.log(`[Supabase] Registros de resolución obtenidos: ${records?.length || 0}`);
+      return records || [];
+    } catch (error) {
+      console.error('[Supabase] Error en getResolutionRecordsByMonth:', error);
+      return [];
+    }
+  }
 }
 
 export const supabaseService = new SupabaseService();

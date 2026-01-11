@@ -422,6 +422,29 @@ export const airtableService = {
     }
   },
 
+  // Obtener todos los trabajadores (para Responsable)
+  async getWorkers(): Promise<{ id: string; nombre: string; email: string; rol: string }[]> {
+    try {
+      const response = await serviciosApi.get(`/${AIRTABLE_WORKERS_TABLE}`, {
+        params: {
+          fields: ['Nombre', 'Email corporativo', 'Puesto'],
+          filterByFormula: "AND({Email corporativo} != '', {Puesto} != '')",
+        },
+      });
+
+      const data = response.data as { records: any[] };
+      return data.records.map((record) => ({
+        id: record.id,
+        nombre: record.fields.Nombre || '',
+        email: record.fields['Email corporativo'] || '',
+        rol: record.fields.Puesto || '',
+      }));
+    } catch (error) {
+      console.error('Error fetching workers:', error);
+      return [];
+    }
+  },
+
   // Obtener URL del logo del trabajador por ID
   async getClientLogo(workerId: string): Promise<string | undefined> {
     try {
@@ -442,27 +465,59 @@ export const airtableService = {
   async getTechnicianDashboardStats(userId?: string, userEmail?: string): Promise<{
     assignedByDay: { date: string; count: number }[];
     resolvedByDay: { date: string; count: number }[];
+    clientesPendientes: number;
+    clientesResueltosHoy: number;
+    promedioResolucionRemotaMes: number;
+    promedioVelocidadResolucionMes: number;
   }> {
     try {
       const records = await fetchAllServicios(AIRTABLE_SERVICES_TABLE, { pageSize: 100 });
       const now = new Date();
       const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
       
-      // Preparar mapa de días (últimos 14 días, solo días laborables: lunes a viernes)
+      // Festivos de la Comunidad de Madrid 2026
+      const madridHolidays2026 = new Set([
+        '2026-01-01', // Año Nuevo
+        '2026-01-06', // Reyes Magos
+        '2026-04-03', // Viernes Santo
+        '2026-04-06', // Lunes de Pascua (no oficial en Madrid pero lo incluyo)
+        '2026-05-01', // Fiesta del Trabajo
+        '2026-05-02', // Fiesta de la Comunidad de Madrid
+        '2026-05-15', // San Isidro (patrón de Madrid)
+        '2026-08-15', // Asunción de la Virgen
+        '2026-10-12', // Fiesta Nacional de España
+        '2026-11-09', // Nuestra Señora de la Almudena (patrona de Madrid)
+        '2026-12-07', // Día de la Constitución (se traslada al lunes 7)
+        '2026-12-08', // Inmaculada Concepción
+        '2026-12-25', // Navidad
+      ]);
+      
+      // Preparar mapa de días (últimos 14 días, solo días laborables: lunes a viernes, sin festivos)
       const dayKey = (d: Date) => d.toISOString().split('T')[0];
       const last14Keys: string[] = [];
       for (let i = 13; i >= 0; i--) {
         const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
         const dayOfWeek = d.getDay(); // 0 = Domingo, 6 = Sábado
-        // Solo agregar si es día laborable (lunes=1 a viernes=5)
-        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
-          last14Keys.push(dayKey(d));
+        const key = dayKey(d);
+        // Solo agregar si es día laborable (lunes=1 a viernes=5) y no es festivo
+        if (dayOfWeek >= 1 && dayOfWeek <= 5 && !madridHolidays2026.has(key)) {
+          last14Keys.push(key);
         }
       }
       const assignedMap = new Map(last14Keys.map(k => [k, 0]));
       const resolvedMap = new Map(last14Keys.map(k => [k, 0]));
       
       console.log(`Processing ${records.length} records for technician dashboard`);
+      
+      // Variables para las nuevas métricas
+      let clientesPendientes = 0;
+      let clientesResueltosHoy = 0;
+      let resolucionesRemotasMes = 0;
+      let resolucionesTotalesMes = 0;
+      let tiempoTotalResolucionMes = 0;
+      let contadorResolucionesMes = 0;
       
       records.forEach((r: any) => {
         const f = r.fields ?? {};
@@ -471,22 +526,23 @@ export const airtableService = {
         const estado = f['Estado'];
         const tecnico = f['Técnico'];
         const emailTrabajador = f['Email trabajador'];
+        const tipoServicio = f['Tipo de servicio'];
+        
+        // Verificar si el servicio pertenece al técnico
+        let belongsToTechnician = false;
+        if (userEmail && emailTrabajador) {
+          if (typeof emailTrabajador === 'string') {
+            belongsToTechnician = emailTrabajador.includes(userEmail);
+          } else if (Array.isArray(emailTrabajador)) {
+            belongsToTechnician = emailTrabajador.some((email: string) => email && email.includes(userEmail));
+          }
+        }
         
         // Servicios asignados (últimas 2 semanas por fecha de registro, donde Email trabajador contiene el email del usuario)
         if (fechaRegistro) {
           const regDate = new Date(fechaRegistro);
           
-          // Verificar que Email trabajador contenga el email del usuario
-          let hasUserEmail = false;
-          if (userEmail && emailTrabajador) {
-            if (typeof emailTrabajador === 'string') {
-              hasUserEmail = emailTrabajador.includes(userEmail);
-            } else if (Array.isArray(emailTrabajador)) {
-              hasUserEmail = emailTrabajador.some((email: string) => email && email.includes(userEmail));
-            }
-          }
-          
-          if (hasUserEmail && regDate >= fourteenDaysAgo && regDate <= now) {
+          if (belongsToTechnician && regDate >= fourteenDaysAgo && regDate <= now) {
             const key = dayKey(regDate);
             if (assignedMap.has(key)) {
               assignedMap.set(key, assignedMap.get(key)! + 1);
@@ -494,31 +550,81 @@ export const airtableService = {
           }
         }
         
+        // Verificar que Técnico esté vacío
+        const isTecnicoEmpty = !tecnico || 
+          (typeof tecnico === 'string' && tecnico.trim() === '') || 
+          (Array.isArray(tecnico) && tecnico.length === 0);
+        
         // Incidencias resueltas: Estado = Finalizado, Técnico vacío, Email trabajador contiene el email del usuario, últimas 2 semanas
         if (estado === 'Finalizado' && ultimoCambio) {
           const resDate = new Date(ultimoCambio);
           
-          // Verificar que Técnico esté vacío
-          const isTecnicoEmpty = !tecnico || 
-            (typeof tecnico === 'string' && tecnico.trim() === '') || 
-            (Array.isArray(tecnico) && tecnico.length === 0);
-          
-          // Verificar que Email trabajador contenga el email del usuario
-          let hasUserEmail = false;
-          if (userEmail && emailTrabajador) {
-            if (typeof emailTrabajador === 'string') {
-              hasUserEmail = emailTrabajador.includes(userEmail);
-            } else if (Array.isArray(emailTrabajador)) {
-              hasUserEmail = emailTrabajador.some((email: string) => email && email.includes(userEmail));
-            }
-          }
-          
           // Solo contar si cumple todas las condiciones Y está en el rango de 2 semanas
-          if (isTecnicoEmpty && hasUserEmail && resDate >= fourteenDaysAgo && resDate <= now) {
+          if (isTecnicoEmpty && belongsToTechnician && resDate >= fourteenDaysAgo && resDate <= now) {
             const key = dayKey(resDate);
             if (resolvedMap.has(key)) {
               resolvedMap.set(key, resolvedMap.get(key)! + 1);
             }
+          }
+          
+          // Clientes resueltos hoy
+          if (isTecnicoEmpty && belongsToTechnician && resDate >= todayStart && resDate <= now) {
+            clientesResueltosHoy++;
+          }
+          
+          // Resoluciones este mes para calcular promedios
+          if (isTecnicoEmpty && belongsToTechnician && resDate >= monthStart && resDate <= now) {
+            resolucionesTotalesMes++;
+            
+            // Verificar si es resolución remota
+            if (tipoServicio === 'Remoto' || tipoServicio === 'remoto') {
+              resolucionesRemotasMes++;
+            }
+            
+            // Calcular tiempo de resolución en horas
+            if (fechaRegistro) {
+              const registroDate = new Date(fechaRegistro);
+              const tiempoResolucion = (resDate.getTime() - registroDate.getTime()) / (1000 * 60 * 60); // en horas
+              tiempoTotalResolucionMes += tiempoResolucion;
+              contadorResolucionesMes++;
+            }
+          }
+        }
+        
+        // Clientes pendientes: servicios que requieren acción (misma lógica que tab "requiere-accion" para Técnico)
+        if (belongsToTechnician && estado) {
+          const cita = f['Cita'] ? new Date(f['Cita']) : null;
+          const citaTecnico = f['Cita técnico'] ? new Date(f['Cita técnico']) : null;
+          const estadoEnvio = f['Estado envío'];
+          
+          const isCitaInterna = estado === 'Citado' && cita;
+          const isCitaTecnico = estado === 'Citado' && citaTecnico;
+          
+          const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          const isUltimoCambioOld = ultimoCambio && new Date(ultimoCambio) < twentyFourHoursAgo;
+          
+          // Estados que siempre requieren acción
+          const estadosActivos = ['Sin contactar', 'Llamado', 'Pendiente de presupuesto', 'Pendiente de asignar', 'Formulario completado', 'Pendiente técnico', 'Pendiente de material', 'Presupuesto enviado'];
+          if (estadosActivos.includes(estado)) {
+            clientesPendientes++;
+          } else if (estado === 'Contactado' && isUltimoCambioOld) {
+            clientesPendientes++;
+          } else if (estado === 'Pendiente de aceptación' && isUltimoCambioOld) {
+            clientesPendientes++;
+          } else if (estado === 'Aceptado' && isUltimoCambioOld) {
+            clientesPendientes++;
+          } else if (estado === 'Material enviado' && estadoEnvio === 'Entregado') {
+            clientesPendientes++;
+          } else if (isCitaInterna && cita) {
+            cita.setHours(0, 0, 0, 0);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (cita <= today) clientesPendientes++;
+          } else if (isCitaTecnico && citaTecnico) {
+            citaTecnico.setHours(0, 0, 0, 0);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            if (citaTecnico < today) clientesPendientes++;
           }
         }
       });
@@ -526,10 +632,75 @@ export const airtableService = {
       const assignedByDay = last14Keys.map(k => ({ date: k, count: assignedMap.get(k)! }));
       const resolvedByDay = last14Keys.map(k => ({ date: k, count: resolvedMap.get(k)! }));
       
+      // Calcular promedio de resolución remota del mes actual (media de las semanas del mes)
+      let promedioResolucionRemotaMes = 0;
+      try {
+        const remoteResolutionData = await this.getTechnicianRemoteResolutionByWeek(userId, userEmail);
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        
+        // Filtrar solo semanas del mes actual
+        const weeklyDataThisMonth = remoteResolutionData.weeklyData.filter(week => {
+          const [year, month] = week.week.split('-').map(Number);
+          return year === currentYear && month === currentMonth + 1; // +1 porque getMonth() devuelve 0-11
+        });
+        
+        // Calcular media de los porcentajes semanales
+        if (weeklyDataThisMonth.length > 0) {
+          const sumPercentages = weeklyDataThisMonth.reduce((sum, week) => sum + week.remotePercentage, 0);
+          promedioResolucionRemotaMes = Math.round(sumPercentages / weeklyDataThisMonth.length);
+        }
+      } catch (error) {
+        console.error('Error calculando promedio resolución remota:', error);
+      }
+      
+      // Calcular velocidad de resolución del mes actual desde Supabase
+      let promedioVelocidadResolucionMes = 0;
+      try {
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const resolutionRecords = await supabaseService.getResolutionRecordsByMonth(monthStart);
+        
+        if (resolutionRecords.length > 0) {
+          let totalHours = 0;
+          let count = 0;
+          
+          resolutionRecords.forEach(record => {
+            // Usar duracion_decimal si existe, sino calcular la diferencia
+            if (record.duracion_decimal !== undefined && record.duracion_decimal !== null) {
+              totalHours += record.duracion_decimal;
+              count++;
+            } else {
+              const creacion = new Date(record.creación);
+              const resolucion = new Date(record.resolución);
+              const hours = (resolucion.getTime() - creacion.getTime()) / (1000 * 60 * 60);
+              totalHours += hours;
+              count++;
+            }
+          });
+          
+          if (count > 0) {
+            promedioVelocidadResolucionMes = Math.round(totalHours / count);
+          }
+        }
+      } catch (error) {
+        console.error('Error calculando velocidad de resolución:', error);
+      }
+      
       console.log('Assigned by day:', assignedByDay);
       console.log('Resolved by day:', resolvedByDay);
+      console.log('Clientes pendientes:', clientesPendientes);
+      console.log('Clientes resueltos hoy:', clientesResueltosHoy);
+      console.log('Promedio resolución remota mes:', promedioResolucionRemotaMes + '%');
+      console.log('Promedio velocidad resolución mes:', promedioVelocidadResolucionMes + 'h');
       
-      return { assignedByDay, resolvedByDay };
+      return { 
+        assignedByDay, 
+        resolvedByDay,
+        clientesPendientes,
+        clientesResueltosHoy,
+        promedioResolucionRemotaMes,
+        promedioVelocidadResolucionMes,
+      };
     } catch (error) {
       console.error('Error fetching technician dashboard stats:', error);
       const now = new Date();
@@ -541,6 +712,173 @@ export const airtableService = {
       return {
         assignedByDay: last14Keys.map(k => ({ date: k, count: 0 })),
         resolvedByDay: last14Keys.map(k => ({ date: k, count: 0 })),
+        clientesPendientes: 0,
+        clientesResueltosHoy: 0,
+        promedioResolucionRemotaMes: 0,
+        promedioVelocidadResolucionMes: 0,
+      };
+    }
+  },
+
+  // Obtener porcentaje de resolución remota por semana para Técnico
+  async getTechnicianRemoteResolutionByWeek(userId?: string, userEmail?: string): Promise<{
+    weeklyData: { week: string; remotePercentage: number; totalServices: number }[];
+  }> {
+    try {
+      const records = await fetchAllServicios(AIRTABLE_SERVICES_TABLE, { pageSize: 100 });
+      const now = new Date();
+      
+      // Fecha de inicio: 1 de enero de 2026
+      const startDate = new Date('2026-01-01T00:00:00');
+      
+      // Festivos de la Comunidad de Madrid 2026
+      const madridHolidays2026 = new Set([
+        '2026-01-01', // Año Nuevo
+        '2026-01-06', // Reyes Magos
+        '2026-04-03', // Viernes Santo
+        '2026-04-06', // Lunes de Pascua (no oficial en Madrid pero lo incluyo)
+        '2026-05-01', // Fiesta del Trabajo
+        '2026-05-02', // Fiesta de la Comunidad de Madrid
+        '2026-05-15', // San Isidro (patrón de Madrid)
+        '2026-08-15', // Asunción de la Virgen
+        '2026-10-12', // Fiesta Nacional de España
+        '2026-11-09', // Nuestra Señora de la Almudena (patrona de Madrid)
+        '2026-12-07', // Día de la Constitución (se traslada al lunes 7)
+        '2026-12-08', // Inmaculada Concepción
+        '2026-12-25', // Navidad
+      ]);
+      
+      // Función para verificar si es día laborable
+      const isWorkingDay = (date: Date): boolean => {
+        const dayOfWeek = date.getDay();
+        // Excluir sábado (6) y domingo (0)
+        if (dayOfWeek === 0 || dayOfWeek === 6) return false;
+        
+        // Excluir festivos de Madrid
+        const dateKey = date.toISOString().split('T')[0];
+        if (madridHolidays2026.has(dateKey)) return false;
+        
+        return true;
+      };
+      
+      // Función para obtener el inicio de la semana (lunes)
+      const getWeekStart = (date: Date): string => {
+        const d = new Date(date);
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Ajustar al lunes
+        const monday = new Date(d.setDate(diff));
+        monday.setHours(0, 0, 0, 0);
+        
+        // Generar fecha en formato YYYY-MM-DD sin zona horaria
+        const year = monday.getFullYear();
+        const month = String(monday.getMonth() + 1).padStart(2, '0');
+        const dayStr = String(monday.getDate()).padStart(2, '0');
+        return `${year}-${month}-${dayStr}`;
+      };
+      
+      // Primera semana completa de 2026: lunes 5 de enero
+      const firstMonday2026 = new Date('2026-01-05T00:00:00');
+      
+      // Generar semanas desde la primera semana completa hasta ahora
+      const weekKeys: string[] = [];
+      let currentMonday = new Date(firstMonday2026);
+      
+      while (currentMonday <= now) {
+        // Generar fecha en formato YYYY-MM-DD sin zona horaria
+        const year = currentMonday.getFullYear();
+        const month = String(currentMonday.getMonth() + 1).padStart(2, '0');
+        const day = String(currentMonday.getDate()).padStart(2, '0');
+        weekKeys.push(`${year}-${month}-${day}`);
+        
+        // Avanzar a la siguiente semana (7 días)
+        currentMonday = new Date(currentMonday.getTime() + 7 * 24 * 60 * 60 * 1000);
+      }
+      
+      // Mapas para contar servicios por semana
+      const weekDataMap = new Map(weekKeys.map(k => [k, { remote: 0, presential: 0 }]));
+      
+      records.forEach((r: any) => {
+        const f = r.fields ?? {};
+        const fechaCierre = f['Último cambio']; // Fecha de cierre cuando se finaliza
+        const estado = f['Estado'];
+        const tecnico = f['Técnico'];
+        const emailTrabajador = f['Email trabajador'];
+        
+        // Verificar si el servicio pertenece al técnico
+        let belongsToTechnician = false;
+        if (userEmail && emailTrabajador) {
+          if (typeof emailTrabajador === 'string') {
+            belongsToTechnician = emailTrabajador.includes(userEmail);
+          } else if (Array.isArray(emailTrabajador)) {
+            belongsToTechnician = emailTrabajador.some((email: string) => email && email.includes(userEmail));
+          }
+        }
+        
+        // FILTROS APLICADOS:
+        // 1. Solo servicios del técnico (belongsToTechnician)
+        // 2. Estado = 'Finalizado'
+        // 3. Fecha cierre >= 5 enero 2026
+        // 4. Fecha dentro del rango hasta ahora
+        
+        if (belongsToTechnician && estado === 'Finalizado' && fechaCierre) {
+          const cierreDate = new Date(fechaCierre);
+          
+          // Primera semana completa: lunes 5 de enero de 2026
+          // No contar fechas anteriores al 5 de enero
+          if (cierreDate >= firstMonday2026 && cierreDate <= now) {
+            const weekStart = getWeekStart(cierreDate);
+            
+            // Verificar que la semana esté en nuestro rango (desde el 5 de enero)
+            if (weekDataMap.has(weekStart)) {
+              const data = weekDataMap.get(weekStart)!;
+              
+              // Si Técnico está vacío = Remoto, si tiene valor = Presencial
+              const isTecnicoEmpty = !tecnico || 
+                (typeof tecnico === 'string' && tecnico.trim() === '') || 
+                (Array.isArray(tecnico) && tecnico.length === 0);
+              
+              if (isTecnicoEmpty) {
+                data.remote++;
+              } else {
+                data.presential++;
+              }
+            }
+          }
+        }
+      });
+      
+      // Calcular porcentajes por semana
+      const weeklyData = weekKeys.map(weekStart => {
+        const data = weekDataMap.get(weekStart)!;
+        const totalServices = data.remote + data.presential;
+        const remotePercentage = totalServices > 0 
+          ? Math.round((data.remote / totalServices) * 100) 
+          : 0;
+        
+        return {
+          week: weekStart,
+          remotePercentage,
+          totalServices,
+        };
+      });
+      
+      console.log('Weekly remote resolution data (desde 2026, solo días laborables):', weeklyData);
+      
+      return { weeklyData };
+    } catch (error) {
+      console.error('Error fetching technician remote resolution by week:', error);
+      const now = new Date();
+      const weekKeys: string[] = [];
+      for (let i = 7; i >= 0; i--) {
+        const weekDate = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+        const d = new Date(weekDate);
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(d.setDate(diff));
+        weekKeys.push(monday.toISOString().split('T')[0]);
+      }
+      return {
+        weeklyData: weekKeys.map(week => ({ week, remotePercentage: 0, totalServices: 0 })),
       };
     }
   },
@@ -1476,11 +1814,13 @@ export const airtableService = {
         trabajadorId: 'Trabajador',
         motivoCancelacion: 'Motivo cancelación',
         seguimiento: 'Seguimiento',
+        motivoTecnico: 'Motivo técnico',
       };
       
       const airtableField = fieldMap[field] || field;
       
       console.log(`[Airtable] Updating field "${airtableField}" with value:`, value, `(type: ${typeof value})`);
+      console.log(`[Airtable] Full payload:`, { fields: { [airtableField]: value } });
       
       await serviciosApi.patch(`/${tableName}/${serviceId}`, {
         fields: {
@@ -1491,7 +1831,9 @@ export const airtableService = {
       console.log(`[Airtable] Successfully updated field "${airtableField}"`);
     } catch (error: any) {
       console.error(`Error updating service field ${field}:`, error);
-      console.error('Error details:', error?.response?.data);
+      console.error('Error response data:', JSON.stringify(error?.response?.data, null, 2));
+      console.error('Error status:', error?.response?.status);
+      console.error('Error message:', error?.message);
       throw error;
     }
   },

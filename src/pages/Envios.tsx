@@ -67,6 +67,7 @@ export default function Envios() {
   const [editing, setEditing] = useState<{ id: string; field: keyof Envio; value: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'requiere-accion' | 'en-espera'>('requiere-accion');
   const [creating, setCreating] = useState(false);
   const [selectedEnvio, setSelectedEnvio] = useState<Envio | null>(null);
   const [commentDraft, setCommentDraft] = useState('');
@@ -222,20 +223,50 @@ export default function Envios() {
     const estadosExcluidos = ['Entregado', 'Devuelto', 'Recogida hecha'];
     if (envio.estado && estadosExcluidos.includes(envio.estado)) return false;
     
-    // Excluir envíos con seguimiento "Email enviado"
-    if (envio.seguimiento === 'Email enviado') return false;
-    
     const now = new Date();
     
-    // Filtrar por fecha de envío (más de 48 horas laborables)
-    if (envio.fechaEnvio) {
-      const fechaEnvio = new Date(envio.fechaEnvio);
-      const businessHours = calculateBusinessHours(fechaEnvio, now);
+    if (activeTab === 'requiere-accion') {
+      // Requiere acción: los filtros actuales
+      // Excluir envíos con seguimiento "Email enviado"
+      if (envio.seguimiento === 'Email enviado') return false;
       
-      // Solo mostrar si han pasado más de 48 horas laborables
-      if (businessHours <= 48) return false;
+      // Filtrar por fecha de envío (más de 48 horas laborables)
+      if (envio.fechaEnvio) {
+        const fechaEnvio = new Date(envio.fechaEnvio);
+        const businessHours = calculateBusinessHours(fechaEnvio, now);
+        
+        // Solo mostrar si han pasado más de 48 horas laborables
+        return businessHours > 48;
+      } else {
+        // Si no tiene fecha de envío, no mostrar en requiere acción
+        return false;
+      }
     }
     
+    if (activeTab === 'en-espera') {
+      // En espera: los que no tienen estado de finalización y NO están en requiere acción
+      // Es decir, los que tienen seguimiento "Email enviado" O tienen fecha de envío <= 48h O no tienen fecha
+      
+      // Si tiene seguimiento "Email enviado", está en espera
+      if (envio.seguimiento === 'Email enviado') return true;
+      
+      // Si tiene fecha de envío
+      if (envio.fechaEnvio) {
+        const fechaEnvio = new Date(envio.fechaEnvio);
+        const businessHours = calculateBusinessHours(fechaEnvio, now);
+        
+        // Solo está en espera si <= 48 horas
+        // Si > 48 horas, NO mostrar (debería estar en requiere acción)
+        return businessHours <= 48;
+      }
+      
+      // Si no tiene fecha de envío, está en espera
+      return true;
+    }
+    
+    return false;
+  }).filter(envio => {
+    // Aplicar filtro de búsqueda después de los filtros de pestaña
     if (!searchTerm) return true;
     const needle = searchTerm.toLowerCase();
     return (
@@ -413,6 +444,32 @@ export default function Envios() {
           >
             <Plus className="w-4 h-4" />
             Añadir
+          </button>
+        </div>
+      </div>
+
+      {/* Pestañas */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="flex border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('requiere-accion')}
+            className={`flex-1 px-6 py-2 text-sm font-medium transition-colors ${
+              activeTab === 'requiere-accion'
+                ? 'bg-brand-primary text-white border-b-2 border-brand-primary'
+                : 'text-gray-700 hover:bg-gray-50 hover:text-brand-primary'
+            }`}
+          >
+            Requiere Acción
+          </button>
+          <button
+            onClick={() => setActiveTab('en-espera')}
+            className={`flex-1 px-6 py-2 text-sm font-medium transition-colors ${
+              activeTab === 'en-espera'
+                ? 'bg-brand-primary text-white border-b-2 border-brand-primary'
+                : 'text-gray-700 hover:bg-gray-50 hover:text-brand-primary'
+            }`}
+          >
+            En Espera
           </button>
         </div>
       </div>
