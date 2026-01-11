@@ -24,7 +24,11 @@ console.log('- Autenticación: Supabase JWT');
 // Función para obtener el token de autenticación
 async function getAuthToken(): Promise<string | null> {
   try {
-    const { data } = await supabaseService.getSession();
+    const { data, error } = await supabaseService.supabase.auth.getSession();
+    if (error) {
+      console.error('Error obteniendo sesión:', error);
+      return null;
+    }
     return data.session?.access_token || null;
   } catch (error) {
     console.error('Error obteniendo token:', error);

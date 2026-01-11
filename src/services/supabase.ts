@@ -29,6 +29,8 @@ export interface AsesoramientoRecord {
 }
 
 class SupabaseService {
+  public supabase = supabase;
+  
   private isEnabled(): boolean {
     return supabase !== null;
   }
