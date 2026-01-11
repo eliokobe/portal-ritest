@@ -1,6 +1,20 @@
 name: sonrisia-portal
 region: nyc
 
+# Configuración de rutas (ingress)
+ingress:
+  rules:
+    - match:
+        path:
+          prefix: /api
+      component:
+        name: backend
+    - match:
+        path:
+          prefix: /
+      component:
+        name: web
+
 # Componente 1: Backend (API Proxy Seguro)
 # La API key está SOLO aquí, nunca se envía al navegador
 services:
@@ -35,6 +49,9 @@ services:
     
     health_check:
       http_path: /api/health
+    
+    routes:
+      - path: /api
 
 # Componente 2: Frontend (Static Site)
 # Ya NO tiene VITE_AIRTABLE_API_KEY
@@ -50,10 +67,13 @@ static_sites:
     envs:
       - key: VITE_BACKEND_URL
         scope: BUILD_TIME
-        value: ${backend.PUBLIC_URL}
+        value: ${_self.PUBLIC_URL}/api
       - key: VITE_SUPABASE_URL
         scope: BUILD_TIME
         value: https://bmnwfimrcblnvmkbflwn.supabase.co
       - key: VITE_SUPABASE_ANON_KEY
         scope: BUILD_TIME
         value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtbndmaW1yY2JsbnZta2JmbHduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNTc4NDQsImV4cCI6MjA4MzYzMzg0NH0.Xdeil2_IPMFjprhFG7yoIwshqIhntNNZ3Hc6jEj6KjM
+    
+    routes:
+      - path: /
