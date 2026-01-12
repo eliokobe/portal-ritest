@@ -53,6 +53,7 @@ interface Service {
   ipartner?: string;
   resolucionVisita?: string;
   requiereAccion?: string;
+  numero?: string;
 }
 
 const STATUS_OPTIONS = [
@@ -1188,6 +1189,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número</th>
+                  {isTramitacion && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expediente</th>}
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Registro</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Nombre</th>
                   {isTramitacion ? (
@@ -1212,7 +1214,14 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                     id={`service-row-${service.id}`}
                     className={`${lastSelectedServiceId === service.id ? 'bg-green-50' : 'hover:bg-gray-50'}`}
                   >
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{service.numero || service.expediente || '-'}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">
+                      {isTramitacion ? (service.numero || '-') : (service.numero || service.expediente || '-')}
+                    </td>
+                    {isTramitacion && (
+                      <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
+                        {service.expediente || '-'}
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">{formatDate(service.fechaRegistro)}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 w-40"><div className="max-w-[10rem] truncate">{service.nombre || '-'}</div></td>
                     {isTramitacion ? (
@@ -1455,7 +1464,13 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                 <div>
                   <h2 className="text-xl font-semibold text-gray-900">Detalle del servicio</h2>
                   <p className="text-sm text-gray-500 mt-1">
-                    Número {selectedService.numero || selectedService.expediente || 'sin número asignado'}
+                    {isTramitacion ? (
+                      <>
+                        Número: {selectedService.numero || '-'} | Expediente: {selectedService.expediente || '-'}
+                      </>
+                    ) : (
+                      <>Número {selectedService.numero || selectedService.expediente || 'sin número asignado'}</>
+                    )}
                   </p>
                 </div>
               )}
