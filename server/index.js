@@ -93,6 +93,15 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Ruta legacy para compatibilidad
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    authenticated: false
+  });
+});
+
 // Endpoint de prueba de autenticación
 app.get('/auth/check', authenticateUser, (req, res) => {
   res.json({
@@ -127,10 +136,55 @@ app.get('/servicios/Trabajadores', async (req, res) => {
   }
 });
 
+// Ruta legacy con /api para compatibilidad
+app.get('/api/servicios/Trabajadores', async (req, res) => {
+  console.log('🔓 Login endpoint LEGACY (sin autenticación) - /api/servicios/Trabajadores');
+  try {
+    const client = createAirtableClient(SERVICIOS_BASE_ID);
+    const config = {
+      method: 'GET',
+      url: '/Trabajadores',
+      params: req.query
+    };
+
+    const response = await client.request(config);
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error en login Trabajadores:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message
+    });
+  }
+});
+
 // Proxy para base de servicios - CON AUTENTICACIÓN
 // Este endpoint genérico NO debe coincidir con /Trabajadores porque está después
 // Proxy para base de servicios - CON AUTENTICACIÓN (excepto Trabajadores para login)
-app.all('/servicios/:tableName*', authenticateUser, async (req, res) => {
+app
+
+// Proxy LEGACY con /api
+app.all('/api/servicios/:tableName*', authenticateUser, async (req, res) => {
+  try {
+    const { tableName } = req.params;
+    const path = req.params[0] || '';
+    const client = createAirtableClient(SERVICIOS_BASE_ID);
+    
+    const config = {
+      method: req.method,
+      url: `/${tableName}${path}`,
+      params: req.query,
+      data: req.body
+    };
+
+    const response = await client.request(config);
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error en proxy Servicios LEGACY:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message
+    });
+  }
+});.all('/servicios/:tableName*', authenticateUser, async (req, res) => {
   try {
     const { tableName } = req.params;
     const path = req.params[0] || '';
@@ -147,6 +201,30 @@ app.all('/servicios/:tableName*', authenticateUser, async (req, res) => {
     res.json(response.data);
   } catch (error) {
     console.error('Error en proxy Servicios:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message
+    });
+  }
+});
+
+// Proxy LEGACY con /api
+app.all('/api/registros/:tableName*', authenticateUser, async (req, res) => {
+  try {
+    const { tableName } = req.params;
+    const path = req.params[0] || '';
+    const client = createAirtableClient(REGISTROS_BASE_ID);
+    
+    const config = {
+      method: req.method,
+      url: `/${tableName}${path}`,
+      params: req.query,
+      data: req.body
+    };
+
+    const response = await client.request(config);
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error en proxy Registros LEGACY:', error.response?.data || error.message);
     res.status(error.response?.status || 500).json({
       error: error.response?.data || error.message
     });

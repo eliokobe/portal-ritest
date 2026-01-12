@@ -38,13 +38,13 @@ async function getAuthToken(): Promise<string | null> {
 
 // Cliente para peticiones a la base principal (via backend)
 const airtableApi = axios.create({
-  baseURL: `${BACKEND_URL}/airtable`,
+  baseURL: `${BACKEND_URL}/api/airtable`,
   timeout: 30000,
 });
 
 // Cliente para peticiones a la base de servicios (via backend)
 const serviciosApi = axios.create({
-  baseURL: `${BACKEND_URL}/servicios`,
+  baseURL: `${BACKEND_URL}/api/servicios`,
   timeout: 30000,
 });
 
@@ -90,7 +90,7 @@ async function inferServiciosFieldSample(tableName: string): Promise<ServiciosFi
 
 // Cliente para peticiones a la base de registros (via backend)
 const registrosApi = axios.create({
-  baseURL: `${BACKEND_URL}/registros`,
+  baseURL: `${BACKEND_URL}/api/registros`,
   timeout: 30000,
 });
 
