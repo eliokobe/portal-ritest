@@ -23,22 +23,72 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedUser = Cookies.get('ritest_user');
-    console.log('AuthContext - Loading saved user from cookies:', savedUser);
-    if (savedUser) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        console.log('AuthContext - Parsed user:', parsedUser);
-        setUser(parsedUser);
-      } catch (error) {
-        console.error('Error parsing saved user:', error);
-        Cookies.remove('ritest_user');
+    const checkSession = async () => {
+      const savedUser = Cookies.get('ritest_user');
+      console.log('AuthContext - Loading saved user from cookies:', savedUser);
+      
+      if (savedUser) {
+        try {
+          const parsedUser = JSON.parse(savedUser);
+          console.log('AuthContext - Parsed user:', parsedUser);
+          
+          // Verificar si hay una sesión activa de Supabase
+          const { data, error } = await supabaseService.supabase.auth.getSession();
+          
+          if (error || !data.session) {
+            console.warn('AuthContext - No hay sesión válida de Supabase, limpiando usuario');
+            console.warn('AuthContext - Error:', error?.message);
+            console.warn('AuthContext - Session:', data.session);
+            Cookies.remove('ritest_user');
+            setUser(null);
+          } else {
+            console.log('AuthContext - Sesión de Supabase válida, token:', data.session.access_token.substring(0, 20) + '...');
+            setUser(parsedUser);
+          }
+        } catch (error) {
+          console.error('Error parsing saved user:', error);
+          Cookies.remove('ritest_user');
+        }
+      } else {
+        console.log('AuthContext - No saved user found in cookies');
       }
-    } else {
-      console.log('AuthContext - No saved user found in cookies');
-    }
-    setLoading(false);
-  }, []);
+      setLoading(false);
+    };
+    
+    checkSession();
+
+    // Escuchar cambios en el estado de autenticación de Supabase
+    const { data: authListener } = supabaseService.supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('AuthContext - Supabase auth state changed:', event, session?.user?.email);
+        
+        if (event === 'SIGNED_OUT' || !session) {
+          console.log('AuthContext - Usuario desconectado por Supabase');
+          setUser(null);
+          Cookies.remove('ritest_user');
+        } else if (event === 'TOKEN_REFRESHED') {
+          console.log('AuthContext - Token JWT refrescado automáticamente');
+        } else if (event === 'SIGNED_IN' && !user) {
+          // Si hay sesión pero no hay usuario local, intentar recuperar
+          const savedUser = Cookies.get('ritest_user');
+          if (savedUser) {
+            try {
+              const parsedUser = JSON.parse(savedUser);
+              console.log('AuthContext - Restaurando usuario desde cookies después de sign in');
+              setUser(parsedUser);
+            } catch (error) {
+              console.error('Error parsing saved user on sign in:', error);
+            }
+          }
+        }
+      }
+    );
+
+    // Cleanup
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [user]);
 
   // Si el usuario existe pero no tiene logoUrl, intenta cargarlo desde Airtable
   useEffect(() => {
@@ -65,18 +115,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error('Credenciales inválidas');
       }
 
-      // 2. Crear sesión en Supabase para obtener JWT token
+      // 2. Crear sesión en Supabase para obtener JWT token (REQUERIDO)
       const { data: supabaseData, error: supabaseError } = await supabaseService.supabase.auth.signInWithPassword({
         email,
         password
       });
 
-      if (supabaseError) {
-        console.warn('Error creando sesión en Supabase:', supabaseError);
-        // Continuar sin Supabase - el usuario está autenticado en Airtable
-      } else {
-        console.log('Sesión Supabase creada:', supabaseData.session?.access_token ? 'Token obtenido' : 'Sin token');
+      if (supabaseError || !supabaseData.session) {
+        console.error('Error creando sesión en Supabase:', supabaseError);
+        throw new Error(`No se pudo crear sesión de autenticación. El usuario debe existir en Supabase.\nError: ${supabaseError?.message || 'Sin sesión'}`);
       }
+
+      console.log('Sesión Supabase creada:', supabaseData.session.access_token ? 'Token obtenido' : 'Sin token');
 
       // 3. Asegurar logoUrl
       let enriched = authenticatedUser;
@@ -95,7 +145,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    // Cerrar sesión en Supabase
+    await supabaseService.supabase.auth.signOut();
+    
+    // Limpiar estado local
     setUser(null);
     Cookies.remove('ritest_user');
   };

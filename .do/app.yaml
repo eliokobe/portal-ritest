@@ -18,7 +18,22 @@ ingress:
       name: backend
     match:
       path:
-        prefix: /api
+        prefix: /servicios
+  - component:
+      name: backend
+    match:
+      path:
+        prefix: /registros
+  - component:
+      name: backend
+    match:
+      path:
+        prefix: /auth
+  - component:
+      name: backend
+    match:
+      path:
+        prefix: /health
   - component:
       name: portal-ritest
     match:
