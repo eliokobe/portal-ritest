@@ -19,7 +19,7 @@ const AIRTABLE_ENVIOS_TABLE = import.meta.env.VITE_AIRTABLE_ENVIOS_TABLE || 'Env
 
 console.log('[Airtable] Configuración segura:');
 console.log('- BACKEND_URL:', BACKEND_URL);
-console.log('- Autenticación: Supabase JWT');
+console.log('- Autenticación: Airtable (tabla Trabajadores)');
 
 // Función para obtener el token de autenticación
 async function getAuthToken(): Promise<string | null> {
