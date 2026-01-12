@@ -3,7 +3,6 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-const rateLimit = require('express-rate-limit');
 const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
@@ -28,26 +27,8 @@ app.use(cors({
 
 app.use(express.json());
 
-// Rate Limiting desactivado (el equipo trabaja mucho)
-// Si necesitas activarlo en el futuro, descomenta:
-// const limiter = rateLimit({
-//   windowMs: 15 * 60 * 1000,
-//   max: 1000,
-//   message: { error: 'Demasiadas peticiones, intenta más tarde' },
-//   standardHeaders: true,
-//   legacyHeaders: false,
-// });
-// app.use('/api', limiter);
-
 // Middleware de autenticación con Supabase
-// Permite login sin autenticación para el endpoint de Trabajadores
 async function authenticateUser(req, res, next) {
-  // Permitir login sin autenticación
-  if (req.path === '/servicios/Trabajadores' && req.method === 'GET') {
-    console.log('🔓 Permitiendo acceso sin autenticación para login');
-    return next();
-  }
-
   try {
     const authHeader = req.headers.authorization;
     
@@ -64,7 +45,6 @@ async function authenticateUser(req, res, next) {
       return res.status(401).json({ error: 'Token inválido o expirado' });
     }
 
-    // Añadir usuario al request para usarlo después
     req.user = user;
     next();
   } catch (error) {
@@ -84,70 +64,26 @@ function createAirtableClient(baseId) {
   });
 }
 
-// Health check (sin autenticación)
+// ============================================
+// HEALTH CHECK (sin autenticación)
+// ============================================
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    authenticated: false
-  });
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Ruta legacy para compatibilidad
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    timestamp: new Date().toISOString(),
-    authenticated: false
-  });
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Endpoint de prueba de autenticación
-app.get('/auth/check', authenticateUser, (req, res) => {
-  res.json({
-    authenticated: true,
-    user: {
-      id: req.user.id,
-      email: req.user.email,
-      role: req.user.user_metadata?.role
-    }
-  });
-});
-
-// Endpoint de login - SIN autenticación (permite login inicial)
-// DEBE estar ANTES del endpoint genérico de servicios
-app.get('/servicios/Trabajadores', async (req, res) => {
-  console.log('🔓 Login endpoint (sin autenticación) - Trabajadores');
-  try {
-    const client = createAirtableClient(SERVICIOS_BASE_ID);
-    const config = {
-      method: 'GET',
-      url: '/Trabajadores',
-      params: req.query
-    };
-
-    const response = await client.request(config);
-    res.json(response.data);
-  } catch (error) {
-    console.error('Error en login Trabajadores:', error.response?.data || error.message);
-    res.status(error.response?.status || 500).json({
-      error: error.response?.data || error.message
-    });
-  }
-});
-
-// Ruta legacy con /api para compatibilidad
+// ============================================
+// ENDPOINT DE LOGIN - SIN AUTENTICACIÓN
+// Estos endpoints DEBEN estar ANTES de los genéricos
+// ============================================
 app.get('/api/servicios/Trabajadores', async (req, res) => {
-  console.log('🔓 Login endpoint LEGACY (sin autenticación) - /api/servicios/Trabajadores');
+  console.log('🔓 Login endpoint - /api/servicios/Trabajadores');
   try {
     const client = createAirtableClient(SERVICIOS_BASE_ID);
-    const config = {
-      method: 'GET',
-      url: '/Trabajadores',
-      params: req.query
-    };
-
-    const response = await client.request(config);
+    const response = await client.get('/Trabajadores', { params: req.query });
     res.json(response.data);
   } catch (error) {
     console.error('Error en login Trabajadores:', error.response?.data || error.message);
@@ -157,12 +93,23 @@ app.get('/api/servicios/Trabajadores', async (req, res) => {
   }
 });
 
-// Proxy para base de servicios - CON AUTENTICACIÓN
-// Este endpoint genérico NO debe coincidir con /Trabajadores porque está después
-// Proxy para base de servicios - CON AUTENTICACIÓN (excepto Trabajadores para login)
-app
+app.get('/servicios/Trabajadores', async (req, res) => {
+  console.log('🔓 Login endpoint - /servicios/Trabajadores');
+  try {
+    const client = createAirtableClient(SERVICIOS_BASE_ID);
+    const response = await client.get('/Trabajadores', { params: req.query });
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error en login Trabajadores:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message
+    });
+  }
+});
 
-// Proxy LEGACY con /api
+// ============================================
+// PROXY SERVICIOS - CON AUTENTICACIÓN
+// ============================================
 app.all('/api/servicios/:tableName*', authenticateUser, async (req, res) => {
   try {
     const { tableName } = req.params;
@@ -179,14 +126,13 @@ app.all('/api/servicios/:tableName*', authenticateUser, async (req, res) => {
     const response = await client.request(config);
     res.json(response.data);
   } catch (error) {
-    console.error('Error en proxy Servicios LEGACY:', error.response?.data || error.message);
+    console.error('Error en proxy Servicios:', error.response?.data || error.message);
     res.status(error.response?.status || 500).json({
       error: error.response?.data || error.message
     });
   }
 });
 
-// Proxy para base de servicios - CON AUTENTICACIÓN
 app.all('/servicios/:tableName*', authenticateUser, async (req, res) => {
   try {
     const { tableName } = req.params;
@@ -210,7 +156,9 @@ app.all('/servicios/:tableName*', authenticateUser, async (req, res) => {
   }
 });
 
-// Proxy LEGACY con /api
+// ============================================
+// PROXY REGISTROS - CON AUTENTICACIÓN
+// ============================================
 app.all('/api/registros/:tableName*', authenticateUser, async (req, res) => {
   try {
     const { tableName } = req.params;
@@ -227,14 +175,13 @@ app.all('/api/registros/:tableName*', authenticateUser, async (req, res) => {
     const response = await client.request(config);
     res.json(response.data);
   } catch (error) {
-    console.error('Error en proxy Registros LEGACY:', error.response?.data || error.message);
+    console.error('Error en proxy Registros:', error.response?.data || error.message);
     res.status(error.response?.status || 500).json({
       error: error.response?.data || error.message
     });
   }
 });
 
-// Proxy para base de registros - CON AUTENTICACIÓN
 app.all('/registros/:tableName*', authenticateUser, async (req, res) => {
   try {
     const { tableName } = req.params;
@@ -261,16 +208,12 @@ app.all('/registros/:tableName*', authenticateUser, async (req, res) => {
 // Manejo de errores global
 app.use((err, req, res, next) => {
   console.error('Error global:', err);
-  res.status(500).json({ 
-    error: 'Error interno del servidor',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
+  res.status(500).json({ error: 'Error interno del servidor' });
 });
 
 app.listen(PORT, () => {
   console.log(`🚀 Servidor backend seguro ejecutándose en puerto ${PORT}`);
   console.log(`🔒 Autenticación: Activada (Supabase JWT)`);
-  console.log(`⏱️  Rate Limiting: DESACTIVADO`);
   console.log(`🌐 CORS: ${CLIENT_URL}`);
   if (!AIRTABLE_API_KEY) {
     console.error('⚠️  ADVERTENCIA: AIRTABLE_API_KEY no configurada');
