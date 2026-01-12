@@ -84,28 +84,30 @@ class SupabaseService {
    * Trackear tramitación completa (crear registro con ambas fechas o actualizar si existe)
    * Este método se llama cuando se marca como tramitado o se cambia Ipartner
    * @param numero - Número de expediente
-   * @param fechaCreacion - Fecha cierre de Airtable (timezone Madrid UTC+1, formato ISO)
+   * @param fechaCreacion - Fecha cierre de Airtable (formato ISO)
    * @param fechaTramitacion - Fecha de tramitación (timestamp actual)
    */
   async trackTramitacion(número: string, fechaCreacion?: string, fechaTramitacion?: string): Promise<void> {
     if (!this.isEnabled()) return;
 
     try {
-      // Sumar 1 hora a ambas fechas para ajustar a la hora de Madrid
-      const addOneHour = (dateStr: string): string => {
-        const date = new Date(dateStr);
-        date.setHours(date.getHours() + 1);
-        return date.toISOString();
+      const getLocalTime = (dateStr?: string): string => {
+        const date = dateStr ? new Date(dateStr) : new Date();
+        return new Intl.DateTimeFormat('sv-SE', {
+          timeZone: 'Europe/Madrid',
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        }).format(date).replace(' ', 'T');
       };
 
-      const tramitacionDate = fechaTramitacion ? addOneHour(fechaTramitacion) : addOneHour(new Date().toISOString());
-      const creacionDate = fechaCreacion ? addOneHour(fechaCreacion) : addOneHour(new Date().toISOString());
+      const tramitacionDate = getLocalTime(fechaTramitacion);
+      const creacionDate = getLocalTime(fechaCreacion);
 
       console.log(`[Supabase] Tracking tramitación: ${número}`, {
         fechaCreacionOriginal: fechaCreacion,
-        fechaCreacionAjustada: creacionDate,
+        fechaCreacionLocal: creacionDate,
         fechaTramitacionOriginal: fechaTramitacion,
-        fechaTramitacionAjustada: tramitacionDate
+        fechaTramitacionLocal: tramitacionDate
       });
 
       // Buscar registro existente sin tramitar
@@ -182,13 +184,17 @@ class SupabaseService {
 
       const recordId = records[0].id;
 
-      // Actualizar con la fecha de tramitación (+1 hora para Madrid)
-      const now = new Date();
-      now.setHours(now.getHours() + 1);
+      // Actualizar con la fecha de tramitación (Hora de Madrid)
+      const nowMadrid = new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Europe/Madrid',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      }).format(new Date()).replace(' ', 'T');
+
       const { error } = await supabase!
         .from('tramitaciones')
         .update({
-          tramitación: now.toISOString(),
+          tramitación: nowMadrid,
         })
         .eq('id', recordId);
 
@@ -399,6 +405,39 @@ class SupabaseService {
   }
 
   /**
+   * Verificar múltiples números y crear registros de recogida para los que no existen
+   */
+  async ensureRecogidas(numeros: string[]): Promise<void> {
+    if (!this.isEnabled() || numeros.length === 0) return;
+
+    try {
+      // Convertir a números para la comparación con la BD
+      const numerosAsNumbers = numeros.map(n => Number(n));
+      
+      // Obtener TODOS los registros existentes con estos números (tramitados o no)
+      const { data: existing } = await supabase!
+        .from('recogidas')
+        .select('número')
+        .in('número', numerosAsNumbers);
+
+      const existingNumeros = new Set(existing?.map((r: any) => Number(r.número)) || []);
+      const newNumeros = numerosAsNumbers.filter(n => !existingNumeros.has(n));
+
+      if (newNumeros.length > 0) {
+        const { error } = await supabase!
+          .from('recogidas')
+          .insert(newNumeros.map(numero => ({ número: numero, tramitado: null })));
+
+        if (error) {
+          console.error('Error creating recogidas:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error in ensureRecogidas:', error);
+    }
+  }
+
+  /**
    * Crear un registro cuando un envío entra en estado de recogida
    */
   async createRecogida(número: string): Promise<void> {
@@ -424,6 +463,7 @@ class SupabaseService {
         .from('recogidas')
         .insert({
           número: número,
+          tramitado: null,
         });
 
       if (error) {
@@ -459,13 +499,17 @@ class SupabaseService {
 
       const recordId = records[0].id;
 
-      // Actualizar con la fecha de tramitado (+1 hora para Madrid)
-      const now = new Date();
-      now.setHours(now.getHours() + 1);
+      // Actualizar con la fecha de tramitado (Hora de Madrid)
+      const nowMadrid = new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Europe/Madrid',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      }).format(new Date()).replace(' ', 'T');
+
       const { error } = await supabase!
         .from('recogidas')
         .update({
-          tramitado: now.toISOString(),
+          tramitado: nowMadrid,
         })
         .eq('id', recordId);
 
@@ -494,21 +538,23 @@ class SupabaseService {
     }
 
     try {
-      // Sumar 1 hora a ambas fechas para ajustar a la hora de Madrid
-      const addOneHour = (dateStr: string): string => {
-        const date = new Date(dateStr);
-        date.setHours(date.getHours() + 1);
-        return date.toISOString();
+      const getLocalTime = (dateStr?: string): string => {
+        const date = dateStr ? new Date(dateStr) : new Date();
+        return new Intl.DateTimeFormat('sv-SE', {
+          timeZone: 'Europe/Madrid',
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        }).format(date).replace(' ', 'T');
       };
 
-      const tramitadoDate = fechaTramitado ? addOneHour(fechaTramitado) : addOneHour(new Date().toISOString());
-      const creacionDate = fechaCreacion ? addOneHour(fechaCreacion) : addOneHour(new Date().toISOString());
+      const tramitadoDate = getLocalTime(fechaTramitado);
+      const creacionDate = getLocalTime(fechaCreacion);
 
       console.log(`[Supabase] Tracking recogida: ${número}`, {
         fechaCreacionOriginal: fechaCreacion,
-        fechaCreacionAjustada: creacionDate,
+        fechaCreacionLocal: creacionDate,
         fechaTramitadoOriginal: fechaTramitado,
-        fechaTramitadoAjustada: tramitadoDate
+        fechaTramitadoLocal: tramitadoDate
       });
 
       // Buscar registro existente sin tramitar
@@ -572,21 +618,23 @@ class SupabaseService {
     }
 
     try {
-      // Sumar 1 hora a ambas fechas para ajustar a la hora de Madrid
-      const addOneHour = (dateStr: string): string => {
-        const date = new Date(dateStr);
-        date.setHours(date.getHours() + 1);
-        return date.toISOString();
+      const getLocalTime = (dateStr?: string): string => {
+        const date = dateStr ? new Date(dateStr) : new Date();
+        return new Intl.DateTimeFormat('sv-SE', {
+          timeZone: 'Europe/Madrid',
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        }).format(date).replace(' ', 'T');
       };
 
-      const informeDate = fechaInforme ? addOneHour(fechaInforme) : addOneHour(new Date().toISOString());
-      const creacionDate = fechaCreacion ? addOneHour(fechaCreacion) : addOneHour(new Date().toISOString());
+      const informeDate = getLocalTime(fechaInforme);
+      const creacionDate = getLocalTime(fechaCreacion);
 
       console.log(`[Supabase] Tracking asesoramiento: ${número}`, {
         fechaCreacionOriginal: fechaCreacion,
-        fechaCreacionAjustada: creacionDate,
+        fechaCreacionLocal: creacionDate,
         fechaInformeOriginal: fechaInforme,
-        fechaInformeAjustada: informeDate
+        fechaInformeLocal: informeDate
       });
 
       // Buscar registro existente sin fecha de informe
@@ -834,37 +882,125 @@ class SupabaseService {
   }
 
   /**
-   * Crear un registro de resolución cuando se resuelve un caso
+   * Abre un ciclo de resolución si no existe uno activo
    * @param numero - Número de expediente
-   * @param fechaCreacion - Fecha de creación del caso (desde Airtable)
    */
-  async createResolutionRecord(numero: string, fechaCreacion?: string): Promise<void> {
-    if (!this.isEnabled()) return;
+  async openResolutionRecord(numero: string | number): Promise<void> {
+    if (!this.isEnabled() || !numero) return;
+
+    const trimmedNumero = String(numero).trim();
 
     try {
-      const resolucionDate = new Date().toISOString();
-      const creacionDate = fechaCreacion || new Date().toISOString();
-
-      console.log(`[Supabase] Creando registro de resolución: ${numero}`, {
-        creación: creacionDate,
-        resolución: resolucionDate
-      });
-
-      const { error } = await supabase!
+      // 1. Buscamos si ya hay uno abierto (resolución IS NULL)
+      const { data, error: selectError } = await supabase!
         .from('resoluciones_remotas')
-        .insert({
-          número: numero,
-          creación: creacionDate,
-          resolución: resolucionDate
-        });
+        .select('id')
+        .eq('número', trimmedNumero)
+        .is('resolución', null)
+        .limit(1)
+        .maybeSingle();
 
-      if (error) {
-        console.error('[Supabase] Error creando registro de resolución:', error);
+      if (selectError) {
+        console.error('[Supabase] Error buscando registro abierto:', selectError);
+        return;
+      }
+
+      // 2. Si no hay ninguno abierto, lo creamos
+      if (!data) {
+        const nowMadrid = new Intl.DateTimeFormat('sv-SE', {
+          timeZone: 'Europe/Madrid',
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        }).format(new Date()).replace(' ', 'T');
+        
+        console.log(`[Supabase] Abriendo ciclo: ${trimmedNumero} a las ${nowMadrid}`);
+        
+        const { error: insertError } = await supabase!
+          .from('resoluciones_remotas')
+          .insert({ 
+            número: trimmedNumero, 
+            creación: nowMadrid,
+            resolución: null // Forzamos explícitamente a null
+          });
+
+        if (insertError) {
+          // Si el error es "duplicate key", significa que alguien lo creó justo antes
+          if (insertError.code === '23505') {
+            console.log(`[Supabase] Ciclo ya existía para ${trimmedNumero}, ignorando insert.`);
+          } else {
+            console.error('[Supabase] Error insertando record:', insertError);
+          }
+        }
       } else {
-        console.log(`[Supabase] Registro de resolución creado para ${numero}`);
+        console.log(`[Supabase] Ya existe un ciclo abierto para ${trimmedNumero} (ID: ${data.id})`);
       }
     } catch (error) {
-      console.error('[Supabase] Error en createResolutionRecord:', error);
+      console.error('[Supabase] Error en openResolutionRecord:', error);
+    }
+  }
+
+  /**
+   * Cierra el ciclo abierto de un expediente
+   * @param numero - Número de expediente
+   */
+  async completeResolutionRecord(numero: string | number): Promise<void> {
+    if (!this.isEnabled() || !numero) return;
+
+    try {
+      const stringNumero = String(numero).trim();
+      const nowMadrid = new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Europe/Madrid',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      }).format(new Date()).replace(' ', 'T');
+      
+      console.log(`[Supabase] Completando ciclo: ${stringNumero} a las ${nowMadrid}`);
+      
+      const { data, error } = await supabase!
+        .from('resoluciones_remotas')
+        .update({ resolución: nowMadrid })
+        .eq('número', stringNumero)
+        .is('resolución', null)
+        .select();
+
+      if (error) {
+        console.error('[Supabase] Error cerrando ciclo de resolución:', error);
+      } else if (data && data.length > 0) {
+        console.log(`[Supabase] Ciclo completado con éxito para ${numero}`, data[0]);
+      } else {
+        console.warn(`[Supabase] No se encontró ciclo abierto para completar para ${numero}`);
+      }
+    } catch (error) {
+      console.error('[Supabase] Error en completeResolutionRecord:', error);
+    }
+  }
+
+  /**
+   * Borra el ciclo abierto (para reprogramaciones o salida de "Requiere acción")
+   * @param numero - Número de expediente
+   */
+  async cancelResolutionRecord(numero: string | number): Promise<void> {
+    if (!this.isEnabled() || !numero) return;
+
+    try {
+      const stringNumero = String(numero).trim();
+      console.log(`[Supabase] Cancelando ciclo (borrando record abierto): ${stringNumero}`);
+      const { data, error } = await supabase!
+        .from('resoluciones_remotas')
+        .delete()
+        .eq('número', stringNumero)
+        .is('resolución', null)
+        .select();
+
+      if (error) {
+        console.error('[Supabase] Error borrando ciclo de resolución:', error);
+      } else if (data && data.length > 0) {
+        console.log(`[Supabase] Ciclo cancelado y borrado para ${numero}`);
+      } else {
+        console.log(`[Supabase] No había ciclo abierto para cancelar para ${numero}`);
+      }
+    } catch (error) {
+      console.error('[Supabase] Error en cancelResolutionRecord:', error);
     }
   }
 

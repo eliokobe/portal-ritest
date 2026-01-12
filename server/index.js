@@ -15,7 +15,7 @@ const REGISTROS_BASE_ID = process.env.AIRTABLE_REGISTROS_BASE_ID || 'applcT2fcdN
 // CORS configurado para tu dominio
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 app.use(cors({
-  origin: [CLIENT_URL, 'https://portal.ritest.es', 'http://localhost:5173'],
+  origin: [CLIENT_URL, 'https://portal.ritest.es', 'http://localhost:5173', 'http://localhost:5174'],
   credentials: true
 }));
 

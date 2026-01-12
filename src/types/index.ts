@@ -32,6 +32,7 @@ export interface Invoice {
 export interface Service {
   id: string;
   expediente?: string;
+  numero?: string;
   cliente?: string;
   telefono?: string;
   estado?: string;

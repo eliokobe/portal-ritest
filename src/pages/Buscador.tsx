@@ -7,6 +7,7 @@ import { getStatusColors, getIpartnerColors } from '../utils/statusColors';
 interface Service {
   id: string;
   expediente?: string;
+  numero?: string;
   fechaRegistro?: string;
   nombre?: string;
   telefono?: string;
@@ -152,7 +153,9 @@ const Buscador: React.FC = () => {
 
   const loadFormulariosForService = async (service: Service | null) => {
     const formularioIds = service?.formularioId;
-    const expediente = service?.expediente?.trim();
+    const numero = service?.numero ? String(service.numero).trim() : undefined;
+    const expedienteLegacy = service?.expediente ? String(service.expediente).trim() : undefined;
+    const identifier = numero || expedienteLegacy;
 
     setFormularios([]);
 
@@ -169,12 +172,12 @@ const Buscador: React.FC = () => {
       data = [];
     }
 
-    // Segundo: buscar por expediente/número
-    if (data.length === 0 && expediente) {
+    // Segundo: buscar por identifier (número o expediente)
+    if (data.length === 0 && identifier) {
       try {
-        data = await airtableService.getFormularioByExpediente(expediente);
+        data = await airtableService.getFormularioByExpediente(identifier);
       } catch (error) {
-        console.warn('No se encontró formulario por expediente', error);
+        console.warn('No se encontró formulario por identificador', error);
         data = [];
       }
     }
@@ -193,13 +196,14 @@ const Buscador: React.FC = () => {
     setSearchResults([]);
 
     try {
-      // Buscar en servicios por expediente
+      // Buscar en servicios por número, expediente, nombre o teléfono
       const services = await airtableService.getServices(user?.clinic);
       const filteredResults = services.filter((service) => {
         const term = searchTerm.trim().toLowerCase();
-        return service.expediente?.toLowerCase().includes(term) ||
-               service.nombre?.toLowerCase().includes(term) ||
-               service.telefono?.toLowerCase().includes(term);
+        return (service.numero && String(service.numero).toLowerCase().includes(term)) ||
+               (service.expediente && String(service.expediente).toLowerCase().includes(term)) ||
+               (service.nombre && String(service.nombre).toLowerCase().includes(term)) ||
+               (service.telefono && String(service.telefono).toLowerCase().includes(term));
       });
 
       setSearchResults(filteredResults);
@@ -301,7 +305,7 @@ const Buscador: React.FC = () => {
               <thead className="bg-slate-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Expediente
+                    Número
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Cliente
@@ -327,7 +331,7 @@ const Buscador: React.FC = () => {
                     className="hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {service.expediente || '-'}
+                      {service.numero || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {service.nombre || '-'}
@@ -407,9 +411,9 @@ const Buscador: React.FC = () => {
               <div className="p-6 space-y-6">
                 <div>
                 <h2 className="text-xl font-semibold text-gray-900">Detalle del expediente</h2>
-                {selectedService.expediente && (
+                {selectedService.numero && (
                   <p className="text-sm text-gray-500 mt-1">
-                    Expediente {selectedService.expediente}
+                    Número {selectedService.numero}
                   </p>
                 )}
               </div>

@@ -50,6 +50,7 @@ interface ServicioInfo {
   id: string;
   nombre?: string;
   expediente?: string;
+  numero?: string;
   cliente?: string;
   telefono?: string;
   direccion?: string;
@@ -108,7 +109,40 @@ export default function Envios() {
   const fetchEnvios = async () => {
     try {
       const data = await airtableService.getEnvios();
-      setEnvios(data as Envio[]);
+      const allEnvios = data as Envio[];
+      setEnvios(allEnvios);
+
+      // Solo crear registros en Supabase para envíos que están en "Requiere acción"
+      if (allEnvios.length > 0) {
+        const now = new Date();
+        const estadosExcluidos = ['Entregado', 'Devuelto', 'Recogida hecha'];
+        
+        const enviosRequierenAccion = allEnvios.filter(envio => {
+          // Excluir estados finalizados
+          if (envio.estado && estadosExcluidos.includes(envio.estado)) return false;
+          
+          // Excluir envíos con seguimiento "Email enviado"
+          if (envio.seguimiento === 'Email enviado') return false;
+          
+          // Debe tener fecha de envío
+          if (!envio.fechaEnvio) return false;
+          
+          // Calcular horas laborables desde la fecha de envío
+          const fechaEnvio = new Date(envio.fechaEnvio);
+          const businessHours = calculateBusinessHours(fechaEnvio, now);
+          
+          // Solo los que tienen más de 48 horas laborables
+          return businessHours > 48;
+        });
+
+        const identificadores = enviosRequierenAccion
+          .map(envio => envio.numero)
+          .filter(n => n && !isNaN(Number(n))) as string[];
+
+        if (identificadores.length > 0) {
+          supabaseService.ensureRecogidas(identificadores);
+        }
+      }
     } catch (error) {
       console.error('Error fetching envíos:', error);
     } finally {
@@ -162,10 +196,11 @@ export default function Envios() {
         nombre: s.nombre || s.expediente || 'Servicio',
         expediente: s.expediente,
       })));
-      setServiciosInfo(serviciosFiltrados.map((s: Servicio) => ({
+      setServiciosInfo(serviciosFiltrados.map((s: any) => ({
         id: s.id,
         nombre: s.nombre,
         expediente: s.expediente,
+        numero: s.numero,
         cliente: s.cliente ?? s.nombre,
         telefono: s.telefono,
         direccion: s.direccion,
@@ -574,27 +609,24 @@ export default function Envios() {
                                   e.id === envio.id ? { ...e, estado: newValue } : e
                                 )
                               );
-                              // Si se marca como "Recogida enviada", trackear en Supabase
+                              // Si se marca como "Recogida enviada", completar el tracking en Supabase
                               if (newValue === 'Recogida enviada') {
-                                console.log('[Envios] Es Recogida enviada, verificando seguimiento:', envio.seguimiento);
-                                // Usar seguimiento, o si no está, usar número de recogida o número regular
-                                const identificador = envio.seguimiento || 
-                                                     (envio.numeroRecogida ? String(envio.numeroRecogida) : undefined) ||
-                                                     envio.numero;
+                                const identificador = envio.numero;
                                 
-                                if (identificador) {
-                                  console.log('[Envios] Llamando a trackRecogida con:', {
-                                    identificador,
-                                    creacion: envio.creacion,
-                                    enviado: new Date().toISOString()
-                                  });
-                                  supabaseService.trackRecogida(
-                                    identificador,
-                                    envio.creacion,
-                                    new Date().toISOString()
-                                  );
+                                if (identificador && !isNaN(Number(identificador))) {
+                                  // Marcar como tramitado con la fecha actual
+                                  supabaseService.completeRecogida(identificador);
                                 } else {
-                                  console.warn('[Envios] No hay identificador (seguimiento, número de recogida o número) para este envío');
+                                  console.warn('[Envios] No hay un número de servicio válido para trackear en Supabase');
+                                }
+                              }
+
+                              // Si se marca como "Recogida hecha", completar el seguimiento en Supabase
+                              if (newValue === 'Recogida hecha') {
+                                const identificador = envio.numero;
+                                
+                                if (identificador && !isNaN(Number(identificador))) {
+                                  supabaseService.completeRecogida(identificador);
                                 }
                               }
                             })
@@ -657,30 +689,14 @@ export default function Envios() {
                           try {
                             await handleSave(envio.id, 'seguimiento', newValue);
                             
-                            // Crear registro en recogidas de Supabase
-                            if (envio.numero && newValue) {
-                              console.log('[Envios] Creando registro en recogidas para:', envio.numero, 'Seguimiento:', newValue);
-                              
-                              // Email enviado: creación = Fecha de envío + 48h + 1h
-                              let fechaCreacion: string;
-                              if (envio.fechaEnvio) {
-                                const fechaEnvio = new Date(envio.fechaEnvio);
-                                fechaEnvio.setHours(fechaEnvio.getHours() + 48 + 1);
-                                fechaCreacion = fechaEnvio.toISOString();
-                                console.log('[Envios] Fecha envío:', envio.fechaEnvio, '+ 49h =', fechaCreacion);
-                              } else {
-                                console.warn('[Envios] No hay fecha de envío, usando fecha actual');
-                                fechaCreacion = new Date().toISOString();
-                              }
-                              
-                              // Fecha tramitado = fecha actual (cuando se marca seguimiento)
-                              const fechaTramitado = new Date().toISOString();
-                              
-                              console.log('[Envios] Fechas calculadas:', { fechaCreacion, fechaTramitado });
-                              await supabaseService.trackRecogida(envio.numero, fechaCreacion, fechaTramitado);
-                              console.log('[Envios] Registro creado en recogidas');
-                            } else {
-                              console.warn('[Envios] No hay número o seguimiento para crear registro en recogidas');
+                            // Si se marca el seguimiento, completar en Supabase
+                            if (newValue) {
+                               const id = envio.numero;
+                               
+                               if (id && !isNaN(Number(id))) {
+                                  console.log('[Envios] Marcando seguimiento como tramitado para servicio:', id);
+                                  await supabaseService.completeRecogida(id);
+                               }
                             }
                           } catch (error) {
                             console.error('[Envios] Error updating seguimiento:', error);
@@ -975,15 +991,15 @@ export default function Envios() {
             <h2 className="text-xl font-bold text-gray-900 mb-4">Detalles del envío</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <p className="text-xs uppercase text-gray-500">Número</p>
+                <p className="text-xs uppercase text-gray-500">Número de envío</p>
                 <p className="text-sm text-gray-900">{selectedEnvio.numero || '-'}</p>
               </div>
               <div>
-                <p className="text-xs uppercase text-gray-500">Expediente</p>
+                <p className="text-xs uppercase text-gray-500">Número de servicio</p>
                 <p className="text-sm text-gray-900">
                   {(() => {
                     const servicioRelacionado = serviciosInfo.find(s => s.id === selectedEnvio.servicio);
-                    return servicioRelacionado?.expediente || '-';
+                    return servicioRelacionado?.numero || '-';
                   })()}
                 </p>
               </div>

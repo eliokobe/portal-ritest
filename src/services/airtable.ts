@@ -6,15 +6,9 @@ import { supabaseService } from './supabase';
 // Backend URL - todas las peticiones van al backend seguro
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 
-// Ya NO usamos VITE_AIRTABLE_API_KEY - está en el backend
-// Base IDs (públicos, no son secretos)
-const AIRTABLE_BASE_ID = import.meta.env.VITE_AIRTABLE_BASE_ID || 'appRMClMob8KPNooU';
-const SERVICIOS_BASE_ID = import.meta.env.VITE_AIRTABLE_SERVICES_BASE_ID || 'appX3CBiSmPy4119D';
-
 // Nombres de tablas
 const AIRTABLE_WORKERS_TABLE = import.meta.env.VITE_AIRTABLE_WORKERS_TABLE || 'Trabajadores';
 const AIRTABLE_SERVICES_TABLE = import.meta.env.VITE_AIRTABLE_SERVICES_TABLE || 'Servicios';
-const AIRTABLE_TRAMITACIONES_TABLE = import.meta.env.VITE_AIRTABLE_TRAMITACIONES_TABLE || 'Tramitaciones';
 const AIRTABLE_ENVIOS_TABLE = import.meta.env.VITE_AIRTABLE_ENVIOS_TABLE || 'Envíos';
 
 console.log('[Airtable] Configuración segura:');
@@ -24,6 +18,10 @@ console.log('- Autenticación: Airtable (tabla Trabajadores)');
 // Función para obtener el token de autenticación
 async function getAuthToken(): Promise<string | null> {
   try {
+    if (!supabaseService.supabase) {
+      console.error('Supabase client not initialized');
+      return null;
+    }
     const { data, error } = await supabaseService.supabase.auth.getSession();
     if (error) {
       console.error('Error obteniendo sesión:', error);
@@ -177,6 +175,8 @@ type ServicioListado = {
   ipartner?: string;
   seguimiento?: string;
   resolucionVisita?: string;
+  requiereAccion?: string;
+  numero?: string;
 };
 
 const mapFormularioRecord = (r: any) => {
@@ -355,6 +355,8 @@ async function fetchServicesByTable(params: {
         ipartner: f['Ipartner'],
         seguimiento: f['Seguimiento'],
         resolucionVisita: f['Resolución visita'] ?? f['Resolucion visita'],
+        requiereAccion: f['Requiere acción'],
+        numero: f['Número'] ?? f['Numero'],
       };
     });
 
@@ -603,8 +605,9 @@ export const airtableService = {
             }
             
             // Calcular tiempo de resolución en horas
-            if (fechaRegistro) {
-              const registroDate = new Date(fechaRegistro);
+            const fechaResolucionInicio = f['Requiere acción'] || fechaRegistro;
+            if (fechaResolucionInicio) {
+              const registroDate = new Date(fechaResolucionInicio);
               const tiempoResolucion = (resDate.getTime() - registroDate.getTime()) / (1000 * 60 * 60); // en horas
               tiempoTotalResolucionMes += tiempoResolucion;
               contadorResolucionesMes++;
@@ -637,15 +640,9 @@ export const airtableService = {
           } else if (estado === 'Material enviado' && estadoEnvio === 'Entregado') {
             clientesPendientes++;
           } else if (isCitaInterna && cita) {
-            cita.setHours(0, 0, 0, 0);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            if (cita <= today) clientesPendientes++;
+            if (cita <= now) clientesPendientes++;
           } else if (isCitaTecnico && citaTecnico) {
-            citaTecnico.setHours(0, 0, 0, 0);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            if (citaTecnico < today) clientesPendientes++;
+            if (citaTecnico <= now) clientesPendientes++;
           }
         }
       });
@@ -742,45 +739,12 @@ export const airtableService = {
   },
 
   // Obtener porcentaje de resolución remota por semana para Técnico
-  async getTechnicianRemoteResolutionByWeek(userId?: string, userEmail?: string): Promise<{
+  async getTechnicianRemoteResolutionByWeek(_userId?: string, userEmail?: string): Promise<{
     weeklyData: { week: string; remotePercentage: number; totalServices: number }[];
   }> {
     try {
       const records = await fetchAllServicios(AIRTABLE_SERVICES_TABLE, { pageSize: 100 });
       const now = new Date();
-      
-      // Fecha de inicio: 1 de enero de 2026
-      const startDate = new Date('2026-01-01T00:00:00');
-      
-      // Festivos de la Comunidad de Madrid 2026
-      const madridHolidays2026 = new Set([
-        '2026-01-01', // Año Nuevo
-        '2026-01-06', // Reyes Magos
-        '2026-04-03', // Viernes Santo
-        '2026-04-06', // Lunes de Pascua (no oficial en Madrid pero lo incluyo)
-        '2026-05-01', // Fiesta del Trabajo
-        '2026-05-02', // Fiesta de la Comunidad de Madrid
-        '2026-05-15', // San Isidro (patrón de Madrid)
-        '2026-08-15', // Asunción de la Virgen
-        '2026-10-12', // Fiesta Nacional de España
-        '2026-11-09', // Nuestra Señora de la Almudena (patrona de Madrid)
-        '2026-12-07', // Día de la Constitución (se traslada al lunes 7)
-        '2026-12-08', // Inmaculada Concepción
-        '2026-12-25', // Navidad
-      ]);
-      
-      // Función para verificar si es día laborable
-      const isWorkingDay = (date: Date): boolean => {
-        const dayOfWeek = date.getDay();
-        // Excluir sábado (6) y domingo (0)
-        if (dayOfWeek === 0 || dayOfWeek === 6) return false;
-        
-        // Excluir festivos de Madrid
-        const dateKey = date.toISOString().split('T')[0];
-        if (madridHolidays2026.has(dateKey)) return false;
-        
-        return true;
-      };
       
       // Función para obtener el inicio de la semana (lunes)
       const getWeekStart = (date: Date): string => {
@@ -1714,6 +1678,7 @@ export const airtableService = {
           reparacion: f['Reparación'],
           detalles: f['Detalles'],
           numeroSerie: f['Número de serie'] ?? f['Numero de serie'] ?? f['S/N'],
+          numero: f['Número'] ?? f['Numero'],
           comentarios: f['Comentarios'],
           conversationId: f['Conversation id'],
           telefonoTecnico: telefonoTecnico,
@@ -1744,18 +1709,6 @@ export const airtableService = {
 
   async setTramitacionTramitado(recordId: string, value: boolean): Promise<void> {
     try {
-      // Primero obtener los datos del registro para Supabase
-      let expediente: string | undefined;
-      let fechaCierre: string | undefined;
-      
-      try {
-        const { data } = await serviciosApi.get(`/${AIRTABLE_SERVICES_TABLE}/${recordId}`);
-        expediente = data?.fields?.['Expediente'] ?? data?.fields?.['Número'];
-        fechaCierre = data?.fields?.['Fecha cierre'] ?? data?.fields?.['Fecha Cierre'];
-      } catch (err) {
-        console.warn('No se pudo obtener los datos del registro:', err);
-      }
-      
       const fields: Record<string, any> = {
         'Tramitado': value,
       };
@@ -1765,13 +1718,8 @@ export const airtableService = {
         const fechaTramitacion = new Date().toISOString();
         fields['Fecha sincronización'] = fechaTramitacion;
         
-        // Crear/actualizar en Supabase si tenemos el expediente
-        if (expediente && expediente.trim() !== '') {
-          // Usar Fecha cierre como fecha de creación (cuando entró en Tramitaciones)
-          supabaseService.trackTramitacion(expediente, fechaCierre, fechaTramitacion).catch(err => {
-            console.error('Error tracking tramitacion in Supabase:', err);
-          });
-        }
+        // NO creamos registros en Supabase aquí porque ya se crean desde Services.tsx
+        // cuando se actualiza el campo Ipartner
       }
       
       await serviciosApi.patch(`/${AIRTABLE_SERVICES_TABLE}/${recordId}`, {
@@ -2306,18 +2254,47 @@ export const airtableService = {
   },
 
   // Obtener formularios por IDs de linked records
-  async getFormulariosByIds(formularioIds: string[]): Promise<any[]> {
+  async getFormulariosByIds(formularioIds: string[] | string): Promise<any[]> {
     try {
-      if (!formularioIds || formularioIds.length === 0) {
-        console.log('No hay IDs de formularios para buscar');
+      if (!formularioIds) {
+        return [];
+      }
+
+      // Normalizar a array y filtrar IDs válidos
+      let rawIds: any[] = [];
+      if (Array.isArray(formularioIds)) {
+        rawIds = formularioIds;
+      } else {
+        rawIds = [formularioIds];
+      }
+
+      const ids: string[] = [];
+      for (const item of rawIds) {
+        if (typeof item !== 'string') continue;
+        const trimmed = item.trim();
+        // Caso 1: ID directo (ej: rec...)
+        if (trimmed.startsWith('rec')) {
+          ids.push(trimmed);
+          continue;
+        }
+        // Caso 2: URL que contiene el ID (ej: ...?id=rec...)
+        const match = trimmed.match(/[?&]id=(rec[a-zA-Z0-9]+)/);
+        if (match) {
+          ids.push(match[1]);
+        }
+      }
+
+      if (ids.length === 0) {
+        // Silenciamos este log porque es común que venga basura o URLs sin ID
+        // console.log('No hay IDs válidos (rec...) de formularios para buscar');
         return [];
       }
       
-      console.log('Buscando formularios por IDs:', formularioIds);
+      // console.log('Buscando formularios por IDs validados:', ids);
       const results: any[] = [];
       
       // Obtener cada formulario por su ID
-      for (const id of formularioIds) {
+      for (const id of ids) {
         try {
           const { data } = await serviciosApi.get(`/Formularios/${id}`);
           results.push(mapFormularioRecord(data));
@@ -2326,7 +2303,7 @@ export const airtableService = {
         }
       }
       
-      console.log('Formularios encontrados:', results.length);
+      // console.log('Formularios encontrados:', results.length);
       return results;
     } catch (error) {
       console.error('Error fetching formularios:', error);
@@ -2487,18 +2464,46 @@ export const airtableService = {
   },
 
   // Obtener reparaciones por IDs de linked records
-  async getReparacionesByIds(reparacionIds: string[]): Promise<any[]> {
+  async getReparacionesByIds(reparacionIds: string[] | string): Promise<any[]> {
     try {
-      if (!reparacionIds || reparacionIds.length === 0) {
-        console.log('No hay IDs de reparaciones para buscar');
+      if (!reparacionIds) {
+        return [];
+      }
+
+      // Normalizar a array y filtrar IDs válidos
+      let rawIds: any[] = [];
+      if (Array.isArray(reparacionIds)) {
+        rawIds = reparacionIds;
+      } else {
+        rawIds = [reparacionIds];
+      }
+
+      const ids: string[] = [];
+      for (const item of rawIds) {
+        if (typeof item !== 'string') continue;
+        const trimmed = item.trim();
+        // Caso 1: ID directo
+        if (trimmed.startsWith('rec')) {
+          ids.push(trimmed);
+          continue;
+        }
+        // Caso 2: URL con id=rec...
+        const match = trimmed.match(/[?&]id=(rec[a-zA-Z0-9]+)/);
+        if (match) {
+          ids.push(match[1]);
+        }
+      }
+
+      if (ids.length === 0) {
+        // Silenciamos log
         return [];
       }
       
-      console.log('Buscando reparaciones por IDs:', reparacionIds);
+      // console.log('Buscando reparaciones por IDs validados:', ids);
       const results: any[] = [];
       
       // Obtener cada reparación por su ID
-      for (const id of reparacionIds) {
+      for (const id of ids) {
         try {
           const { data } = await serviciosApi.get(`/Reparaciones/${id}`);
           const f = data.fields ?? {};

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { Search, X, XCircle, MessageCircle, Phone } from 'lucide-react';
 import { airtableService } from '../services/airtable';
 import { supabaseService } from '../services/supabase';
@@ -19,6 +19,7 @@ interface Service {
   reparacion?: string;
   detalles?: string;
   numeroSerie?: string;
+  numero?: string;
   comentarios?: string;
   conversationId?: string;
   telefonoTecnico?: string;
@@ -83,6 +84,8 @@ const Reparaciones: React.FC = () => {
   const [fallbackFormulario, setFallbackFormulario] = useState<any | null>(null);
   const [showCitaModal, setShowCitaModal] = useState(false);
   const [pendingEstadoChange, setPendingEstadoChange] = useState<{serviceId: string, newEstado: string} | null>(null);
+
+  const processedNumerosRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let isMounted = true;
@@ -176,7 +179,7 @@ const Reparaciones: React.FC = () => {
       setFormularios([]);
       setFallbackFormulario(null);
     }
-  }, [selectedService]);
+  }, [selectedService?.id]);
 
   const loadServicioComentarios = async (service: Service) => {
     if (service.servicioId && Array.isArray(service.servicioId) && service.servicioId.length > 0) {
@@ -326,7 +329,9 @@ const Reparaciones: React.FC = () => {
 
   const loadFormulariosForService = async (service: Service | null) => {
     const formularioIds = service?.formularioId;
-    const expediente = service?.expediente?.trim();
+    const numero = service?.numero ? String(service.numero).trim() : undefined;
+    const expedienteLegacy = service?.expediente ? String(service.expediente).trim() : undefined;
+    const expediente = numero || expedienteLegacy;
 
     const fallbackKey = expediente || 'sin-clave';
 
@@ -337,7 +342,7 @@ const Reparaciones: React.FC = () => {
     // Primero: intentar obtener por IDs de linked records
     try {
       if (formularioIds && formularioIds.length > 0) {
-        console.log('Cargando formularios por linked records:', formularioIds);
+        // console.log('Cargando formularios por linked records:', formularioIds);
         data = await airtableService.getFormulariosByIds(formularioIds);
       }
     } catch (error) {
@@ -392,62 +397,28 @@ const Reparaciones: React.FC = () => {
     if (!service || newSeguimiento === service.seguimiento) return;
     setSaving(true);
     try {
-      // Guardar la fecha de seguimiento ANTERIOR antes de actualizar (se perderá al actualizar el campo)
-      const fechaSeguimientoAnterior = service.fechaSeguimiento;
-      console.log('[Reparaciones] Fecha seguimiento anterior:', fechaSeguimientoAnterior);
-      
       await airtableService.updateServiceField(service.id, 'Seguimiento', newSeguimiento, 'Reparaciones');
       setServices((prev) => prev.map((s) => (s.id === service.id ? { ...s, seguimiento: newSeguimiento } : s)));
       setSelectedService((prev) => (prev && prev.id === service.id ? { ...prev, seguimiento: newSeguimiento } : prev));
       
-      // Crear registro en tramitaciones de Supabase si hay servicioId
-      console.log('[Reparaciones] Verificando servicioId para tramitación:', service.servicioId);
-      if (service.servicioId && service.servicioId.length > 0) {
+      // Actualizar registro en tramitaciones de Supabase
+      const numeroIdentificador = service.numero || service.expediente;
+      
+      if (numeroIdentificador) {
         try {
-          // Obtener el expediente del servicio relacionado
-          console.log('[Reparaciones] Obteniendo datos del servicio:', service.servicioId[0]);
-          const servicioData = await airtableService.getServicioData(service.servicioId[0]);
-          console.log('[Reparaciones] Datos del servicio recibidos:', servicioData);
+          // La fecha de tramitado es la fecha actual (cuando se marca el seguimiento)
+          const fechaTramitado = new Date().toISOString();
           
-          const expediente = servicioData?.fields?.['Expediente'] || servicioData?.fields?.['expediente'];
-          console.log('[Reparaciones] Expediente encontrado:', expediente);
-          
-          if (expediente) {
-            // La fecha de tramitado es la fecha actual (cuando se marca el seguimiento)
-            const fechaTramitado = new Date().toISOString();
-            
-            // La fecha de creación depende del tipo de seguimiento
-            let fechaCreacion = fechaTramitado;
-            
-            if (newSeguimiento === 'Primera llamada') {
-              // Primera llamada: Los servicios aparecen en tramitaciones 2 días después de la Fecha Estado
-              if (service.fechaEstado) {
-                const fechaEstadoDate = new Date(service.fechaEstado);
-                fechaEstadoDate.setDate(fechaEstadoDate.getDate() + 2); // Añadir 2 días
-                fechaCreacion = fechaEstadoDate.toISOString();
-              }
-            } else if (newSeguimiento === 'Segunda llamada' || newSeguimiento === 'Whatsapp' || newSeguimiento === 'Ilocalizable') {
-              // Segunda llamada, Whatsapp o Ilocalizable: creación = Fecha seguimiento anterior + 4h
-              if (fechaSeguimientoAnterior) {
-                const fechaSeguimientoDate = new Date(fechaSeguimientoAnterior);
-                fechaSeguimientoDate.setHours(fechaSeguimientoDate.getHours() + 4);
-                fechaCreacion = fechaSeguimientoDate.toISOString();
-                console.log('[Reparaciones] Usando fecha seguimiento anterior + 4h:', fechaSeguimientoAnterior, '->', fechaCreacion);
-              }
-            }
-            
-            console.log('[Reparaciones] Creando tramitación con seguimiento:', newSeguimiento, { expediente, fechaCreacion, fechaTramitado });
-            await supabaseService.trackTramitacion(expediente, fechaCreacion, fechaTramitado);
-            console.log(`[Reparaciones] Registro creado en tramitaciones para expediente ${expediente}`);
-          } else {
-            console.log('[Reparaciones] No se encontró expediente en el servicio');
-          }
+          console.log('[Reparaciones] Actualizando tramitación en Supabase:', { numero: numeroIdentificador, fechaTramitado });
+          // trackTramitacion buscará un registro sin tramitar y le pondrá la fecha de tramitación
+          await supabaseService.trackTramitacion(numeroIdentificador, undefined, fechaTramitado);
+          console.log(`[Reparaciones] Registro actualizado en tramitaciones para número ${numeroIdentificador}`);
         } catch (error) {
-          console.error('[Reparaciones] Error creando registro en tramitaciones:', error);
-          // No mostramos error al usuario ya que el seguimiento se guardó correctamente
+          console.error('[Reparaciones] Error actualizando registro en tramitaciones:', error);
+          // No mostramos error al usuario ya que el seguimiento se guardó correctamente en Airtable
         }
       } else {
-        console.log('[Reparaciones] No hay servicioId vinculado a esta reparación');
+        console.log('[Reparaciones] No hay número ni expediente vinculado a esta reparación');
       }
     } catch (err) {
       console.error('Reparaciones - Error actualizando seguimiento:', err);
@@ -545,6 +516,25 @@ const Reparaciones: React.FC = () => {
       return dateB - dateA; // Más recientes primero
     });
   }, [services, searchTerm, user?.role, activeTab]);
+
+  // Asegurar que los registros de tramitaciones existen para los servicios en "Requiere Acción"
+  useEffect(() => {
+    // Solo para el rol Administrativa y en la pestaña de Requiere Acción
+    const isAdministrativa = user?.role === 'Administrativa';
+    
+    if (isAdministrativa && activeTab === 'requiere-accion' && filteredServices.length > 0) {
+      const numeros = filteredServices
+        .map(s => s.numero)
+        .filter(n => n && !processedNumerosRef.current.has(`tramitacion-${n}`)) as string[];
+      
+      if (numeros.length > 0) {
+        // Marcar como procesados
+        numeros.forEach(n => processedNumerosRef.current.add(`tramitacion-${n}`));
+        console.log('[SLA] Reparaciones - Asegurando tramitaciones para:', numeros);
+        supabaseService.ensureTramitaciones(numeros);
+      }
+    }
+  }, [filteredServices, activeTab, user?.role]);
 
   const formatDateTime = (dateString?: string) => {
     if (!dateString) return '-';

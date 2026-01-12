@@ -52,6 +52,7 @@ interface Service {
   accionIpartner?: string;
   ipartner?: string;
   resolucionVisita?: string;
+  requiereAccion?: string;
 }
 
 const STATUS_OPTIONS = [
@@ -164,6 +165,9 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   const [pendingEstadoChange, setPendingEstadoChange] = useState<{serviceId: string, newEstado: string} | null>(null);
   const [showCitaModal, setShowCitaModal] = useState(false);
   const [showMotivoTecnicoModal, setShowMotivoTecnicoModal] = useState(false);
+
+  // Ref para trackear registros procesados en esta sesión y evitar duplicados por re-renders
+  const processedNumerosRef = React.useRef<Set<string>>(new Set());
 
   // Determinar si el usuario es Gestora Técnica
   const isGestoraTecnica = user?.role === 'Gestora Técnica';
@@ -566,16 +570,14 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
           // Material enviado: solo si Estado envío es "Entregado"
           if (estado === 'Material enviado' && estadoEnvio === 'Entregado') return true;
           
-          // Cita interna: HOY o ANTERIOR
+          // Cita interna: Ahora o anterior (según fecha y hora exacta)
           if (isCitaInterna && cita) {
-            cita.setHours(0, 0, 0, 0);
-            if (cita <= today) return true;
+            if (cita <= now) return true;
           }
           
-          // Cita técnico: ANTERIOR a hoy (reclamar informe)
+          // Cita técnico: Ahora o anterior (según fecha y hora exacta)
           if (isCitaTecnico && citaTecnico) {
-            citaTecnico.setHours(0, 0, 0, 0);
-            if (citaTecnico < today) return true;
+            if (citaTecnico <= now) return true;
           }
           
           return false;
@@ -593,14 +595,12 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
           
           // Cita interna: FUTURA
           if (isCitaInterna && cita) {
-            cita.setHours(0, 0, 0, 0);
-            if (cita > today) return true;
+            if (cita > now) return true;
           }
           
-          // Cita técnico: HOY o FUTURA
+          // Cita técnico: FUTURA
           if (isCitaTecnico && citaTecnico) {
-            citaTecnico.setHours(0, 0, 0, 0);
-            if (citaTecnico >= today) return true;
+            if (citaTecnico > now) return true;
           }
           
           return false;
@@ -613,16 +613,18 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
 
     const term = searchTerm.trim().toLowerCase();
     const filtered = term ? servicesWithAllowedStates.filter((service) => {
-      const matchesExpediente = service.expediente?.toLowerCase().includes(term);
-      const matchesNombre = service.nombre?.toLowerCase().includes(term);
-      const matchesTelefono = service.telefono?.toLowerCase().includes(term);
-      const matchesDireccion = service.direccion?.toLowerCase().includes(term);
-      const matchesEstado = service.estado?.toLowerCase().includes(term);
-      const matchesEstadoIpas = service.estadoIpas?.toLowerCase().includes(term);
-      const matchesReferencia = service.referencia?.toLowerCase().includes(term);
+      const matchesExpediente = String(service.expediente || '').toLowerCase().includes(term);
+      const matchesNumero = String(service.numero || '').toLowerCase().includes(term);
+      const matchesNombre = String(service.nombre || '').toLowerCase().includes(term);
+      const matchesTelefono = String(service.telefono || '').toLowerCase().includes(term);
+      const matchesDireccion = String(service.direccion || '').toLowerCase().includes(term);
+      const matchesEstado = String(service.estado || '').toLowerCase().includes(term);
+      const matchesEstadoIpas = String(service.estadoIpas || '').toLowerCase().includes(term);
+      const matchesReferencia = String(service.referencia || '').toLowerCase().includes(term);
 
       return (
         matchesExpediente ||
+        matchesNumero ||
         matchesNombre ||
         matchesTelefono ||
         matchesDireccion ||
@@ -646,6 +648,38 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     console.log('Services - Final filtered services:', finalFiltered.length);
     return finalFiltered;
   }, [services, searchTerm, activeTab, isTramitacion, isTecnico, isResponsableOrAdministrativa]);
+
+  // Asegurar que los registros de resolución existen para los servicios en "Requiere Acción"
+  useEffect(() => {
+    // Solo para técnicos en la pestaña de Requiere Acción
+    if (!isTramitacion && isTecnico && activeTab === 'requiere-accion' && filteredServices.length > 0) {
+      console.log('[SLA] Revisando filteredServices para asegurar ciclos abiertos:', filteredServices.length);
+      filteredServices.forEach(service => {
+        if (service.numero && !processedNumerosRef.current.has(service.numero)) {
+          console.log('[SLA] Intentando abrir ciclo para:', service.numero);
+          processedNumerosRef.current.add(service.numero);
+          supabaseService.openResolutionRecord(service.numero).catch(err => {
+            console.error('[SLA] Error opening resolution record:', err);
+            processedNumerosRef.current.delete(service.numero!);
+          });
+        }
+      });
+    }
+    
+    // Si estamos en la vista de Tramitaciones, asegurar que los registros 
+    // existen en Supabase para trackear el tiempo de SLA (solo para servicios filtrados)
+    if (isTramitacion && filteredServices.length > 0) {
+      const numeros = filteredServices
+        .map(s => s.numero)
+        .filter(n => n && !processedNumerosRef.current.has(`tramitacion-${n}`)) as string[];
+      
+      if (numeros.length > 0) {
+        // Marcar como procesados
+        numeros.forEach(n => processedNumerosRef.current.add(`tramitacion-${n}`));
+        supabaseService.ensureTramitaciones(numeros);
+      }
+    }
+  }, [filteredServices, activeTab, isTecnico, isTramitacion]);
 
   const handleCloseModal = () => {
     setSelectedService(null);
@@ -723,7 +757,10 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
         // Intentar obtener por IDs de linked records
         if (selectedService.reparacionesId && selectedService.reparacionesId.length > 0) {
           console.log('Cargando reparaciones por linked records:', selectedService.reparacionesId);
-          dataRep = await airtableService.getReparacionesByIds(selectedService.reparacionesId);
+          const idsToFetch = Array.isArray(selectedService.reparacionesId) 
+            ? selectedService.reparacionesId 
+            : [selectedService.reparacionesId];
+          dataRep = await airtableService.getReparacionesByIds(idsToFetch);
         }
         
         // Buscar por expediente/número
@@ -751,8 +788,9 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
         // Intentar obtener por IDs de linked records
         try {
           if (formularioIds && formularioIds.length > 0) {
-            console.log('Cargando formularios por linked records:', formularioIds);
-            dataForm = await airtableService.getFormulariosByIds(formularioIds);
+            // Asegurar que pasamos un array o string válido
+            const idsToFetch = Array.isArray(formularioIds) ? formularioIds : [formularioIds];
+            dataForm = await airtableService.getFormulariosByIds(idsToFetch);
           }
         } catch (error) {
           console.warn('No se pudieron cargar formularios por linked records', error);
@@ -1149,7 +1187,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expediente</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Registro</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">Nombre</th>
                   {isTramitacion ? (
@@ -1174,7 +1212,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                     id={`service-row-${service.id}`}
                     className={`${lastSelectedServiceId === service.id ? 'bg-green-50' : 'hover:bg-gray-50'}`}
                   >
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{service.expediente || '-'}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{service.numero || service.expediente || '-'}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">{formatDate(service.fechaRegistro)}</td>
                     <td className="px-4 py-3 text-sm text-gray-900 w-40"><div className="max-w-[10rem] truncate">{service.nombre || '-'}</div></td>
                     {isTramitacion ? (
@@ -1188,21 +1226,15 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                               
                               setSaving(true);
                               try {
-                                await airtableService.updateServiceField(service.id, 'Ipartner', newValue);
-                                
-                                // Trackear en Supabase cuando se cambia Ipartner
-                                // (la automatización de Airtable marcará como tramitado)
-                                if (service.expediente) {
-                                  const fechaCierre = service.ultimoCambio; // o la fecha que corresponda
-                                  const fechaTramitacion = new Date().toISOString();
-                                  await airtableService.trackTramitacionSupabase(
-                                    service.expediente,
-                                    fechaCierre,
-                                    fechaTramitacion
-                                  );
-                                }
-                                
-                                const updatedServices = services.map((s) =>
+                        await airtableService.updateServiceField(service.id, 'Ipartner', newValue);
+                        
+                        // Cuando se actualiza Ipartner, marcar como tramitado en Supabase
+                        const idRecord = service.numero;
+                        if (idRecord) {
+                          await supabaseService.completeTramitacion(idRecord);
+                        }
+                        
+                        const updatedServices = services.map((s) =>
                                   s.id === service.id ? { ...s, ipartner: newValue } : s
                                 );
                                 setServices(updatedServices);
@@ -1423,7 +1455,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                 <div>
                   <h2 className="text-xl font-semibold text-gray-900">Detalle del servicio</h2>
                   <p className="text-sm text-gray-500 mt-1">
-                    Expediente {selectedService.expediente || 'sin expediente asignado'}
+                    Número {selectedService.numero || selectedService.expediente || 'sin número asignado'}
                   </p>
                 </div>
               )}
@@ -1502,6 +1534,13 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                           setSaving(true);
                           try {
                             await airtableService.updateServiceField(selectedService.id, 'Ipartner', newValue);
+                            
+                            // Cuando se actualiza Ipartner, marcar como tramitado en Supabase
+                            const idRecord = selectedService.numero;
+                            if (idRecord) {
+                              await supabaseService.completeTramitacion(idRecord);
+                            }
+                            
                             const updatedServices = services.map(s => 
                               s.id === selectedService.id ? {...s, ipartner: newValue} : s
                             );
@@ -1722,7 +1761,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                     <div>
                       <h2 className="text-xl font-semibold text-gray-900">Formulario</h2>
                       <p className="text-sm text-gray-500 mt-1">
-                        Expediente {selectedService.expediente || 'sin expediente asignado'}
+                        Número {selectedService.numero || selectedService.expediente || 'sin número asignado'}
                       </p>
                     </div>
                     {formularios.length > 1 && (
@@ -2029,7 +2068,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                     <div>
                       <h2 className="text-xl font-semibold text-gray-900">Reparaciones</h2>
                       <p className="text-sm text-gray-500 mt-1">
-                        Expediente {selectedService.expediente || 'sin expediente asignado'}
+                        Número {selectedService.numero || selectedService.expediente || 'sin número asignado'}
                       </p>
                     </div>
                     {reparaciones.length > 1 && (
@@ -2258,7 +2297,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   <div>
                     <h2 className="text-xl font-semibold text-gray-900">Fotos</h2>
                     <p className="text-sm text-gray-500 mt-1">
-                      Expediente {selectedService.expediente || 'sin expediente asignado'}
+                      Número {selectedService.numero || selectedService.expediente || 'sin número asignado'}
                     </p>
                   </div>
 
@@ -2538,6 +2577,23 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                         null
                       );
 
+                      // Definir estados que se consideran una resolución de la gestión remota
+                      const RESOLUTION_STATES = ['Finalizado', 'Cancelado', 'Pendiente presupuesto'];
+                      const isResolutionFinal = RESOLUTION_STATES.includes(pendingEstadoChange.newEstado);
+                      const serviceForResolution = services.find(s => s.id === pendingEstadoChange.serviceId);
+                      
+                      console.log('[Resolution] Intentando cerrar ciclo (ResolucionModal):', {
+                        numero: serviceForResolution?.numero,
+                        nuevoEstado: pendingEstadoChange.newEstado,
+                        isResolutionFinal
+                      });
+
+                      if (serviceForResolution?.numero && isResolutionFinal) {
+                        await supabaseService.completeResolutionRecord(serviceForResolution.numero);
+                        // Permitir que se vuelva a abrir el ciclo si el registro regresara a Requiere Acción más tarde
+                        processedNumerosRef.current.delete(serviceForResolution.numero);
+                      }
+
                       // Actualizar el estado local
                       const updatedServices = services.map((s) =>
                         s.id === pendingEstadoChange.serviceId
@@ -2624,13 +2680,20 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                         opcion
                       );
 
-                      // Crear registro en Supabase para tracking de resolución
-                      const service = services.find(s => s.id === pendingEstadoChange.serviceId);
-                      if (service?.expediente && service?.fechaRegistro) {
-                        await supabaseService.createResolutionRecord(
-                          service.expediente,
-                          service.fechaRegistro
-                        );
+                      // Estados que para el técnico significan el fin de la gestión remota
+                      const isResolutionFinal = ['Pendiente de asignar', 'Material enviado'].includes(pendingEstadoChange.newEstado);
+                      const serviceForResolution = services.find(s => s.id === pendingEstadoChange.serviceId);
+                      
+                      console.log('[Resolution] Intentando cerrar ciclo (MotivoTecnicoModal):', {
+                        numero: serviceForResolution?.numero,
+                        nuevoEstado: pendingEstadoChange.newEstado,
+                        isResolutionFinal
+                      });
+
+                      if (serviceForResolution?.numero && isResolutionFinal) {
+                        await supabaseService.completeResolutionRecord(serviceForResolution.numero);
+                        // Permitir que se vuelva a abrir el ciclo si el registro regresara a Requiere Acción más tarde
+                        processedNumerosRef.current.delete(serviceForResolution.numero);
                       }
 
                       // Actualizar el estado local
@@ -2745,10 +2808,18 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                         isoString
                       );
 
+                      // Si se reprograma, borramos el ciclo abierto de resolución en Supabase de este intento
+                      const service = services.find(s => s.id === pendingEstadoChange.serviceId);
+                      if (service?.numero) {
+                        await supabaseService.cancelResolutionRecord(service.numero);
+                        // Permitir que se vuelva a abrir el ciclo cuando llegue la nueva fecha
+                        processedNumerosRef.current.delete(service.numero);
+                      }
+
                       // Actualizar el estado local
                       const updatedServices = services.map((s) =>
                         s.id === pendingEstadoChange.serviceId
-                          ? { ...s, estado: pendingEstadoChange.newEstado, cita: isoString }
+                          ? { ...s, estado: pendingEstadoChange.newEstado, cita: isoString, requiereAccion: undefined }
                           : s
                       );
                       setServices(updatedServices);
