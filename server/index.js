@@ -184,7 +184,10 @@ app.all('/api/servicios/:tableName*', authenticateUser, async (req, res) => {
       error: error.response?.data || error.message
     });
   }
-});.all('/servicios/:tableName*', authenticateUser, async (req, res) => {
+});
+
+// Proxy para base de servicios - CON AUTENTICACIÓN
+app.all('/servicios/:tableName*', authenticateUser, async (req, res) => {
   try {
     const { tableName } = req.params;
     const path = req.params[0] || '';
