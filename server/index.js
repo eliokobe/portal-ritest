@@ -3,15 +3,9 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
-const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-
-// Configuración de Supabase para verificar tokens
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://bmnwfimrcblnvmkbflwn.supabase.co';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtbndmaW1yY2JsbnZta2JmbHduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNTc4NDQsImV4cCI6MjA4MzYzMzg0NH0.Xdeil2_IPMFjprhFG7yoIwshqIhntNNZ3Hc6jEj6KjM';
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Configuración de Airtable
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
@@ -27,32 +21,6 @@ app.use(cors({
 
 app.use(express.json());
 
-// Middleware de autenticación con Supabase
-async function authenticateUser(req, res, next) {
-  try {
-    const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No autorizado - Token requerido' });
-    }
-
-    const token = authHeader.substring(7);
-    
-    // Verificar el token con Supabase
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    
-    if (error || !user) {
-      return res.status(401).json({ error: 'Token inválido o expirado' });
-    }
-
-    req.user = user;
-    next();
-  } catch (error) {
-    console.error('Error de autenticación:', error);
-    res.status(401).json({ error: 'Error de autenticación' });
-  }
-}
-
 // Función para crear cliente de Airtable
 function createAirtableClient(baseId) {
   return axios.create({
@@ -65,7 +33,7 @@ function createAirtableClient(baseId) {
 }
 
 // ============================================
-// HEALTH CHECK (sin autenticación)
+// HEALTH CHECK
 // ============================================
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -76,45 +44,15 @@ app.get('/api/health', (req, res) => {
 });
 
 // ============================================
-// ENDPOINT DE LOGIN - SIN AUTENTICACIÓN
-// Estos endpoints DEBEN estar ANTES de los genéricos
+// PROXY SERVICIOS (sin autenticación JWT)
 // ============================================
-app.get('/api/servicios/Trabajadores', async (req, res) => {
-  console.log('🔓 Login endpoint - /api/servicios/Trabajadores');
-  try {
-    const client = createAirtableClient(SERVICIOS_BASE_ID);
-    const response = await client.get('/Trabajadores', { params: req.query });
-    res.json(response.data);
-  } catch (error) {
-    console.error('Error en login Trabajadores:', error.response?.data || error.message);
-    res.status(error.response?.status || 500).json({
-      error: error.response?.data || error.message
-    });
-  }
-});
-
-app.get('/servicios/Trabajadores', async (req, res) => {
-  console.log('🔓 Login endpoint - /servicios/Trabajadores');
-  try {
-    const client = createAirtableClient(SERVICIOS_BASE_ID);
-    const response = await client.get('/Trabajadores', { params: req.query });
-    res.json(response.data);
-  } catch (error) {
-    console.error('Error en login Trabajadores:', error.response?.data || error.message);
-    res.status(error.response?.status || 500).json({
-      error: error.response?.data || error.message
-    });
-  }
-});
-
-// ============================================
-// PROXY SERVICIOS - CON AUTENTICACIÓN
-// ============================================
-app.all('/api/servicios/:tableName*', authenticateUser, async (req, res) => {
+app.all('/api/servicios/:tableName*', async (req, res) => {
   try {
     const { tableName } = req.params;
     const path = req.params[0] || '';
     const client = createAirtableClient(SERVICIOS_BASE_ID);
+    
+    console.log(`📡 Proxy Servicios: ${req.method} /${tableName}${path}`);
     
     const config = {
       method: req.method,
@@ -133,11 +71,13 @@ app.all('/api/servicios/:tableName*', authenticateUser, async (req, res) => {
   }
 });
 
-app.all('/servicios/:tableName*', authenticateUser, async (req, res) => {
+app.all('/servicios/:tableName*', async (req, res) => {
   try {
     const { tableName } = req.params;
     const path = req.params[0] || '';
     const client = createAirtableClient(SERVICIOS_BASE_ID);
+    
+    console.log(`📡 Proxy Servicios: ${req.method} /${tableName}${path}`);
     
     const config = {
       method: req.method,
@@ -157,13 +97,15 @@ app.all('/servicios/:tableName*', authenticateUser, async (req, res) => {
 });
 
 // ============================================
-// PROXY REGISTROS - CON AUTENTICACIÓN
+// PROXY REGISTROS (sin autenticación JWT)
 // ============================================
-app.all('/api/registros/:tableName*', authenticateUser, async (req, res) => {
+app.all('/api/registros/:tableName*', async (req, res) => {
   try {
     const { tableName } = req.params;
     const path = req.params[0] || '';
     const client = createAirtableClient(REGISTROS_BASE_ID);
+    
+    console.log(`📡 Proxy Registros: ${req.method} /${tableName}${path}`);
     
     const config = {
       method: req.method,
@@ -182,11 +124,13 @@ app.all('/api/registros/:tableName*', authenticateUser, async (req, res) => {
   }
 });
 
-app.all('/registros/:tableName*', authenticateUser, async (req, res) => {
+app.all('/registros/:tableName*', async (req, res) => {
   try {
     const { tableName } = req.params;
     const path = req.params[0] || '';
     const client = createAirtableClient(REGISTROS_BASE_ID);
+    
+    console.log(`📡 Proxy Registros: ${req.method} /${tableName}${path}`);
     
     const config = {
       method: req.method,
@@ -212,10 +156,11 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor backend seguro ejecutándose en puerto ${PORT}`);
-  console.log(`🔒 Autenticación: Activada (Supabase JWT)`);
+  console.log(`🚀 Servidor backend ejecutándose en puerto ${PORT}`);
   console.log(`🌐 CORS: ${CLIENT_URL}`);
   if (!AIRTABLE_API_KEY) {
     console.error('⚠️  ADVERTENCIA: AIRTABLE_API_KEY no configurada');
+  } else {
+    console.log('✅ AIRTABLE_API_KEY configurada');
   }
 });
