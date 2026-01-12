@@ -73,9 +73,15 @@ services:
   - key: SUPABASE_ANON_KEY
     scope: RUN_TIME
     value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtbndmaW1yY2JsbnZta2JmbHduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNTc4NDQsImV4cCI6MjA4MzYzMzg0NH0.Xdeil2_IPMFjprhFG7yoIwshqIhntNNZ3Hc6jEj6KjM
+  - key: PORT
+    scope: RUN_TIME
+    value: "8080"
+  
+  http_port: 8080
   
   health_check:
     http_path: /health
+    port: 8080
 
 # Frontend (Static Site) - SIN API key
 - name: portal-ritest
