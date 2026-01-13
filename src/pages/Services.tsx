@@ -99,9 +99,12 @@ const RESOLUCION_FINALIZADO_OPTIONS = [
 ];
 
 const RESOLUCION_PRESUPUESTO_OPTIONS = [
-  'Incidencia solucionada pero el cliente solicita un presupuesto adicional',
-  'No procede soporte',
-  'Sin cobertura ya que supera los 3 años'
+  'Sobretensiones sin cobertura',
+  'GDP con cobertura',
+  'Diferencial sin cobertura',
+  'Cuadro eléctrico con cobertura',
+  'Cuadro eléctrico sin cobertura',
+  'Cargador sin cobertura'
 ];
 
 const MOTIVO_TECNICO_OPTIONS = [
@@ -321,7 +324,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
       return;
     }
 
-    if (['Cancelado', 'Finalizado', 'Pendiente presupuesto'].includes(newEstado)) {
+    if (['Cancelado', 'Finalizado', 'Presupuesto enviado'].includes(newEstado)) {
       setPendingEstadoChange({ serviceId: service.id, newEstado });
       setShowResolucionModal(true);
       return;
@@ -2571,7 +2574,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
             <div className="space-y-3">
               {(pendingEstadoChange.newEstado === 'Cancelado' 
                 ? RESOLUCION_CANCELADO_OPTIONS 
-                : pendingEstadoChange.newEstado === 'Pendiente presupuesto'
+                : pendingEstadoChange.newEstado === 'Presupuesto enviado'
                 ? RESOLUCION_PRESUPUESTO_OPTIONS
                 : RESOLUCION_FINALIZADO_OPTIONS).map((opcion) => (
                 <button
@@ -2600,7 +2603,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                       );
 
                       // Definir estados que se consideran una resolución de la gestión remota
-                      const RESOLUTION_STATES = ['Finalizado', 'Cancelado', 'Pendiente presupuesto'];
+                      const RESOLUTION_STATES = ['Finalizado', 'Cancelado', 'Presupuesto enviado'];
                       const isResolutionFinal = RESOLUTION_STATES.includes(pendingEstadoChange.newEstado);
                       const serviceForResolution = services.find(s => s.id === pendingEstadoChange.serviceId);
                       
