@@ -1828,6 +1828,21 @@ export const airtableService = {
     }
   },
 
+  // Actualizar múltiples campos de un servicio a la vez
+  async updateServiceFields(serviceId: string, fields: Record<string, any>, tableName: string = AIRTABLE_SERVICES_TABLE): Promise<void> {
+    try {
+      console.log(`[Airtable] Updating multiple fields:`, fields);
+      await serviciosApi.patch(`/${tableName}/${serviceId}`, {
+        fields: fields,
+      });
+      console.log(`[Airtable] Successfully updated multiple fields`);
+    } catch (error: any) {
+      console.error(`Error updating service fields:`, error);
+      console.error('Error response data:', JSON.stringify(error?.response?.data, null, 2));
+      throw error;
+    }
+  },
+
   // Actualizar técnico de un servicio (linked record)
   async updateServiceTecnico(serviceId: string, tecnicoId: string | string[], tableName: string = AIRTABLE_SERVICES_TABLE): Promise<void> {
     try {

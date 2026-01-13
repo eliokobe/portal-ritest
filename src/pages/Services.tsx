@@ -67,6 +67,7 @@ const STATUS_OPTIONS = [
   'Pendiente técnico',
   'Pendiente de material',
   'Pendiente presupuesto',
+  'Pendiente revisión',
   'Presupuesto enviado',
   'Material enviado',
   'Finalizado',
@@ -78,7 +79,8 @@ const IPARTNER_OPTIONS = [
   'Cita confirmada',
   'Finalizado',
   'Cancelado',
-  'Facturado'
+  'Facturado',
+  'Descripción añadida'
 ];
 
 const RESOLUCION_CANCELADO_OPTIONS = [
@@ -163,7 +165,6 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [appointmentAlert, setAppointmentAlert] = useState<Service | null>(null);
   const [dismissedAppointmentId, setDismissedAppointmentId] = useState<string | null>(null);
   const [lastSelectedServiceId, setLastSelectedServiceId] = useState<string | null>(null);
@@ -479,7 +480,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
       servicesWithAllowedStates = servicesWithAllowedStates.filter((s) => {
         // Asegurarse de que accionIpartner sea un string para evitar errores con .trim()
         const accionStr = typeof s.accionIpartner === 'string' ? s.accionIpartner : 
-                         Array.isArray(s.accionIpartner) ? s.accionIpartner.join(', ') : 
+                         Array.isArray(s.accionIpartner) ? (s.accionIpartner as string[]).join(', ') : 
                          String(s.accionIpartner || '');
 
         // Registros pendientes de tramitar
@@ -531,22 +532,35 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
           'Aceptado',
           'Duplicado',
         ];
+        console.log('Services - Filtering excluded states for Técnico. Before:', servicesWithAllowedStates.length);
         servicesWithAllowedStates = servicesWithAllowedStates.filter(
           (s) => !(s.estado && estadosExcluidosTecnico.includes(s.estado))
         );
+        console.log('Services - After estado exclusion:', servicesWithAllowedStates.length);
         // Además, excluir "Citado" si tiene "Cita técnico" rellena
         servicesWithAllowedStates = servicesWithAllowedStates.filter(
           (s) => !(s.estado === 'Citado' && !!s.citaTecnico)
         );
-        // Excluir servicios que tienen la columna "Técnico" rellena
+        console.log('Services - After citado filter:', servicesWithAllowedStates.length);
+        // Verificar si hay "Pendiente revisión" antes del filtro de técnico
+        const pendientesRevision = servicesWithAllowedStates.filter(s => s.estado === 'Pendiente revisión');
+        console.log('Services - Pendientes revisión ANTES filtro técnico:', pendientesRevision.length, pendientesRevision.map(s => ({exp: s.expediente, tecnico: s.tecnico})));
+        // Excluir servicios que tienen la columna "Técnico" rellena, EXCEPTO si el estado es "Pendiente revisión"
+        const beforeTecnicoFilter = servicesWithAllowedStates.length;
         servicesWithAllowedStates = servicesWithAllowedStates.filter(
           (s) => {
+            // Si es "Pendiente revisión", siempre incluirlo sin importar si tiene técnico asignado
+            if (s.estado === 'Pendiente revisión') return true;
+            
             if (!s.tecnico) return true;
             if (typeof s.tecnico === 'string') return s.tecnico.trim() === '';
             if (Array.isArray(s.tecnico)) return (s.tecnico as string[]).length === 0;
             return true;
           }
         );
+        console.log('Services - After tecnico filter:', servicesWithAllowedStates.length, 'removed:', beforeTecnicoFilter - servicesWithAllowedStates.length);
+        const pendientesRevisionDespues = servicesWithAllowedStates.filter(s => s.estado === 'Pendiente revisión');
+        console.log('Services - Pendientes revisión DESPUÉS filtro técnico:', pendientesRevisionDespues.length);
       }
 
       servicesWithAllowedStates = servicesWithAllowedStates.filter(service => {
@@ -566,8 +580,11 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
         
         if (activeTab === 'requiere-accion') {
           // Estados activos que siempre requieren acción
-          const estadosActivos = ['Sin contactar', 'Llamado', 'Pendiente de presupuesto', 'Pendiente de asignar', 'Formulario completado', 'Pendiente técnico', 'Pendiente de material', 'Presupuesto enviado'];
-          if (estado && estadosActivos.includes(estado)) return true;
+          const estadosActivos = ['Sin contactar', 'Llamado', 'Pendiente de presupuesto', 'Pendiente de asignar', 'Formulario completado', 'Pendiente técnico', 'Pendiente de material', 'Presupuesto enviado', 'Pendiente revisión'];
+          if (estado && estadosActivos.includes(estado)) {
+            console.log('Service requiere acción:', service.expediente, estado);
+            return true;
+          }
 
           // Contactado: solo si último cambio > 24 horas
           if (estado === 'Contactado' && isUltimoCambioOld) return true;
@@ -861,20 +878,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     }
   }, [selectedService, selectedFormulario, selectedReparacion, lastSelectedServiceId]);
 
-  // Función para marcar como tramitado (no se usa actualmente pero se mantiene para futura funcionalidad)
-  const _handleMarkSynced = async (id: string) => {
-    if (!isTramitacion) return;
-    if (updatingId) return;
-    setUpdatingId(id);
-    try {
-      await airtableService.setTramitacionTramitado(id, true);
-      setServices((prev) => prev.filter((s) => s.id !== id));
-    } catch (err: any) {
-      alert(err?.message || 'No se pudo marcar como tramitado');
-    } finally {
-      setUpdatingId(null);
-    }
-  };
+
 
   // Función para manejar edición de campos
   const handleEdit = (serviceId: string, field: string, currentValue: string) => {
@@ -1245,7 +1249,11 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                               
                               setSaving(true);
                               try {
-                        await airtableService.updateServiceField(service.id, 'Ipartner', newValue);
+                        // Actualizar Ipartner y Tramitado en una sola llamada
+                        await airtableService.updateServiceFields(service.id, {
+                          'Ipartner': newValue,
+                          'Tramitado': true
+                        });
                         
                         // Cuando se actualiza Ipartner, marcar como tramitado en Supabase
                         const idRecord = service.numero;
@@ -1254,7 +1262,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                         }
                         
                         const updatedServices = services.map((s) =>
-                                  s.id === service.id ? { ...s, ipartner: newValue } : s
+                                  s.id === service.id ? { ...s, ipartner: newValue, tramitado: true } : s
                                 );
                                 setServices(updatedServices);
                               } catch (error) {
@@ -1488,6 +1496,10 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
               {detailsView === 'detalles' && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
+                  <p className="text-xs uppercase text-gray-500">Expediente</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.expediente)}</p>
+                </div>
+                <div>
                   <p className="text-xs uppercase text-gray-500">Nombre</p>
                   <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.nombre)}</p>
                 </div>
@@ -1496,15 +1508,19 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.telefono)}</p>
                 </div>
                 <div>
+                  <p className="text-xs uppercase text-gray-500">Dirección</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.direccion)}</p>
+                </div>
+                <div>
+                  <p className="text-xs uppercase text-gray-500">Población</p>
+                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.poblacion)}</p>
+                </div>
+                <div>
                   <p className="text-xs uppercase text-gray-500">Número de serie</p>
                   <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.numeroSerie)}</p>
                 </div>
                 {!isTramitacion && !isTecnico && (
                   <>
-                    <div>
-                      <p className="text-xs uppercase text-gray-500">Dirección</p>
-                      <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.direccion)}</p>
-                    </div>
                     <div>
                       <p className="text-xs uppercase text-gray-500">Código postal</p>
                       <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.codigoPostal)}</p>
@@ -1512,10 +1528,6 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                     <div>
                       <p className="text-xs uppercase text-gray-500">Provincia</p>
                       <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.provincia)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase text-gray-500">Población</p>
-                      <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.poblacion)}</p>
                     </div>
                   </>
                 )}
@@ -1558,7 +1570,15 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                           if (!newValue || newValue === selectedService.ipartner) return;
                           setSaving(true);
                           try {
-                            await airtableService.updateServiceField(selectedService.id, 'Ipartner', newValue);
+                            console.log('[Services] Actualizando Ipartner y Tramitado para:', selectedService.id);
+                            
+                            // Actualizar Ipartner y Tramitado en una sola llamada
+                            await airtableService.updateServiceFields(selectedService.id, {
+                              'Ipartner': newValue,
+                              'Tramitado': true
+                            });
+                            
+                            console.log('[Services] Actualización exitosa de Ipartner y Tramitado');
                             
                             // Cuando se actualiza Ipartner, marcar como tramitado en Supabase
                             const idRecord = selectedService.numero;
@@ -1567,13 +1587,16 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                             }
                             
                             const updatedServices = services.map(s => 
-                              s.id === selectedService.id ? {...s, ipartner: newValue} : s
+                              s.id === selectedService.id ? {...s, ipartner: newValue, tramitado: true} : s
                             );
                             setServices(updatedServices);
-                            setSelectedService({...selectedService, ipartner: newValue});
-                          } catch (error) {
+                            
+                            // Cerrar el modal automáticamente después de actualizar
+                            setSelectedService(null);
+                          } catch (error: any) {
                             console.error('Error updating ipartner:', error);
-                            alert('Error al actualizar Ipartner');
+                            console.error('Error details:', error?.response?.data);
+                            alert(`Error al actualizar Ipartner: ${error?.message || 'Error desconocido'}`);
                           } finally {
                             setSaving(false);
                           }
