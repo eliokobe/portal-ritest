@@ -2410,204 +2410,86 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="text-sm font-semibold text-gray-700">Técnico</h3>
-                        {reparaciones[selectedReparacionIndex]?.id && (
-                          <button
-                            onClick={() => {
-                              const rep = reparaciones[selectedReparacionIndex];
-                              handleEdit(rep.id, 'tecnico-rep', rep.tecnico || '');
-                            }}
-                            className="text-xs text-brand-primary hover:text-brand-green"
-                          >
-                            Editar
-                          </button>
-                        )}
-                      </div>
-                      {editingField && reparaciones[selectedReparacionIndex]?.id === editingField.id && editingField.field === 'tecnico-rep' ? (
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
-                            disabled={saving}
-                            autoFocus
-                          />
-                          <div className="flex gap-2">
-                            <button onClick={() => handleSaveReparacion(reparaciones[selectedReparacionIndex].id, 'Técnico')} disabled={saving} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
-                              Guardar
-                            </button>
-                            <button onClick={handleCancel} disabled={saving} className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">
-                              Cancelar
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="mt-1 text-sm text-gray-900">{renderDetailValue(reparaciones[selectedReparacionIndex]?.tecnico)}</p>
-                      )}
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1">Técnico</h3>
+                      <p className="mt-1 text-sm text-gray-900">{renderDetailValue(reparaciones[selectedReparacionIndex]?.tecnico)}</p>
                     </div>
 
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="text-sm font-semibold text-gray-700">Resultado</h3>
-                        {reparaciones[selectedReparacionIndex]?.id && (
-                          <button
-                            onClick={() => {
-                              const rep = reparaciones[selectedReparacionIndex];
-                              handleEdit(rep.id, 'resultado', rep.resultado || '');
-                            }}
-                            className="text-xs text-brand-primary hover:text-brand-green"
-                          >
-                            Editar
-                          </button>
-                        )}
-                      </div>
-                      {editingField && reparaciones[selectedReparacionIndex]?.id === editingField.id && editingField.field === 'resultado' ? (
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
-                            disabled={saving}
-                            autoFocus
-                          />
-                          <div className="flex gap-2">
-                            <button onClick={() => handleSaveReparacion(reparaciones[selectedReparacionIndex].id, 'Resultado')} disabled={saving} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
-                              Guardar
-                            </button>
-                            <button onClick={handleCancel} disabled={saving} className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">
-                              Cancelar
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="mt-1 text-sm text-gray-900">{renderDetailValue(reparaciones[selectedReparacionIndex]?.resultado)}</p>
-                      )}
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1">Resultado</h3>
+                      <p className="mt-1 text-sm text-gray-900">{renderDetailValue(reparaciones[selectedReparacionIndex]?.resultado)}</p>
                     </div>
 
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="text-sm font-semibold text-gray-700">Reparación</h3>
-                        {reparaciones[selectedReparacionIndex]?.id && (
-                          <button
-                            onClick={() => {
-                              const rep = reparaciones[selectedReparacionIndex];
-                              handleEdit(rep.id, 'reparacion', rep.reparacion || '');
-                            }}
-                            className="text-xs text-brand-primary hover:text-brand-green"
-                          >
-                            Editar
-                          </button>
-                        )}
-                      </div>
-                      {editingField && reparaciones[selectedReparacionIndex]?.id === editingField.id && editingField.field === 'reparacion' ? (
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
-                            disabled={saving}
-                            autoFocus
-                          />
-                          <div className="flex gap-2">
-                            <button onClick={() => handleSaveReparacion(reparaciones[selectedReparacionIndex].id, 'Reparación')} disabled={saving} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
-                              Guardar
-                            </button>
-                            <button onClick={handleCancel} disabled={saving} className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">
-                              Cancelar
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="mt-1 text-sm text-gray-900">{renderDetailValue(reparaciones[selectedReparacionIndex]?.reparacion)}</p>
-                      )}
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1">Reparación</h3>
+                      <p className="mt-1 text-sm text-gray-900">{renderDetailValue(reparaciones[selectedReparacionIndex]?.reparacion)}</p>
                     </div>
 
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="text-sm font-semibold text-gray-700">Cuadro eléctrico</h3>
-                        {reparaciones[selectedReparacionIndex]?.id && (
-                          <button
-                            onClick={() => {
-                              const rep = reparaciones[selectedReparacionIndex];
-                              handleEdit(rep.id, 'cuadroElectrico', rep.cuadroElectrico || '');
-                            }}
-                            className="text-xs text-brand-primary hover:text-brand-green"
-                          >
-                            Editar
-                          </button>
-                        )}
-                      </div>
-                      {editingField && reparaciones[selectedReparacionIndex]?.id === editingField.id && editingField.field === 'cuadroElectrico' ? (
-                        <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
-                            disabled={saving}
-                            autoFocus
-                          />
-                          <div className="flex gap-2">
-                            <button onClick={() => handleSaveReparacion(reparaciones[selectedReparacionIndex].id, 'Cuadro eléctrico')} disabled={saving} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
-                              Guardar
-                            </button>
-                            <button onClick={handleCancel} disabled={saving} className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">
-                              Cancelar
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="mt-1 text-sm text-gray-900">{renderDetailValue(reparaciones[selectedReparacionIndex]?.cuadroElectrico)}</p>
-                      )}
+                      <h3 className="text-sm font-semibold text-gray-700 mb-1">Material</h3>
+                      <p className="mt-1 text-sm text-gray-900">{renderDetailValue(reparaciones[selectedReparacionIndex]?.cuadroElectrico)}</p>
                     </div>
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className="text-sm font-semibold text-gray-700">Detalles</h3>
-                      {reparaciones[selectedReparacionIndex]?.id && (
-                        <button
-                          onClick={() => {
-                            const rep = reparaciones[selectedReparacionIndex];
-                            handleEdit(rep.id, 'detalles-rep', rep.detalles || '');
-                          }}
-                          className="text-xs text-brand-primary hover:text-brand-green"
-                        >
-                          Editar
-                        </button>
-                      )}
-                    </div>
-                    {editingField && reparaciones[selectedReparacionIndex]?.id === editingField.id && editingField.field === 'detalles-rep' ? (
-                      <div className="space-y-2">
-                        <textarea
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
-                          rows={3}
-                          disabled={saving}
-                          autoFocus
-                        />
-                        <div className="flex gap-2">
-                          <button onClick={() => handleSaveReparacion(reparaciones[selectedReparacionIndex].id, 'Detalles')} disabled={saving} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
-                            Guardar
-                          </button>
-                          <button onClick={handleCancel} disabled={saving} className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">
-                            Cancelar
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{renderDetailValue(reparaciones[selectedReparacionIndex]?.detalles)}</p>
-                    )}
+                    <h3 className="text-sm font-semibold text-gray-700 mb-1">Detalles</h3>
+                    <p className="mt-1 text-sm text-gray-900 whitespace-pre-line">{renderDetailValue(reparaciones[selectedReparacionIndex]?.detalles)}</p>
                   </div>
 
                   <div>
                     <h3 className="text-sm font-semibold text-gray-700 mb-1">Número de serie</h3>
                     <p className="mt-1 text-sm text-gray-900">{renderDetailValue(reparaciones[selectedReparacionIndex]?.numeroSerie)}</p>
+                  </div>
+
+                  {/* Fotos de la reparación */}
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-gray-700">Fotos</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Foto principal */}
+                      <div>
+                        <h4 className="text-xs font-medium text-gray-600 mb-2">Foto</h4>
+                        {reparaciones[selectedReparacionIndex]?.Foto && Array.isArray(reparaciones[selectedReparacionIndex].Foto) && reparaciones[selectedReparacionIndex].Foto.length > 0 ? (
+                          <div className="space-y-2">
+                            {reparaciones[selectedReparacionIndex].Foto.map((file: AirtableAttachment, idx: number) => (
+                              <div key={idx} className="space-y-1">
+                                {file.thumbnails?.large?.url && (
+                                  <img
+                                    src={file.thumbnails.large.url}
+                                    alt="Foto reparación"
+                                    className="w-full h-auto object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                                    onClick={() => window.open(file.url, '_blank')}
+                                  />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500">Sin foto</p>
+                        )}
+                      </div>
+
+                      {/* Foto de la etiqueta */}
+                      <div>
+                        <h4 className="text-xs font-medium text-gray-600 mb-2">Foto de la etiqueta</h4>
+                        {reparaciones[selectedReparacionIndex]?.['Foto de la etiqueta'] && Array.isArray(reparaciones[selectedReparacionIndex]['Foto de la etiqueta']) && reparaciones[selectedReparacionIndex]['Foto de la etiqueta'].length > 0 ? (
+                          <div className="space-y-2">
+                            {reparaciones[selectedReparacionIndex]['Foto de la etiqueta'].map((file: AirtableAttachment, idx: number) => (
+                              <div key={idx} className="space-y-1">
+                                {file.thumbnails?.large?.url && (
+                                  <img
+                                    src={file.thumbnails.large.url}
+                                    alt="Foto de la etiqueta"
+                                    className="w-full h-auto object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                                    onClick={() => window.open(file.url, '_blank')}
+                                  />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500">Sin foto</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

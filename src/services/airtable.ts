@@ -2532,14 +2532,42 @@ export const airtableService = {
         try {
           const { data } = await serviciosApi.get(`/Reparaciones/${id}`);
           const f = data.fields ?? {};
+          
+          // Obtener nombres de técnicos desde la tabla Técnicos
+          let tecnicoValue = '';
+          if (Array.isArray(f['Técnicos']) && f['Técnicos'].length > 0) {
+            const tecnicosIds = f['Técnicos'];
+            const nombresPromises = tecnicosIds.map(async (tecnicoId: string) => {
+              try {
+                const { data: tecnicoData } = await serviciosApi.get(`/Técnicos/${tecnicoId}`);
+                return tecnicoData.fields?.['Nombre'] || tecnicoId;
+              } catch (error) {
+                console.error(`Error al obtener técnico ${tecnicoId}:`, error);
+                return tecnicoId;
+              }
+            });
+            const nombres = await Promise.all(nombresPromises);
+            tecnicoValue = nombres.join(', ');
+          }
+          
           results.push({
             id: data.id,
             numero: f['Número'],
-            tecnico: f['Técnico'] ?? f['Technician'],
-            resultado: f['Resultado'] ?? f['Result'],
-            reparacion: f['Reparación'] ?? f['Repair'],
-            cuadroElectrico: f['Cuadro eléctrico'] ?? f['Electrical Panel'],
-            detalles: f['Detalles'] ?? f['Details'] ?? f['Descripción'],
+            tecnico: tecnicoValue || f['Técnico'] || f['Technician'],
+            resultado: f['Estado'] || f['Resultado'] || f['Result'],
+            reparacion: f['Motivo'] || f['Reparación'] || f['Repair'],
+            cuadroElectrico: f['Material'] || f['Cuadro eléctrico'] || f['Electrical Panel'],
+            detalles: f['Detalles'] || f['Details'] || f['Descripción'],
+            // Campos adicionales disponibles
+            cliente: f['Cliente'],
+            direccion: f['Dirección'],
+            poblacion: f['Población'],
+            provincia: f['Provincia'],
+            telefono: f['Teléfono'],
+            telefonoTecnico: f['Teléfono técnico'],
+            cita: f['Cita'],
+            comentarios: f['Comentarios'],
+            seguimiento: f['Seguimiento'],
             // Campo de foto principal
             Foto: f['Foto'],
             foto: f['Foto'],
@@ -2547,7 +2575,7 @@ export const airtableService = {
             // Campo de foto de la etiqueta
             'Foto de la etiqueta': f['Foto de la etiqueta'],
             fotoEtiqueta: f['Foto de la etiqueta'],
-            numeroSerie: f['Número de serie'] ?? f['Numero de serie'] ?? f['S/N'] ?? f['# S/N'] ?? f['Nº Serie'] ?? f['SN'],
+            numeroSerie: f['Número de serie'] || f['Numero de serie'] || f['S/N'] || f['# S/N'] || f['Nº Serie'] || f['SN'],
           });
         } catch (error) {
           console.error(`Error al obtener reparación ${id}:`, error);
@@ -2577,16 +2605,45 @@ export const airtableService = {
         return [];
       }
       
-      return records.map((r: any) => {
+      // Obtener nombres de técnicos para todos los registros
+      const resultsWithTecnicos = await Promise.all(records.map(async (r: any) => {
         const f = r.fields ?? {};
+        
+        // Obtener nombres de técnicos desde la tabla Técnicos
+        let tecnicoValue = '';
+        if (Array.isArray(f['Técnicos']) && f['Técnicos'].length > 0) {
+          const tecnicosIds = f['Técnicos'];
+          const nombresPromises = tecnicosIds.map(async (tecnicoId: string) => {
+            try {
+              const { data: tecnicoData } = await serviciosApi.get(`/Técnicos/${tecnicoId}`);
+              return tecnicoData.fields?.['Nombre'] || tecnicoId;
+            } catch (error) {
+              console.error(`Error al obtener técnico ${tecnicoId}:`, error);
+              return tecnicoId;
+            }
+          });
+          const nombres = await Promise.all(nombresPromises);
+          tecnicoValue = nombres.join(', ');
+        }
+        
         return {
           id: r.id,
           numero: f['Número'],
-          tecnico: f['Técnico'] ?? f['Technician'],
-          resultado: f['Resultado'] ?? f['Result'],
-          reparacion: f['Reparación'] ?? f['Repair'],
-          cuadroElectrico: f['Cuadro eléctrico'] ?? f['Electrical Panel'],
-          detalles: f['Detalles'] ?? f['Details'] ?? f['Descripción'],
+          tecnico: tecnicoValue || f['Técnico'] || f['Technician'],
+          resultado: f['Estado'] || f['Resultado'] || f['Result'],
+          reparacion: f['Motivo'] || f['Reparación'] || f['Repair'],
+          cuadroElectrico: f['Material'] || f['Cuadro eléctrico'] || f['Electrical Panel'],
+          detalles: f['Detalles'] || f['Details'] || f['Descripción'],
+          // Campos adicionales disponibles
+          cliente: f['Cliente'],
+          direccion: f['Dirección'],
+          poblacion: f['Población'],
+          provincia: f['Provincia'],
+          telefono: f['Teléfono'],
+          telefonoTecnico: f['Teléfono técnico'],
+          cita: f['Cita'],
+          comentarios: f['Comentarios'],
+          seguimiento: f['Seguimiento'],
           // Campo de foto principal
           Foto: f['Foto'],
           foto: f['Foto'],
@@ -2594,9 +2651,11 @@ export const airtableService = {
           // Campo de foto de la etiqueta
           'Foto de la etiqueta': f['Foto de la etiqueta'],
           fotoEtiqueta: f['Foto de la etiqueta'],
-          numeroSerie: f['Número de serie'] ?? f['Numero de serie'] ?? f['S/N'] ?? f['# S/N'] ?? f['Nº Serie'] ?? f['SN'],
+          numeroSerie: f['Número de serie'] || f['Numero de serie'] || f['S/N'] || f['# S/N'] || f['Nº Serie'] || f['SN'],
         };
-      });
+      }));
+      
+      return resultsWithTecnicos;
     } catch (error) {
       console.error('Error fetching reparaciones:', error);
       throw error;
