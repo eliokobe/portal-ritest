@@ -981,6 +981,31 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     }
   };
 
+  const handleSaveServiceField = async (serviceId: string, airtableField: string, localField: string) => {
+    if (saving) return;
+    
+    setSaving(true);
+    try {
+      await airtableService.updateServiceField(serviceId, airtableField, editValue);
+      
+      // Actualizar el servicio seleccionado y la lista de servicios
+      if (selectedService?.id === serviceId) {
+        setSelectedService((prev: any) => prev ? { ...prev, [localField]: editValue } : null);
+      }
+      setServices((prev) =>
+        prev.map((s) => (s.id === serviceId ? { ...s, [localField]: editValue } : s))
+      );
+      
+      setEditingField(null);
+      setEditValue('');
+    } catch (error) {
+      console.error('Error updating service field:', error);
+      alert('Error al guardar los cambios');
+    } finally {
+      setSaving(false);
+    }
+  };
+
 
 
   const formatDate = (dateString?: string) => {
@@ -1496,38 +1521,286 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
               {detailsView === 'detalles' && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <p className="text-xs uppercase text-gray-500">Expediente</p>
-                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.expediente)}</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs uppercase text-gray-500">Expediente</p>
+                    {selectedService.id && (
+                      <button
+                        onClick={() => handleEdit(selectedService.id, 'expediente', selectedService.expediente || '')}
+                        className="text-xs text-brand-primary hover:text-brand-green"
+                      >
+                        Editar
+                      </button>
+                    )}
+                  </div>
+                  {editingField && selectedService.id === editingField.id && editingField.field === 'expediente' ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                        disabled={saving}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button onClick={() => handleSaveServiceField(selectedService.id, 'Expediente', 'expediente')} disabled={saving} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
+                          Guardar
+                        </button>
+                        <button onClick={handleCancel} disabled={saving} className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.expediente)}</p>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-gray-500">Nombre</p>
-                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.nombre)}</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs uppercase text-gray-500">Nombre</p>
+                    {selectedService.id && (
+                      <button
+                        onClick={() => handleEdit(selectedService.id, 'nombre', selectedService.nombre || '')}
+                        className="text-xs text-brand-primary hover:text-brand-green"
+                      >
+                        Editar
+                      </button>
+                    )}
+                  </div>
+                  {editingField && selectedService.id === editingField.id && editingField.field === 'nombre' ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                        disabled={saving}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button onClick={() => handleSaveServiceField(selectedService.id, 'Nombre', 'nombre')} disabled={saving} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
+                          Guardar
+                        </button>
+                        <button onClick={handleCancel} disabled={saving} className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.nombre)}</p>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-gray-500">Teléfono</p>
-                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.telefono)}</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs uppercase text-gray-500">Teléfono</p>
+                    {selectedService.id && (
+                      <button
+                        onClick={() => handleEdit(selectedService.id, 'telefono', selectedService.telefono || '')}
+                        className="text-xs text-brand-primary hover:text-brand-green"
+                      >
+                        Editar
+                      </button>
+                    )}
+                  </div>
+                  {editingField && selectedService.id === editingField.id && editingField.field === 'telefono' ? (
+                    <div className="space-y-2">
+                      <input
+                        type="tel"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                        disabled={saving}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button onClick={() => handleSaveServiceField(selectedService.id, 'Teléfono', 'telefono')} disabled={saving} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
+                          Guardar
+                        </button>
+                        <button onClick={handleCancel} disabled={saving} className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.telefono)}</p>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-gray-500">Dirección</p>
-                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.direccion)}</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs uppercase text-gray-500">Dirección</p>
+                    {selectedService.id && (
+                      <button
+                        onClick={() => handleEdit(selectedService.id, 'direccion', selectedService.direccion || '')}
+                        className="text-xs text-brand-primary hover:text-brand-green"
+                      >
+                        Editar
+                      </button>
+                    )}
+                  </div>
+                  {editingField && selectedService.id === editingField.id && editingField.field === 'direccion' ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                        disabled={saving}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button onClick={() => handleSaveServiceField(selectedService.id, 'Dirección', 'direccion')} disabled={saving} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
+                          Guardar
+                        </button>
+                        <button onClick={handleCancel} disabled={saving} className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.direccion)}</p>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-gray-500">Población</p>
-                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.poblacion)}</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs uppercase text-gray-500">Población</p>
+                    {selectedService.id && (
+                      <button
+                        onClick={() => handleEdit(selectedService.id, 'poblacion', selectedService.poblacion || '')}
+                        className="text-xs text-brand-primary hover:text-brand-green"
+                      >
+                        Editar
+                      </button>
+                    )}
+                  </div>
+                  {editingField && selectedService.id === editingField.id && editingField.field === 'poblacion' ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                        disabled={saving}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button onClick={() => handleSaveServiceField(selectedService.id, 'Población', 'poblacion')} disabled={saving} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
+                          Guardar
+                        </button>
+                        <button onClick={handleCancel} disabled={saving} className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.poblacion)}</p>
+                  )}
                 </div>
                 <div>
-                  <p className="text-xs uppercase text-gray-500">Número de serie</p>
-                  <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.numeroSerie)}</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs uppercase text-gray-500">Número de serie</p>
+                    {selectedService.id && (
+                      <button
+                        onClick={() => handleEdit(selectedService.id, 'numeroSerie', selectedService.numeroSerie || '')}
+                        className="text-xs text-brand-primary hover:text-brand-green"
+                      >
+                        Editar
+                      </button>
+                    )}
+                  </div>
+                  {editingField && selectedService.id === editingField.id && editingField.field === 'numeroSerie' ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                        disabled={saving}
+                        autoFocus
+                      />
+                      <div className="flex gap-2">
+                        <button onClick={() => handleSaveServiceField(selectedService.id, 'Número de serie', 'numeroSerie')} disabled={saving} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
+                          Guardar
+                        </button>
+                        <button onClick={handleCancel} disabled={saving} className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.numeroSerie)}</p>
+                  )}
                 </div>
                 {!isTramitacion && !isTecnico && (
                   <>
                     <div>
-                      <p className="text-xs uppercase text-gray-500">Código postal</p>
-                      <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.codigoPostal)}</p>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs uppercase text-gray-500">Código postal</p>
+                        {selectedService.id && (
+                          <button
+                            onClick={() => handleEdit(selectedService.id, 'codigoPostal', selectedService.codigoPostal || '')}
+                            className="text-xs text-brand-primary hover:text-brand-green"
+                          >
+                            Editar
+                          </button>
+                        )}
+                      </div>
+                      {editingField && selectedService.id === editingField.id && editingField.field === 'codigoPostal' ? (
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                            disabled={saving}
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <button onClick={() => handleSaveServiceField(selectedService.id, 'Código postal', 'codigoPostal')} disabled={saving} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
+                              Guardar
+                            </button>
+                            <button onClick={handleCancel} disabled={saving} className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.codigoPostal)}</p>
+                      )}
                     </div>
                     <div>
-                      <p className="text-xs uppercase text-gray-500">Provincia</p>
-                      <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.provincia)}</p>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs uppercase text-gray-500">Provincia</p>
+                        {selectedService.id && (
+                          <button
+                            onClick={() => handleEdit(selectedService.id, 'provincia', selectedService.provincia || '')}
+                            className="text-xs text-brand-primary hover:text-brand-green"
+                          >
+                            Editar
+                          </button>
+                        )}
+                      </div>
+                      {editingField && selectedService.id === editingField.id && editingField.field === 'provincia' ? (
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={editValue}
+                            onChange={(e) => setEditValue(e.target.value)}
+                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                            disabled={saving}
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <button onClick={() => handleSaveServiceField(selectedService.id, 'Provincia', 'provincia')} disabled={saving} className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700">
+                              Guardar
+                            </button>
+                            <button onClick={handleCancel} disabled={saving} className="px-3 py-1 bg-gray-200 text-gray-700 text-xs rounded hover:bg-gray-300">
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-900 mt-1">{renderDetailValue(selectedService.provincia)}</p>
+                      )}
                     </div>
                   </>
                 )}

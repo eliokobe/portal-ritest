@@ -1385,9 +1385,12 @@ export const airtableService = {
 
       const fields: Record<string, any> = {};
       Object.entries(updates).forEach(([key, value]) => {
-        if (value === undefined || value === null) return;
         const airtableField = fieldMap[key];
         if (!airtableField) return;
+        
+        // Permitir null para limpiar campos, pero omitir undefined
+        if (value === undefined) return;
+        
         if (airtableField === 'Catálogo') {
           fields[airtableField] = value ? [value] : [];
         } else {

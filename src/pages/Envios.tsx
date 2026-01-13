@@ -321,9 +321,10 @@ export default function Envios() {
 
   const handleSelectServicioPorExpediente = () => {
     const needle = normalizeExpediente(expedienteQuery);
-    const match = serviciosInfo.find((s) => normalizeExpediente(s.expediente) === needle);
+    // Buscar solo por número
+    const match = serviciosInfo.find((s) => normalizeExpediente(s.numero) === needle);
     if (!needle || !match) {
-      setExpedienteError('Expediente no encontrado');
+      setExpedienteError('Número no encontrado');
       setNewEnvio((prev) => ({ ...prev, servicio: '' }));
       return;
     }
@@ -795,7 +796,7 @@ export default function Envios() {
             >
               <div>
                 <label htmlFor="expediente" className="block text-sm font-medium text-gray-700 mb-1">
-                  Expediente *
+                  Número *
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -808,7 +809,7 @@ export default function Envios() {
                     }}
                     onBlur={handleSelectServicioPorExpediente}
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
-                    placeholder="Introduce el expediente"
+                    placeholder="Introduce el número"
                   />
                   <button
                     type="button"
@@ -1012,11 +1013,22 @@ export default function Envios() {
                     setSelectedEnvio((prev) => (prev ? { ...prev, numeroRecogida: e.target.value === '' ? undefined : Number(e.target.value) } : prev));
                   }}
                   onBlur={(e) => {
-                    const newValue = e.target.value === '' ? undefined : Number(e.target.value);
-                    if (newValue === selectedEnvio.numeroRecogida) return;
+                    const newValue = e.target.value === '' ? null : Number(e.target.value);
+                    // Comparar con el valor del envío original en la lista, no con el estado local
+                    const originalEnvio = envios.find(env => env.id === selectedEnvio.id);
+                    const originalValue = originalEnvio?.numeroRecogida;
+                    
+                    console.log('[Envios] onBlur - Valor nuevo:', newValue, 'Valor original:', originalValue);
+                    
+                    if (newValue === originalValue) {
+                      console.log('[Envios] No hay cambios, no se guarda');
+                      return;
+                    }
+                    console.log('[Envios] Guardando número de recogida:', newValue);
                     setSavingNumeroRecogida(true);
                     airtableService.updateEnvio(selectedEnvio.id, { numeroRecogida: newValue })
                       .then(() => {
+                        console.log('[Envios] Número de recogida guardado exitosamente');
                         setEnvios((prev) => prev.map((e) => (e.id === selectedEnvio.id ? { ...e, numeroRecogida: newValue } : e)));
                         setSelectedEnvio((prev) => (prev ? { ...prev, numeroRecogida: newValue } : prev));
                         setNumeroRecogidaDraft(newValue ? String(newValue) : '');
@@ -1078,31 +1090,171 @@ export default function Envios() {
               </div>
               <div>
                 <p className="text-xs uppercase text-gray-500">Cliente</p>
-                <p className="text-sm text-gray-900">{selectedEnvio.cliente || '-'}</p>
+                <input
+                  type="text"
+                  value={selectedEnvio.cliente || ''}
+                  onChange={(e) => setSelectedEnvio(prev => prev ? {...prev, cliente: e.target.value} : prev)}
+                  onBlur={(e) => {
+                    const newValue = e.target.value.trim();
+                    const originalEnvio = envios.find(env => env.id === selectedEnvio.id);
+                    if (newValue === originalEnvio?.cliente) return;
+                    setSaving(true);
+                    airtableService.updateEnvio(selectedEnvio.id, { cliente: newValue })
+                      .then(() => setEnvios(prev => prev.map(e => e.id === selectedEnvio.id ? {...e, cliente: newValue} : e)))
+                      .catch(error => {
+                        console.error('Error updating cliente:', error);
+                        alert('Error al actualizar el cliente');
+                      })
+                      .finally(() => setSaving(false));
+                  }}
+                  disabled={saving}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                  placeholder="Nombre del cliente"
+                />
               </div>
               <div>
                 <p className="text-xs uppercase text-gray-500">Teléfono</p>
-                <p className="text-sm text-gray-900">{selectedEnvio.telefono || '-'}</p>
+                <input
+                  type="tel"
+                  value={selectedEnvio.telefono || ''}
+                  onChange={(e) => setSelectedEnvio(prev => prev ? {...prev, telefono: e.target.value} : prev)}
+                  onBlur={(e) => {
+                    const newValue = e.target.value.trim();
+                    const originalEnvio = envios.find(env => env.id === selectedEnvio.id);
+                    if (newValue === originalEnvio?.telefono) return;
+                    setSaving(true);
+                    airtableService.updateEnvio(selectedEnvio.id, { telefono: newValue })
+                      .then(() => setEnvios(prev => prev.map(e => e.id === selectedEnvio.id ? {...e, telefono: newValue} : e)))
+                      .catch(error => {
+                        console.error('Error updating telefono:', error);
+                        alert('Error al actualizar el teléfono');
+                      })
+                      .finally(() => setSaving(false));
+                  }}
+                  disabled={saving}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                  placeholder="Teléfono"
+                />
               </div>
               <div className="sm:col-span-2">
                 <p className="text-xs uppercase text-gray-500">Dirección</p>
-                <p className="text-sm text-gray-900">{selectedEnvio.direccion || '-'}</p>
+                <input
+                  type="text"
+                  value={selectedEnvio.direccion || ''}
+                  onChange={(e) => setSelectedEnvio(prev => prev ? {...prev, direccion: e.target.value} : prev)}
+                  onBlur={(e) => {
+                    const newValue = e.target.value.trim();
+                    const originalEnvio = envios.find(env => env.id === selectedEnvio.id);
+                    if (newValue === originalEnvio?.direccion) return;
+                    setSaving(true);
+                    airtableService.updateEnvio(selectedEnvio.id, { direccion: newValue })
+                      .then(() => setEnvios(prev => prev.map(e => e.id === selectedEnvio.id ? {...e, direccion: newValue} : e)))
+                      .catch(error => {
+                        console.error('Error updating direccion:', error);
+                        alert('Error al actualizar la dirección');
+                      })
+                      .finally(() => setSaving(false));
+                  }}
+                  disabled={saving}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                  placeholder="Dirección completa"
+                />
               </div>
               <div>
                 <p className="text-xs uppercase text-gray-500">Población</p>
-                <p className="text-sm text-gray-900">{selectedEnvio.poblacion || '-'}</p>
+                <input
+                  type="text"
+                  value={selectedEnvio.poblacion || ''}
+                  onChange={(e) => setSelectedEnvio(prev => prev ? {...prev, poblacion: e.target.value} : prev)}
+                  onBlur={(e) => {
+                    const newValue = e.target.value.trim();
+                    const originalEnvio = envios.find(env => env.id === selectedEnvio.id);
+                    if (newValue === originalEnvio?.poblacion) return;
+                    setSaving(true);
+                    airtableService.updateEnvio(selectedEnvio.id, { poblacion: newValue })
+                      .then(() => setEnvios(prev => prev.map(e => e.id === selectedEnvio.id ? {...e, poblacion: newValue} : e)))
+                      .catch(error => {
+                        console.error('Error updating poblacion:', error);
+                        alert('Error al actualizar la población');
+                      })
+                      .finally(() => setSaving(false));
+                  }}
+                  disabled={saving}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                  placeholder="Población"
+                />
               </div>
               <div>
                 <p className="text-xs uppercase text-gray-500">Código postal</p>
-                <p className="text-sm text-gray-900">{selectedEnvio.codigoPostal || '-'}</p>
+                <input
+                  type="text"
+                  value={selectedEnvio.codigoPostal || ''}
+                  onChange={(e) => setSelectedEnvio(prev => prev ? {...prev, codigoPostal: e.target.value} : prev)}
+                  onBlur={(e) => {
+                    const newValue = e.target.value.trim();
+                    const originalEnvio = envios.find(env => env.id === selectedEnvio.id);
+                    if (newValue === originalEnvio?.codigoPostal) return;
+                    setSaving(true);
+                    airtableService.updateEnvio(selectedEnvio.id, { codigoPostal: newValue })
+                      .then(() => setEnvios(prev => prev.map(e => e.id === selectedEnvio.id ? {...e, codigoPostal: newValue} : e)))
+                      .catch(error => {
+                        console.error('Error updating codigoPostal:', error);
+                        alert('Error al actualizar el código postal');
+                      })
+                      .finally(() => setSaving(false));
+                  }}
+                  disabled={saving}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                  placeholder="Código postal"
+                />
               </div>
               <div>
                 <p className="text-xs uppercase text-gray-500">Provincia</p>
-                <p className="text-sm text-gray-900">{selectedEnvio.provincia || '-'}</p>
+                <input
+                  type="text"
+                  value={selectedEnvio.provincia || ''}
+                  onChange={(e) => setSelectedEnvio(prev => prev ? {...prev, provincia: e.target.value} : prev)}
+                  onBlur={(e) => {
+                    const newValue = e.target.value.trim();
+                    const originalEnvio = envios.find(env => env.id === selectedEnvio.id);
+                    if (newValue === originalEnvio?.provincia) return;
+                    setSaving(true);
+                    airtableService.updateEnvio(selectedEnvio.id, { provincia: newValue })
+                      .then(() => setEnvios(prev => prev.map(e => e.id === selectedEnvio.id ? {...e, provincia: newValue} : e)))
+                      .catch(error => {
+                        console.error('Error updating provincia:', error);
+                        alert('Error al actualizar la provincia');
+                      })
+                      .finally(() => setSaving(false));
+                  }}
+                  disabled={saving}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                  placeholder="Provincia"
+                />
               </div>
               <div>
                 <p className="text-xs uppercase text-gray-500">Referencia</p>
-                <p className="text-sm text-gray-900">{selectedEnvio.referencia || '-'}</p>
+                <input
+                  type="text"
+                  value={selectedEnvio.referencia || ''}
+                  onChange={(e) => setSelectedEnvio(prev => prev ? {...prev, referencia: e.target.value} : prev)}
+                  onBlur={(e) => {
+                    const newValue = e.target.value.trim();
+                    const originalEnvio = envios.find(env => env.id === selectedEnvio.id);
+                    if (newValue === originalEnvio?.referencia) return;
+                    setSaving(true);
+                    airtableService.updateEnvio(selectedEnvio.id, { referencia: newValue })
+                      .then(() => setEnvios(prev => prev.map(e => e.id === selectedEnvio.id ? {...e, referencia: newValue} : e)))
+                      .catch(error => {
+                        console.error('Error updating referencia:', error);
+                        alert('Error al actualizar la referencia');
+                      })
+                      .finally(() => setSaving(false));
+                  }}
+                  disabled={saving}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+                  placeholder="Referencia"
+                />
               </div>
               <div className="flex flex-col sm:col-span-2">
                 <p className="text-xs uppercase text-gray-500 mb-1">Producto / Catálogo</p>
