@@ -351,7 +351,9 @@ async function fetchServicesByTable(params: {
         tramitado: f['Tramitado'] ?? false,
         numeroSerie: f['Número de serie'] ?? f['Numero de serie'] ?? f['S/N'] ?? f['# S/N'] ?? f['Nº Serie'] ?? f['SN'],
         importe: f['Importe'],
-        accionIpartner: f['Acción Ipartner'] ?? f['Accion Ipartner'],
+        accionIpartner: Array.isArray(f['Acción Ipartner'] ?? f['Accion Ipartner']) 
+          ? (f['Acción Ipartner'] ?? f['Accion Ipartner']).join(', ') 
+          : (f['Acción Ipartner'] ?? f['Accion Ipartner']),
         ipartner: f['Ipartner'],
         seguimiento: f['Seguimiento'],
         resolucionVisita: f['Resolución visita'] ?? f['Resolucion visita'],
@@ -887,9 +889,14 @@ export const airtableService = {
       
       // Aplicar el mismo filtro que usa la página Services.tsx para tramitaciones
       const tramitacionesFiltradas = allTramitaciones.filter((s: any) => {
+        // Asegurarse de que accionIpartner sea un string para evitar errores con .trim()
+        const accionStr = typeof s.accionIpartner === 'string' ? s.accionIpartner : 
+                         Array.isArray(s.accionIpartner) ? s.accionIpartner.join(', ') : 
+                         String(s.accionIpartner || '');
+
         // Registros pendientes de tramitar
         const isPendiente = !s.tramitado &&
-          !!s.accionIpartner && s.accionIpartner.trim() !== '' &&
+          accionStr.trim() !== '' &&
           s.ipartner !== 'Cancelado' && s.ipartner !== 'Facturado';
         
         return isPendiente;

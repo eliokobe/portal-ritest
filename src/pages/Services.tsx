@@ -87,13 +87,15 @@ const RESOLUCION_CANCELADO_OPTIONS = [
   'No procede soporte',
   'Sin llave del cuadro',
   'Sin cobertura ya que supera los 3 años',
-  'Interviene la empresa instaladora'
+  'Interviene la empresa instaladora',
+  'Presupuesto rechazado'
 ];
 
 const RESOLUCION_FINALIZADO_OPTIONS = [
   'Liberación cuenta',
   'Reset y actualización',
-  'Configuración del cargador'
+  'Configuración del cargador',
+  'Diagnóstico'
 ];
 
 const RESOLUCION_PRESUPUESTO_OPTIONS = [
@@ -472,9 +474,14 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     } else if (isTramitacion) {
       // Para tramitación: filtrar según condiciones específicas (aplica a TODOS los usuarios)
       servicesWithAllowedStates = servicesWithAllowedStates.filter((s) => {
+        // Asegurarse de que accionIpartner sea un string para evitar errores con .trim()
+        const accionStr = typeof s.accionIpartner === 'string' ? s.accionIpartner : 
+                         Array.isArray(s.accionIpartner) ? s.accionIpartner.join(', ') : 
+                         String(s.accionIpartner || '');
+
         // Registros pendientes de tramitar
         const isPendiente = !s.tramitado &&
-          !!s.accionIpartner && s.accionIpartner.trim() !== '' &&
+          accionStr.trim() !== '' &&
           s.ipartner !== 'Cancelado' && s.ipartner !== 'Facturado';
         
         return isPendiente;
