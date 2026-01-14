@@ -52,7 +52,7 @@ const Settings: React.FC = () => {
         <p className="text-gray-600 mt-2">Gestiona tu información personal y preferencias</p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+      <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200">
         {/* Información Personal */}
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">

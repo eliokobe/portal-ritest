@@ -605,7 +605,7 @@ const Reparaciones: React.FC = () => {
       </div>
 
       {user?.role === 'Administrativa' && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 overflow-hidden">
           <div className="flex border-b border-gray-200">
             <button
               onClick={() => setActiveTab('requiere-accion')}
@@ -631,7 +631,7 @@ const Reparaciones: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-slate-50">
@@ -737,7 +737,7 @@ const Reparaciones: React.FC = () => {
           onClick={() => setSelectedService(null)}
         >
           <div
-            className="relative w-full max-w-4xl bg-white rounded-2xl shadow-lg border border-gray-200 my-8 max-h-[90vh] flex flex-col"
+            className="relative w-full max-w-4xl bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 my-8 max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
@@ -771,7 +771,7 @@ const Reparaciones: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-6 space-y-6 bg-white rounded-2xl overflow-y-auto">
+            <div className="p-6 space-y-6 bg-white rounded-lg overflow-y-auto">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">Detalle de la reparación</h2>
                 {selectedService.expediente && (
@@ -985,7 +985,7 @@ const Reparaciones: React.FC = () => {
             }}
           >
             <div
-              className="relative w-full max-w-md bg-white rounded-2xl shadow-lg border border-gray-200 p-6"
+              className="relative w-full max-w-md bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 p-6"
               onClick={(event) => event.stopPropagation()}
             >
               <button

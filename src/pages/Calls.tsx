@@ -142,7 +142,7 @@ const Calls: React.FC = () => {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:gap-4">
           <div className="flex-1 min-w-[180px]">
             <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
@@ -187,7 +187,7 @@ const Calls: React.FC = () => {
                 <div className="text-xs text-gray-500 mt-2">Mostrando {filtered.length} de {calls.length} llamadas de asesoramiento</div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 overflow-hidden">
         {filtered.length === 0 ? (
           <div className="text-center py-12">
             <PhoneCall className="h-12 w-12 text-gray-400 mx-auto mb-4" />

@@ -485,7 +485,7 @@ export default function Envios() {
       </div>
 
       {/* Pestañas */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 overflow-hidden">
         <div className="flex border-b border-gray-200">
           <button
             onClick={() => setActiveTab('requiere-accion')}
@@ -511,7 +511,7 @@ export default function Envios() {
       </div>
 
       {/* Tabla de envíos */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -630,6 +630,19 @@ export default function Envios() {
                                   supabaseService.completeRecogida(identificador);
                                 }
                               }
+
+                              // Si se marca como "Entregado", completar el tracking en Supabase
+                              if (newValue === 'Entregado') {
+                                const identificador = envio.numero;
+                                
+                                if (identificador && !isNaN(Number(identificador))) {
+                                  // Marcar como tramitado con la fecha actual
+                                  supabaseService.completeTracking(identificador);
+                                  console.log('[Envios] Marcado como tramitado en Supabase por estado Entregado');
+                                } else {
+                                  console.warn('[Envios] No hay un número de servicio válido para trackear en Supabase');
+                                }
+                              }
                             })
                             .catch((error) => {
                               console.error('[Envios] Error updating estado:', error);
@@ -743,7 +756,7 @@ export default function Envios() {
       {/* Modal para crear envío */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl max-w-md w-full p-6">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-gray-900">Añadir Nuevo Envío</h2>
               <button
@@ -954,7 +967,7 @@ export default function Envios() {
       {selectedEnvio && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto" onClick={() => setSelectedEnvio(null)}>
           <div
-            className="bg-white rounded-xl max-w-xl w-full p-6 relative shadow-lg my-8 max-h-[calc(100vh-4rem)] overflow-y-auto"
+            className="bg-white rounded-lg max-w-xl w-full p-6 relative transition-shadow hover:shadow-md my-8 max-h-[calc(100vh-4rem)] overflow-y-auto border border-gray-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="absolute top-4 right-4 flex items-center gap-2">

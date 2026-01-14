@@ -90,7 +90,7 @@ const Invoices: React.FC = () => {
         <p className="text-gray-600 mt-2">Facturas emitidas por Ritest para tu empresa</p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 overflow-hidden">
         {invoices.length === 0 ? (
           <div className="text-center py-12">
             <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -158,7 +158,7 @@ const Invoices: React.FC = () => {
       {/* Resumen de facturas */}
       {invoices.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 p-6">
             <div className="flex items-center">
               <CheckCircle className="h-8 w-8 text-green-500" />
               <div className="ml-4">
@@ -170,7 +170,7 @@ const Invoices: React.FC = () => {
             </div>
           </div>
           
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 p-6">
             <div className="flex items-center">
               <Clock className="h-8 w-8 text-yellow-500" />
               <div className="ml-4">
@@ -182,7 +182,7 @@ const Invoices: React.FC = () => {
             </div>
           </div>
           
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 p-6">
             <div className="flex items-center">
               <AlertTriangle className="h-8 w-8 text-red-500" />
               <div className="ml-4">

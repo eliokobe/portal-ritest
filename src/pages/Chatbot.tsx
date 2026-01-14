@@ -371,7 +371,7 @@ const Chatbot: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-slate-50 sticky top-0">
@@ -507,7 +507,7 @@ const Chatbot: React.FC = () => {
         >
           <div className="min-h-screen flex items-center justify-center p-4">
             <div
-              className="relative w-full max-w-6xl bg-white rounded-2xl shadow-lg border border-gray-200 my-8"
+              className="relative w-full max-w-6xl bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 my-8"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="absolute top-4 right-4 z-10">
@@ -696,7 +696,7 @@ const Chatbot: React.FC = () => {
           onClick={() => setShowCommentsModal(false)}
         >
           <div
-            className="relative w-full max-w-md bg-white rounded-2xl shadow-lg border border-gray-200 p-6"
+            className="relative w-full max-w-md bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Comentarios</h2>

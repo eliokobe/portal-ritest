@@ -78,7 +78,7 @@ const Schedule: React.FC = () => {
         <p className="text-gray-600 mt-2">Selecciona fecha y cuéntanos el motivo.</p>
       </div>
 
-  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+  <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 overflow-hidden">
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           {success && (
@@ -125,7 +125,7 @@ const Schedule: React.FC = () => {
               onChange={(e) => setReason(e.target.value)}
               rows={4}
               placeholder="Escribe brevemente el motivo"
-              className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-brand-dark focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-dark focus:border-transparent"
               required
             />
           </div>

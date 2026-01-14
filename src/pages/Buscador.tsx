@@ -254,7 +254,7 @@ const Buscador: React.FC = () => {
         <p className="text-gray-600 mt-2">Busca expedientes por número, nombre o teléfono.</p>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+      <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-100 p-6">
         <div className="flex gap-4">
           <div className="flex-1">
             <div className="relative">
@@ -293,13 +293,13 @@ const Buscador: React.FC = () => {
       )}
 
       {searched && !loading && searchResults.length === 0 && (
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8 text-center">
+        <div className="bg-white rounded-lg border border-gray-200 p-8 text-center transition-shadow hover:shadow-md">
           <p className="text-gray-600">No se encontraron resultados para "{searchTerm}"</p>
         </div>
       )}
 
       {searchResults.length > 0 && (
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden transition-shadow hover:shadow-md">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-slate-50">
@@ -374,7 +374,7 @@ const Buscador: React.FC = () => {
         >
           <div className="min-h-screen flex items-center justify-center p-4">
             <div
-              className="relative w-full max-w-4xl bg-white rounded-2xl shadow-lg border border-gray-200 my-8"
+              className="relative w-full max-w-4xl bg-white rounded-lg border border-gray-200 my-8 transition-shadow hover:shadow-md"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="absolute top-4 right-4 z-10 flex items-center gap-2">

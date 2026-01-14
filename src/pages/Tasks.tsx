@@ -115,7 +115,7 @@ export default function Tasks() {
         <p className="text-gray-600 mt-2">Gestiona tus tareas diarias</p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+      <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
             Pendientes ({pendingTasks.length})
@@ -167,7 +167,7 @@ export default function Tasks() {
       </div>
 
       {completedTasks.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200">
           <div className="p-6 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">
               Completadas ({completedTasks.length})

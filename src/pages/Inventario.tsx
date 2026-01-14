@@ -50,7 +50,7 @@ const Inventario: React.FC = () => {
           <p className="text-gray-600 font-medium">Cargando inventario...</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 overflow-hidden">
           {items.length === 0 ? (
             <div className="text-center py-12">
               <Info className="h-10 w-10 text-gray-400 mx-auto mb-4" />

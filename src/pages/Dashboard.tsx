@@ -146,22 +146,22 @@ const Dashboard: React.FC = () => {
 
         {/* Tarjetas de resumen para Administrativa */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+          <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
             <p className="text-sm font-medium text-gray-600">Pendientes de tramitar</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">{adminStats.unsynchronizedCount}</p>
           </div>
           
-          <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+          <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
             <p className="text-sm font-medium text-gray-600">Envíos pendientes</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">{adminStats.enviosPendientesCount}</p>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+          <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
             <p className="text-sm font-medium text-gray-600">Asesoramientos pendientes</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">{asesoramientosStats.totalRegistros}</p>
           </div>
           
-          <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+          <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
             <p className="text-sm font-medium text-gray-600">Reparaciones pendientes</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">{adminStats.reparacionesPendientesCount}</p>
           </div>
@@ -172,7 +172,7 @@ const Dashboard: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Gráfico de tiempo de asesoramientos */}
             {asesoramientoTimeStats && asesoramientoTimeStats.dailyData.length > 0 && (
-              <div className="bg-white rounded-2xl border border-gray-100 p-8 hover:border-gray-200 transition-colors">
+              <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Tiempo de Asesoramientos</h3>
                 <p className="text-sm text-gray-500 mb-8">Promedio de horas desde que se crea el registro hasta que se marca como Informe/Ilocalizable/No interesado (Mes actual)</p>
                 <ResponsiveContainer width="100%" height={400}>
@@ -222,7 +222,7 @@ const Dashboard: React.FC = () => {
 
             {/* Gráfico de distribución de estados de asesoramientos */}
             {asesoramientosEstadosStats && asesoramientosEstadosStats.estadosData.length > 0 && (
-              <div className="bg-white rounded-2xl border border-gray-100 p-8 hover:border-gray-200 transition-colors">
+              <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
             <h3 className="text-xl font-bold text-gray-900 mb-2">Distribución de Estados de Asesoramientos</h3>
             <p className="text-sm text-gray-500 mb-8">Registros del mes actual por estado</p>
             <div className="flex flex-col lg:flex-row items-center justify-center gap-12">
@@ -286,7 +286,7 @@ const Dashboard: React.FC = () => {
                   return (
                     <div 
                       key={estado.name} 
-                      className="flex items-center gap-4 p-3 rounded-xl bg-white border border-gray-100"
+                      className="flex items-center gap-4 p-3 rounded-lg bg-white border border-gray-100"
                     >
                       <div 
                         className="w-3 h-3 rounded-full" 
@@ -312,7 +312,7 @@ const Dashboard: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Gráfico de tiempo de recogida */}
             {recogidaTimeStats && recogidaTimeStats.dailyData.length > 0 && (
-              <div className="bg-white rounded-2xl border border-gray-100 p-8 hover:border-gray-200 transition-colors">
+              <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Tiempo de Recogida</h3>
                 <p className="text-sm text-gray-500 mb-8">Promedio de horas desde que se crea la recogida hasta que se envía (Mes actual)</p>
                 <ResponsiveContainer width="100%" height={400}>
@@ -362,7 +362,7 @@ const Dashboard: React.FC = () => {
 
             {/* Gráfico de tiempo de tramitación */}
             {tramitacionTimeStats && tramitacionTimeStats.dailyData.length > 0 && (
-              <div className="bg-white rounded-2xl border border-gray-100 p-8 hover:border-gray-200 transition-colors">
+              <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Tiempo de Tramitación</h3>
                 <p className="text-sm text-gray-500 mb-8">Promedio de horas desde que aparece en Tramitaciones hasta que se tramita (Mes actual)</p>
                 <ResponsiveContainer width="100%" height={400}>
@@ -426,7 +426,7 @@ const Dashboard: React.FC = () => {
 
         {/* Tarjetas de resumen para Administrativa */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <div className="bg-white rounded-lg border border-gray-100 p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Pendientes de tramitar</p>
@@ -438,7 +438,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           
-          <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <div className="bg-white rounded-lg border border-gray-100 p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Tramitados hoy</p>
@@ -464,7 +464,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Selector de trabajador */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <div className="bg-white rounded-lg border border-gray-100 p-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Seleccionar Trabajador
           </label>
@@ -497,7 +497,7 @@ const Dashboard: React.FC = () => {
 
         {/* Mostrar dashboard del trabajador seleccionado */}
         {!selectedTrabajador && (
-          <div className="text-center py-12 bg-white rounded-xl border border-gray-100">
+          <div className="text-center py-12 bg-white rounded-lg border border-gray-100">
             <p className="text-gray-500">Selecciona un trabajador para ver su panel gráfico</p>
           </div>
         )}
@@ -523,22 +523,22 @@ const Dashboard: React.FC = () => {
 
             {/* Tarjetas de resumen para Técnico */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+              <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
                 <p className="text-sm font-medium text-gray-600">Clientes pendientes</p>
                 <p className="text-3xl font-bold text-gray-900 mt-2">{techStats.clientesPendientes}</p>
               </div>
               
-              <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+              <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
                 <p className="text-sm font-medium text-gray-600">Resueltos hoy</p>
                 <p className="text-3xl font-bold text-gray-900 mt-2">{techStats.clientesResueltosHoy}</p>
               </div>
 
-              <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+              <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
                 <p className="text-sm font-medium text-gray-600">Resolución remota (mes)</p>
                 <p className="text-3xl font-bold text-gray-900 mt-2">{techStats.promedioResolucionRemotaMes}%</p>
               </div>
               
-              <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+              <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
                 <p className="text-sm font-medium text-gray-600">Velocidad resolución (mes)</p>
                 <p className="text-3xl font-bold text-gray-900 mt-2">{techStats.promedioVelocidadResolucionMes}h</p>
               </div>
@@ -549,7 +549,7 @@ const Dashboard: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Gráfico de porcentaje de resolución remota por semana */}
               {techRemoteStats && techRemoteStats.weeklyData.length > 0 && (
-                <div className="bg-white rounded-2xl border border-gray-100 p-8 hover:border-gray-200 transition-colors">
+                <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
                   <h3 className="text-xl font-bold text-gray-900 mb-2">Porcentaje de Resolución Remota</h3>
                   <p className="text-sm text-gray-500 mb-8">Últimas 8 semanas (servicios finalizados)</p>
                   <ResponsiveContainer width="100%" height={400}>
@@ -607,7 +607,7 @@ const Dashboard: React.FC = () => {
 
               {/* Gráfico de porcentaje de casos gestionados en 24h */}
               {tech24hStats && tech24hStats.weeklyData.length > 0 && (
-                <div className="bg-white rounded-2xl border border-gray-100 p-8 hover:border-gray-200 transition-colors">
+                <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
                   <h3 className="text-xl font-bold text-gray-900 mb-2">Casos Gestionados en 24h</h3>
                   <p className="text-sm text-gray-500 mb-8">Porcentaje de casos resueltos en menos de 24 horas por semana</p>
                   <ResponsiveContainer width="100%" height={400}>
@@ -668,7 +668,7 @@ const Dashboard: React.FC = () => {
             {/* Gráficos de servicios asignados e incidencias resueltas */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Gráfico de servicios asignados */}
-              <div className="bg-white rounded-2xl border border-gray-100 p-8 hover:border-gray-200 transition-colors">
+              <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Servicios Asignados</h3>
                 <p className="text-sm text-gray-500 mb-8">Últimas 2 semanas (solo días laborables)</p>
                 <ResponsiveContainer width="100%" height={400}>
@@ -712,7 +712,7 @@ const Dashboard: React.FC = () => {
               </div>
 
               {/* Gráfico de incidencias resueltas */}
-              <div className="bg-white rounded-2xl border border-gray-100 p-8 hover:border-gray-200 transition-colors">
+              <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Incidencias Resueltas</h3>
                 <p className="text-sm text-gray-500 mb-8">Últimas 2 semanas (solo días laborables)</p>
                 <ResponsiveContainer width="100%" height={400}>
@@ -769,22 +769,22 @@ const Dashboard: React.FC = () => {
 
             {/* Tarjetas de resumen para Administrativa */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+              <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
                 <p className="text-sm font-medium text-gray-600">Pendientes de tramitar</p>
                 <p className="text-3xl font-bold text-gray-900 mt-2">{adminStats.unsynchronizedCount}</p>
               </div>
               
-              <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+              <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
                 <p className="text-sm font-medium text-gray-600">Envíos pendientes</p>
                 <p className="text-3xl font-bold text-gray-900 mt-2">{adminStats.enviosPendientesCount}</p>
               </div>
 
-              <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+              <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
                 <p className="text-sm font-medium text-gray-600">Asesoramientos pendientes</p>
                 <p className="text-3xl font-bold text-gray-900 mt-2">{asesoramientosStats.totalRegistros}</p>
               </div>
               
-              <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+              <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
                 <p className="text-sm font-medium text-gray-600">Reparaciones pendientes</p>
                 <p className="text-3xl font-bold text-gray-900 mt-2">{adminStats.reparacionesPendientesCount}</p>
               </div>
@@ -795,7 +795,7 @@ const Dashboard: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Gráfico de tiempo de asesoramientos */}
                 {asesoramientoTimeStats && asesoramientoTimeStats.dailyData.length > 0 && (
-                  <div className="bg-white rounded-2xl border border-gray-100 p-8 hover:border-gray-200 transition-colors">
+                  <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
                     <h3 className="text-xl font-bold text-gray-900 mb-2">Tiempo de Asesoramientos</h3>
                     <p className="text-sm text-gray-500 mb-8">Promedio de horas desde que se crea el registro hasta que se marca como Informe/Ilocalizable/No interesado (Mes actual)</p>
                     <ResponsiveContainer width="100%" height={400}>
@@ -845,7 +845,7 @@ const Dashboard: React.FC = () => {
 
                 {/* Gráfico de distribución de estados de asesoramientos */}
                 {asesoramientosEstadosStats && asesoramientosEstadosStats.estadosData.length > 0 && (
-                  <div className="bg-white rounded-2xl border border-gray-100 p-8 hover:border-gray-200 transition-colors">
+                  <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
                     <h3 className="text-xl font-bold text-gray-900 mb-2">Distribución de Estados de Asesoramientos</h3>
                     <p className="text-sm text-gray-500 mb-8">Registros del mes actual por estado</p>
                     <div className="flex flex-col lg:flex-row items-center justify-center gap-12">
@@ -904,7 +904,7 @@ const Dashboard: React.FC = () => {
                           return (
                             <div 
                               key={estado.name} 
-                              className="flex items-center gap-4 p-3 rounded-xl bg-white border border-gray-100"
+                              className="flex items-center gap-4 p-3 rounded-lg bg-white border border-gray-100"
                             >
                               <div 
                                 className="w-3 h-3 rounded-full" 
@@ -930,7 +930,7 @@ const Dashboard: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Gráfico de tiempo de recogida */}
                 {recogidaTimeStats && recogidaTimeStats.dailyData.length > 0 && (
-                  <div className="bg-white rounded-2xl border border-gray-100 p-8 hover:border-gray-200 transition-colors">
+                  <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
                     <h3 className="text-xl font-bold text-gray-900 mb-2">Tiempo de Recogida</h3>
                     <p className="text-sm text-gray-500 mb-8">Promedio de horas desde que se crea la recogida hasta que se envía (Mes actual)</p>
                     <ResponsiveContainer width="100%" height={400}>
@@ -980,7 +980,7 @@ const Dashboard: React.FC = () => {
 
                 {/* Gráfico de tiempo de tramitación */}
                 {tramitacionTimeStats && tramitacionTimeStats.dailyData.length > 0 && (
-                  <div className="bg-white rounded-2xl border border-gray-100 p-8 hover:border-gray-200 transition-colors">
+                  <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
                     <h3 className="text-xl font-bold text-gray-900 mb-2">Tiempo de Tramitación</h3>
                     <p className="text-sm text-gray-500 mb-8">Promedio de horas desde que aparece en Tramitaciones hasta que se tramita (Mes actual)</p>
                     <ResponsiveContainer width="100%" height={400}>
@@ -1045,22 +1045,22 @@ const Dashboard: React.FC = () => {
 
         {/* Tarjetas de resumen para Técnico */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+          <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
             <p className="text-sm font-medium text-gray-600">Clientes pendientes</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">{techStats.clientesPendientes}</p>
           </div>
           
-          <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+          <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
             <p className="text-sm font-medium text-gray-600">Resueltos hoy</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">{techStats.clientesResueltosHoy}</p>
           </div>
 
-          <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+          <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
             <p className="text-sm font-medium text-gray-600">Resolución remota (mes)</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">{techStats.promedioResolucionRemotaMes}%</p>
           </div>
           
-          <div className="bg-white rounded-xl border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+          <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
             <p className="text-sm font-medium text-gray-600">Velocidad resolución (mes)</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">{techStats.promedioVelocidadResolucionMes}h</p>
           </div>
@@ -1071,7 +1071,7 @@ const Dashboard: React.FC = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Gráfico de porcentaje de resolución remota por semana */}
           {techRemoteStats && techRemoteStats.weeklyData.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-100 p-8 hover:border-gray-200 transition-colors">
+            <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
               <h3 className="text-xl font-bold text-gray-900 mb-2">Porcentaje de Resolución Remota</h3>
               <p className="text-sm text-gray-500 mb-8">Últimas 8 semanas (servicios finalizados)</p>
               <ResponsiveContainer width="100%" height={400}>
@@ -1130,7 +1130,7 @@ const Dashboard: React.FC = () => {
 
           {/* Gráfico de porcentaje de casos gestionados en 24h */}
           {tech24hStats && tech24hStats.weeklyData.length > 0 && (
-            <div className="bg-white rounded-2xl border border-gray-100 p-8 hover:border-gray-200 transition-colors">
+            <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
               <h3 className="text-xl font-bold text-gray-900 mb-2">Casos Gestionados en 24h</h3>
               <p className="text-sm text-gray-500 mb-8">Porcentaje de casos resueltos en menos de 24 horas por semana</p>
               <ResponsiveContainer width="100%" height={400}>
@@ -1191,7 +1191,7 @@ const Dashboard: React.FC = () => {
         {/* Gráficos de servicios asignados e incidencias resueltas (debajo) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Gráfico de servicios asignados */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-8 hover:border-gray-200 transition-colors">
+          <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
             <h3 className="text-xl font-bold text-gray-900 mb-2">Servicios Asignados</h3>
             <p className="text-sm text-gray-500 mb-8">Últimas 2 semanas (solo días laborables)</p>
             <ResponsiveContainer width="100%" height={400}>
@@ -1235,7 +1235,7 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* Gráfico de incidencias resueltas */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-8 hover:border-gray-200 transition-colors">
+          <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
             <h3 className="text-xl font-bold text-gray-900 mb-2">Incidencias Resueltas</h3>
             <p className="text-sm text-gray-500 mb-8">Últimas 2 semanas (solo días laborables)</p>
             <ResponsiveContainer width="100%" height={400}>
@@ -1293,7 +1293,7 @@ const Dashboard: React.FC = () => {
 
         {/* Tarjetas de resumen para Administrativa */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <div className="bg-white rounded-lg border border-gray-100 p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Pendientes de tramitar</p>
@@ -1305,7 +1305,7 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
           
-          <div className="bg-white rounded-xl border border-gray-100 p-6">
+          <div className="bg-white rounded-lg border border-gray-100 p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Tramitados hoy</p>
@@ -1368,7 +1368,7 @@ const Dashboard: React.FC = () => {
         {summaryCards.map((card, index) => {
           const Icon = card.icon;
           return (
-            <div key={index} className="bg-white rounded-xl border border-gray-100 p-6">
+            <div key={index} className="bg-white rounded-lg border border-gray-100 p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{card.title}</p>
@@ -1386,7 +1386,7 @@ const Dashboard: React.FC = () => {
       {/* Gráficos */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Gráfico de barras */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <div className="bg-white rounded-lg border border-gray-100 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-6">Actividad Semanal (Barras)</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={stats.dailyData}>
@@ -1410,7 +1410,7 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Gráfico de líneas */}
-        <div className="bg-white rounded-xl border border-gray-100 p-6">
+        <div className="bg-white rounded-lg border border-gray-100 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-6">Tendencia Semanal (Líneas)</h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={stats.dailyData}>

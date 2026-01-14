@@ -1151,7 +1151,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
         </div>
         {!isTramitacion && appointmentAlert && (
           <div className="fixed bottom-4 right-4 z-50 max-w-sm w-[calc(100vw-2rem)] sm:w-96">
-            <div className="bg-green-50 border border-green-200 text-green-900 rounded-lg p-4 shadow-lg">
+            <div className="bg-green-50 border border-green-200 text-green-900 rounded-lg p-4 transition-shadow hover:shadow-md">
               <div className="flex justify-between items-start gap-3">
                 <div>
                   <p className="text-sm font-semibold">Tienes una cita con el cliente {appointmentAlert.nombre || 'sin nombre'} ahora.</p>
@@ -1190,7 +1190,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
       </div>
 
       {!isTramitacion && isTecnico && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 overflow-hidden">
           <div className="flex border-b border-gray-200">
             <button
               onClick={() => setActiveTab('requiere-accion')}
@@ -1216,7 +1216,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 overflow-hidden">
         {filteredServices.length === 0 ? (
           <div className="text-center py-12">
             <Info className="h-10 w-10 text-gray-400 mx-auto mb-4" />
@@ -1411,7 +1411,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
           onClick={handleCloseModal}
         >
           <div
-            className="relative w-full max-w-4xl bg-gray-50 rounded-2xl shadow-lg border border-gray-200 my-4 mx-auto"
+            className="relative w-full max-w-4xl bg-gray-50 rounded-lg border border-gray-200 my-4 mx-auto transition-shadow hover:shadow-md"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="absolute top-4 right-4 flex items-center gap-2 z-10">
@@ -1523,7 +1523,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-xs uppercase text-gray-500">Expediente</p>
-                    {selectedService.id && (
+                    {selectedService.id && !isTramitacion && (
                       <button
                         onClick={() => handleEdit(selectedService.id, 'expediente', selectedService.expediente || '')}
                         className="text-xs text-brand-primary hover:text-brand-green"
@@ -1532,7 +1532,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                       </button>
                     )}
                   </div>
-                  {editingField && selectedService.id === editingField.id && editingField.field === 'expediente' ? (
+                  {editingField && selectedService.id === editingField.id && editingField.field === 'expediente' && !isTramitacion ? (
                     <div className="space-y-2">
                       <input
                         type="text"
@@ -1558,7 +1558,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-xs uppercase text-gray-500">Nombre</p>
-                    {selectedService.id && (
+                    {selectedService.id && !isTramitacion && (
                       <button
                         onClick={() => handleEdit(selectedService.id, 'nombre', selectedService.nombre || '')}
                         className="text-xs text-brand-primary hover:text-brand-green"
@@ -1567,7 +1567,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                       </button>
                     )}
                   </div>
-                  {editingField && selectedService.id === editingField.id && editingField.field === 'nombre' ? (
+                  {editingField && selectedService.id === editingField.id && editingField.field === 'nombre' && !isTramitacion ? (
                     <div className="space-y-2">
                       <input
                         type="text"
@@ -1593,7 +1593,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-xs uppercase text-gray-500">Teléfono</p>
-                    {selectedService.id && (
+                    {selectedService.id && !isTramitacion && (
                       <button
                         onClick={() => handleEdit(selectedService.id, 'telefono', selectedService.telefono || '')}
                         className="text-xs text-brand-primary hover:text-brand-green"
@@ -1602,7 +1602,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                       </button>
                     )}
                   </div>
-                  {editingField && selectedService.id === editingField.id && editingField.field === 'telefono' ? (
+                  {editingField && selectedService.id === editingField.id && editingField.field === 'telefono' && !isTramitacion ? (
                     <div className="space-y-2">
                       <input
                         type="tel"
@@ -1628,7 +1628,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-xs uppercase text-gray-500">Dirección</p>
-                    {selectedService.id && (
+                    {selectedService.id && !isTramitacion && (
                       <button
                         onClick={() => handleEdit(selectedService.id, 'direccion', selectedService.direccion || '')}
                         className="text-xs text-brand-primary hover:text-brand-green"
@@ -1637,7 +1637,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                       </button>
                     )}
                   </div>
-                  {editingField && selectedService.id === editingField.id && editingField.field === 'direccion' ? (
+                  {editingField && selectedService.id === editingField.id && editingField.field === 'direccion' && !isTramitacion ? (
                     <div className="space-y-2">
                       <input
                         type="text"
@@ -1663,7 +1663,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-xs uppercase text-gray-500">Población</p>
-                    {selectedService.id && (
+                    {selectedService.id && !isTramitacion && (
                       <button
                         onClick={() => handleEdit(selectedService.id, 'poblacion', selectedService.poblacion || '')}
                         className="text-xs text-brand-primary hover:text-brand-green"
@@ -1672,7 +1672,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                       </button>
                     )}
                   </div>
-                  {editingField && selectedService.id === editingField.id && editingField.field === 'poblacion' ? (
+                  {editingField && selectedService.id === editingField.id && editingField.field === 'poblacion' && !isTramitacion ? (
                     <div className="space-y-2">
                       <input
                         type="text"
@@ -1698,7 +1698,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-xs uppercase text-gray-500">Número de serie</p>
-                    {selectedService.id && (
+                    {selectedService.id && !isTramitacion && (
                       <button
                         onClick={() => handleEdit(selectedService.id, 'numeroSerie', selectedService.numeroSerie || '')}
                         className="text-xs text-brand-primary hover:text-brand-green"
@@ -1707,7 +1707,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                       </button>
                     )}
                   </div>
-                  {editingField && selectedService.id === editingField.id && editingField.field === 'numeroSerie' ? (
+                  {editingField && selectedService.id === editingField.id && editingField.field === 'numeroSerie' && !isTramitacion ? (
                     <div className="space-y-2">
                       <input
                         type="text"
@@ -2732,7 +2732,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
           }}
         >
           <div
-            className="relative w-full max-w-md bg-white rounded-2xl shadow-lg border border-gray-200 p-6"
+            className="relative w-full max-w-md bg-white rounded-lg border border-gray-200 transition-shadow hover:shadow-md p-6"
             onClick={(event) => event.stopPropagation()}
           >
             <button
@@ -2846,7 +2846,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
           }}
         >
           <div
-            className="relative w-full max-w-3xl bg-white rounded-2xl shadow-lg border border-gray-200 p-6 my-8"
+            className="relative w-full max-w-3xl bg-white rounded-lg border border-gray-200 p-6 my-8 transition-shadow hover:shadow-md"
             onClick={(event) => event.stopPropagation()}
           >
             <button
@@ -2946,7 +2946,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
           }}
         >
           <div
-            className="relative w-full max-w-md bg-white rounded-2xl shadow-lg border border-gray-200 p-6"
+            className="relative w-full max-w-md bg-white rounded-lg border border-gray-200 transition-shadow hover:shadow-md p-6"
             onClick={(event) => event.stopPropagation()}
           >
             <button

@@ -56,7 +56,7 @@ const Resources = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredResources.map((res) => (
-            <article key={res.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-3">
+            <article key={res.id} className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 p-3">
               <div className="aspect-[16/9] rounded-lg overflow-hidden bg-gradient-to-br from-brand-primary via-brand-green to-green-500 flex items-center justify-center">
                 {res.imageUrl ? (
                   <img src={res.imageUrl} alt={res.name} className="h-full w-full object-cover" />

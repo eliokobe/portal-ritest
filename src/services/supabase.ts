@@ -524,6 +524,53 @@ class SupabaseService {
   }
 
   /**
+   * Actualizar la fecha de tramitación cuando un envío se marca como "Entregado"
+   */
+  async completeTracking(número: string): Promise<void> {
+    if (!this.isEnabled()) return;
+
+    try {
+      // Buscar el registro más reciente sin fecha de tramitado en la tabla recogidas
+      const { data: records } = await supabase!
+        .from('recogidas')
+        .select('id')
+        .eq('número', número)
+        .is('tramitado', null)
+        .order('creación', { ascending: false })
+        .limit(1);
+
+      if (!records || records.length === 0) {
+        console.log(`No se encontró recogida pendiente para número ${número}`);
+        return;
+      }
+
+      const recordId = records[0].id;
+
+      // Actualizar con la fecha de tramitado (Hora de Madrid)
+      const nowMadrid = new Intl.DateTimeFormat('sv-SE', {
+        timeZone: 'Europe/Madrid',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      }).format(new Date()).replace(' ', 'T');
+
+      const { error } = await supabase!
+        .from('recogidas')
+        .update({
+          tramitado: nowMadrid,
+        })
+        .eq('id', recordId);
+
+      if (error) {
+        console.error('Error updating recogida (entregado):', error);
+      } else {
+        console.log(`Recogida completada (entregado) para número ${número}`);
+      }
+    } catch (error) {
+      console.error('Error in completeTracking:', error);
+    }
+  }
+
+  /**
    * Trackear recogida completa (crear registro con ambas fechas o actualizar si existe)
    * @param numero - Número del envío
    * @param fechaCreacion - Fecha de creación (cuando entró en estado de recogida)

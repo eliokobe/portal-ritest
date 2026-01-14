@@ -5,14 +5,14 @@ Este proyecto es un CRM para la empresa Ritest, conectado a Airtable y diseñado
 ## Características
 
 ...
-# Portal Sonrisia - Clínicas Dentales
+# Portal Ritest - Gestión de Puntos de Recarga
 
-Portal web profesional para la gestión de clínicas dentales con integración a Airtable.
+Portal web profesional para la gestión de servicios de puntos de recarga eléctricos con integración a Airtable y Supabase.
 
 ## Características
 
-- **Autenticación**: Login con email/contraseña y Google OAuth
-- **Dashboard**: Estadísticas y gráficos de llamadas y citas
+- **Autenticación**: Login con email/contraseña
+- **Dashboard**: Estadísticas y gráficos de servicios y tramitaciones
 - **Gestión de Tareas**: Actualización de estados conectada a Airtable
 - **Facturas**: Visualización de facturas con importes y fechas
 - **Agendamiento**: Formulario de Fillout para programar reuniones
@@ -117,10 +117,10 @@ npm run build
 
 ### Colores Corporativos
 - Azul principal: `#0059F1`
-- Azul oscuro: `#003CB8`
+- Verde oscuro: `#2E7016`
 
 ### Logo
-El logo "S" de Sonrisia se muestra en un círculo azul en toda la aplicación.
+El logo de Ritest se muestra en toda la aplicación junto con la imagen del logotipo oficial.
 
 ## Soporte
 

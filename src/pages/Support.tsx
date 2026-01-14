@@ -50,7 +50,7 @@ const Support: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Enviar Ticket */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 p-6">
             <div className="flex items-start gap-3 mb-4">
               <MessageSquare className="h-5 w-5 text-gray-700 mt-0.5" />
               <div>
@@ -87,7 +87,7 @@ const Support: React.FC = () => {
                   onChange={(e) => setMessage(e.target.value)}
                   placeholder="Explica detalladamente tu consulta o problema"
                   rows={6}
-                  className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-brand-dark focus:border-transparent"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-brand-dark focus:border-transparent"
                 />
               </div>
               <button
@@ -103,19 +103,19 @@ const Support: React.FC = () => {
 
         {/* Contacto y Estado */}
         <div className="space-y-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-1">Contacto Directo</h3>
             <p className="text-sm text-gray-600 mb-4">Múltiples formas de contactar con nuestro equipo</p>
             <div className="space-y-3">
-              <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl">
+              <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
                 <Mail className="h-5 w-5 text-gray-600" />
                 <div>
                   <p className="text-sm font-medium text-gray-900">Email</p>
-                  <p className="text-sm text-gray-700">soporte@sonrisia.com</p>
+                  <p className="text-sm text-gray-700">soporte@ritest.es</p>
                   <p className="text-xs text-gray-500">Respuesta en 24 horas</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl">
+              <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
                 <Phone className="h-5 w-5 text-gray-600" />
                 <div>
                   <p className="text-sm font-medium text-gray-900">Teléfono</p>
@@ -123,7 +123,7 @@ const Support: React.FC = () => {
                   <p className="text-xs text-gray-500">Lunes a Viernes 9:00-18:00</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-xl">
+              <div className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg">
                 <LifeBuoy className="h-5 w-5 text-gray-600" />
                 <div>
                   <p className="text-sm font-medium text-gray-900">WhatsApp</p>
@@ -134,7 +134,7 @@ const Support: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-3">Estado del Sistema</h3>
             <div className="flex items-center gap-2 text-green-700">
               <CheckCircle2 className="h-5 w-5" />

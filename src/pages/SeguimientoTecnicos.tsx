@@ -321,7 +321,7 @@ const SeguimientoTecnicos: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+      <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-slate-50">
@@ -427,7 +427,7 @@ const SeguimientoTecnicos: React.FC = () => {
           onClick={() => setSelectedService(null)}
         >
           <div
-            className="relative w-full max-w-4xl bg-white rounded-2xl shadow-lg border border-gray-200 my-8"
+            className="relative w-full max-w-4xl bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 my-8"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -439,7 +439,7 @@ const SeguimientoTecnicos: React.FC = () => {
               <X className="h-5 w-5" />
             </button>
 
-            <div className="p-6 space-y-6 bg-white rounded-2xl">
+            <div className="p-6 space-y-6 bg-white rounded-lg">
               <div>
                 <h2 className="text-xl font-semibold text-gray-900">Detalle de la reparación</h2>
                 <p className="text-sm text-gray-500 mt-1">

@@ -10,10 +10,10 @@ const LoadingScreen: React.FC = () => {
             <div className="absolute inset-0 border-4 border-white/20 rounded-full"></div>
             <div className="absolute inset-0 border-4 border-transparent border-t-white rounded-full animate-spin"></div>
             <div className="absolute inset-2 bg-white rounded-full flex items-center justify-center shadow-2xl">
-              <span className="text-green-600 text-3xl font-bold">S</span>
+              <span className="text-green-600 text-3xl font-bold">R</span>
             </div>
           </div>
-          <h1 className="text-white text-4xl font-bold mt-6 tracking-tight">Sonrisia</h1>
+          <h1 className="text-white text-4xl font-bold mt-6 tracking-tight">Ritest</h1>
         </div>
         {/* Barra de progreso animada */}
         <div className="w-64 mx-auto h-1.5 bg-white/20 rounded-full overflow-hidden">

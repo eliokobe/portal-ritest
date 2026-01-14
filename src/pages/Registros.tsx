@@ -366,7 +366,7 @@ export default function Registros() {
       </div>
 
       {/* Lista de registros */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -514,7 +514,7 @@ export default function Registros() {
       {/* Modal de Detalles */}
       {selectedRegistro && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-lg border border-gray-200 max-w-2xl w-full max-h-[90vh] overflow-y-auto transition-shadow hover:shadow-md">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">Detalles del Registro</h2>
               <div className="flex items-center gap-2">
@@ -809,7 +809,7 @@ export default function Registros() {
           }}
         >
           <div
-            className="relative w-full max-w-md bg-white rounded-2xl shadow-lg border border-gray-200 p-6"
+            className="relative w-full max-w-md bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 p-6"
             onClick={(event) => event.stopPropagation()}
           >
             <button

@@ -534,7 +534,7 @@ export const airtableService = {
       const assignedMap = new Map(last14Keys.map(k => [k, 0]));
       const resolvedMap = new Map(last14Keys.map(k => [k, 0]));
       
-      console.log(`Processing ${records.length} records for technician dashboard`);
+
       
       // Variables para las nuevas métricas
       let clientesPendientes = 0;
@@ -544,14 +544,28 @@ export const airtableService = {
       let tiempoTotalResolucionMes = 0;
       let contadorResolucionesMes = 0;
       
+      let serviciosFinalizados = 0;
+      let serviciosFinalizadosTecnico = 0;
+      
       records.forEach((r: any) => {
         const f = r.fields ?? {};
         const fechaRegistro = f['Fecha de registro'];
-        const ultimoCambio = f['Último cambio'];
+        const fechaCierre = f['Fecha cierre'];
         const estado = f['Estado'];
         const tecnico = f['Técnico'];
         const emailTrabajador = f['Email trabajador'];
         const tipoServicio = f['Tipo de servicio'];
+        
+        // DEBUG: Contar finalizados
+        if (estado === 'Finalizado') {
+          serviciosFinalizados++;
+          const isTecnicoEmpty = !tecnico || 
+            (typeof tecnico === 'string' && tecnico.trim() === '') || 
+            (Array.isArray(tecnico) && tecnico.length === 0);
+          if (isTecnicoEmpty) {
+            serviciosFinalizadosTecnico++;
+          }
+        }
         
         // Verificar si el servicio pertenece al técnico
         let belongsToTechnician = false;
@@ -581,8 +595,8 @@ export const airtableService = {
           (Array.isArray(tecnico) && tecnico.length === 0);
         
         // Incidencias resueltas: Estado = Finalizado, Técnico vacío, Email trabajador contiene el email del usuario, últimas 2 semanas
-        if (estado === 'Finalizado' && ultimoCambio) {
-          const resDate = new Date(ultimoCambio);
+        if (estado === 'Finalizado' && fechaCierre) {
+          const resDate = new Date(fechaCierre);
           
           // Solo contar si cumple todas las condiciones Y está en el rango de 2 semanas
           if (isTecnicoEmpty && belongsToTechnician && resDate >= fourteenDaysAgo && resDate <= now) {
@@ -627,7 +641,7 @@ export const airtableService = {
           const isCitaTecnico = estado === 'Citado' && citaTecnico;
           
           const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-          const isUltimoCambioOld = ultimoCambio && new Date(ultimoCambio) < twentyFourHoursAgo;
+          const isUltimoCambioOld = fechaCierre && new Date(fechaCierre) < twentyFourHoursAgo;
           
           // Estados que siempre requieren acción
           const estadosActivos = ['Sin contactar', 'Llamado', 'Pendiente de presupuesto', 'Pendiente de asignar', 'Formulario completado', 'Pendiente técnico', 'Pendiente de material', 'Presupuesto enviado'];
@@ -706,12 +720,17 @@ export const airtableService = {
         console.error('Error calculando velocidad de resolución:', error);
       }
       
-      console.log('Assigned by day:', assignedByDay);
-      console.log('Resolved by day:', resolvedByDay);
-      console.log('Clientes pendientes:', clientesPendientes);
-      console.log('Clientes resueltos hoy:', clientesResueltosHoy);
-      console.log('Promedio resolución remota mes:', promedioResolucionRemotaMes + '%');
-      console.log('Promedio velocidad resolución mes:', promedioVelocidadResolucionMes + 'h');
+      console.log('[DEBUG RESUMEN getTechnicianDashboardStats]');
+      console.log('- Total servicios procesados:', records.length);
+      console.log('- Servicios Finalizados:', serviciosFinalizados);
+      console.log('- Servicios Finalizados con Técnico vacío:', serviciosFinalizadosTecnico);
+      console.log('- Clientes resueltos hoy:', clientesResueltosHoy);
+      console.log('- Clientes pendientes:', clientesPendientes);
+      console.log('- Assigned by day:', assignedByDay);
+      console.log('- Resolved by day:', resolvedByDay);
+      console.log('- Promedio resolución remota mes:', promedioResolucionRemotaMes + '%');
+      console.log('- Promedio velocidad resolución mes:', promedioVelocidadResolucionMes + 'h');
+      
       
       return { 
         assignedByDay, 
@@ -786,7 +805,7 @@ export const airtableService = {
       
       records.forEach((r: any) => {
         const f = r.fields ?? {};
-        const fechaCierre = f['Último cambio']; // Fecha de cierre cuando se finaliza
+        const fechaCierre = f['Fecha cierre']; // Fecha de cierre cuando se finaliza
         const estado = f['Estado'];
         const tecnico = f['Técnico'];
         const emailTrabajador = f['Email trabajador'];

@@ -42,7 +42,7 @@ const Login: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-[radial-gradient(120%_120%_at_100%_0%,#008606_0%,#ffffff_55%),radial-gradient(120%_120%_at_0%_100%,#008606_0%,#ffffff_60%)]">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl p-8">
+      <div className="max-w-md w-full bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
         <div className="text-center mb-8">
           <img src="/ritest-logo.png" alt="Ritest" className="mx-auto mb-4 w-32 h-auto" />
           <p className="text-gray-600 mt-2">Portal de Gestión Operativa</p>
