@@ -1424,7 +1424,7 @@ export const airtableService = {
       // Si se está marcando como "Entregado", actualizar el servicio vinculado
       if (updates.estado === 'Entregado') {
         try {
-          // Obtener la información completa del envío para verificar el producto
+          // Obtener la información completa del envío para verificar el producto y técnico
           const { data } = await serviciosApi.get(`/${AIRTABLE_ENVIOS_TABLE}/${envioId}`);
           const envioData = (data as any)?.fields;
           
@@ -1432,7 +1432,17 @@ export const airtableService = {
           const productoRaw = envioData?.['Producto'];
           const producto = Array.isArray(productoRaw) ? productoRaw[0] : productoRaw;
           
+          // Obtener el técnico del envío (linked record, viene como array)
+          const tecnicoEnvio = envioData?.['Técnicos'];
+          const tecnicoId = Array.isArray(tecnicoEnvio) && tecnicoEnvio.length > 0 ? tecnicoEnvio[0] : null;
+          
           console.log(`[Airtable] Producto detectado: "${producto}" (tipo: ${typeof producto}, raw:`, productoRaw, ')');
+          console.log(`[Airtable] Técnicos en envío - raw:`, tecnicoEnvio, 'tecnicoId:', tecnicoId);
+          if (tecnicoId) {
+            console.log(`[Airtable] ✓ Técnico detectado en envío: ${tecnicoId}`);
+          } else {
+            console.log(`[Airtable] ✗ No se detectó técnico en el envío`);
+          }
           
           const esSoportePulsar = producto === 'Soporte Pulsar Plus' || producto === 'Soporte Pulsar Max';
           
@@ -1441,7 +1451,7 @@ export const airtableService = {
           
           if (servicioId) {
             if (esSoportePulsar) {
-              // Si es Soporte Pulsar Plus o Max, actualizar a "Finalizado" y "Resolución visita"
+              // Si es Soporte Pulsar Plus o Max, actualizar a "Finalizado" y "Resolución visita" (sin asignar técnico)
               await serviciosApi.patch(`/${AIRTABLE_SERVICES_TABLE}/${servicioId}`, {
                 fields: {
                   'Estado': 'Finalizado',
@@ -1451,7 +1461,19 @@ export const airtableService = {
               console.log(`[Airtable] Servicio ${servicioId} actualizado a "Finalizado" con resolución "Reset y actualización" tras entrega de "${producto}"`);
             } else {
               // Si no es Soporte Pulsar, actualizar a "Pendiente de asignar"
-              await this.updateServiceStatus(servicioId, 'Pendiente de asignar');
+              const updateFields: Record<string, any> = {
+                'Estado': 'Pendiente de asignar',
+              };
+              
+              // Si hay técnico en el envío, asignarlo al servicio (reemplazando el existente)
+              if (tecnicoId) {
+                updateFields['Técnico'] = [tecnicoId];
+                console.log(`[Airtable] Asignando técnico ${tecnicoId} al servicio ${servicioId} (reemplazando existente si lo hay)`);
+              }
+              
+              await serviciosApi.patch(`/${AIRTABLE_SERVICES_TABLE}/${servicioId}`, {
+                fields: updateFields,
+              });
               console.log(`[Airtable] Servicio ${servicioId} actualizado a "Pendiente de asignar" tras entrega del envío ${envioId} (producto: "${producto}")`);
             }
           }
@@ -1482,6 +1504,7 @@ export const airtableService = {
     codigoPostal?: string;
     provincia?: string;
     telefono?: string;
+    tecnico?: string[];
   }): Promise<void> {
     try {
       const fields: Record<string, any> = {
@@ -1502,6 +1525,7 @@ export const airtableService = {
           : undefined,
         'Provincia': envio.provincia,
         'Teléfono': envio.telefono,
+        'Técnicos': envio.tecnico, // Linked record a tabla Técnicos
       };
 
       // Eliminar claves undefined para evitar errores 422

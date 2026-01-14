@@ -1,26 +1,27 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleProtectedRoute from './components/RoleProtectedRoute';
 import Layout from './components/Layout';
+import LoadingScreen from './components/LoadingScreen';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Tasks from './pages/Tasks';
-import Settings from './pages/Settings';
-import Services from './pages/Services';
-import Tramitacion from './pages/Tramitacion';
-import Technicians from './pages/Technicians';
-import Resources from './pages/Resources';
-import Informe from './pages/Informe';
-import Registros from './pages/Registros';
-import Envios from './pages/Envios';
-import Inventario from './pages/Inventario';
-import Email from './pages/Email';
-import Agenda from './pages/Agenda';
-import Reparaciones from './pages/Reparaciones';
-import Buscador from './pages/Buscador';
-import Chatbot from './pages/Chatbot';
+
+// Lazy load de páginas para mejorar el rendimiento inicial
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Tasks = lazy(() => import('./pages/Tasks'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Services = lazy(() => import('./pages/Services'));
+const Tramitacion = lazy(() => import('./pages/Tramitacion'));
+const Technicians = lazy(() => import('./pages/Technicians'));
+const Resources = lazy(() => import('./pages/Resources'));
+const Registros = lazy(() => import('./pages/Registros'));
+const Envios = lazy(() => import('./pages/Envios'));
+const Inventario = lazy(() => import('./pages/Inventario'));
+const Agenda = lazy(() => import('./pages/Agenda'));
+const Reparaciones = lazy(() => import('./pages/Reparaciones'));
+const Buscador = lazy(() => import('./pages/Buscador'));
 
 const DefaultRoute = () => {
   const { user } = useAuth();
@@ -45,6 +46,10 @@ const queryClient = new QueryClient({
     queries: {
       retry: 1,
       refetchOnWindowFocus: false,
+      staleTime: 3 * 60 * 1000, // 3 minutos - considera los datos frescos durante este tiempo
+      gcTime: 10 * 60 * 1000, // 10 minutos - mantiene datos en caché (antes era cacheTime)
+      refetchOnMount: true, // Refresca al montar componente si los datos están stale
+      refetchOnReconnect: true, // Refresca al reconectar internet
     },
   },
 });
@@ -61,7 +66,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <Dashboard />
+                    <Suspense fallback={<LoadingScreen />}>
+                      <Dashboard />
+                    </Suspense>
                   </Layout>
                 </ProtectedRoute>
               }
@@ -71,7 +78,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <Tasks />
+                    <Suspense fallback={<LoadingScreen />}>
+                      <Tasks />
+                    </Suspense>
                   </Layout>
                 </ProtectedRoute>
               }
@@ -84,7 +93,9 @@ function App() {
                   redirectTo="/panel-grafico"
                 >
                   <Layout>
-                    <Services />
+                    <Suspense fallback={<LoadingScreen />}>
+                      <Services />
+                    </Suspense>
                   </Layout>
                 </RoleProtectedRoute>
               }
@@ -97,7 +108,9 @@ function App() {
                   redirectTo="/panel-grafico"
                 >
                   <Layout>
-                    <Reparaciones />
+                    <Suspense fallback={<LoadingScreen />}>
+                      <Reparaciones />
+                    </Suspense>
                   </Layout>
                 </RoleProtectedRoute>
               }
@@ -107,7 +120,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <Tramitacion />
+                    <Suspense fallback={<LoadingScreen />}>
+                      <Tramitacion />
+                    </Suspense>
                   </Layout>
                 </ProtectedRoute>
               }
@@ -117,19 +132,11 @@ function App() {
               element={
                 <RoleProtectedRoute allowedRoles={["Responsable"]} redirectTo="/panel-grafico">
                   <Layout>
-                    <Technicians />
+                    <Suspense fallback={<LoadingScreen />}>
+                      <Technicians />
+                    </Suspense>
                   </Layout>
                 </RoleProtectedRoute>
-              }
-            />
-            <Route
-              path="/email"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Email />
-                  </Layout>
-                </ProtectedRoute>
               }
             />
             <Route
@@ -137,17 +144,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <Resources />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/informe"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Informe />
+                    <Suspense fallback={<LoadingScreen />}>
+                      <Resources />
+                    </Suspense>
                   </Layout>
                 </ProtectedRoute>
               }
@@ -157,7 +156,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <Registros />
+                    <Suspense fallback={<LoadingScreen />}>
+                      <Registros />
+                    </Suspense>
                   </Layout>
                 </ProtectedRoute>
               }
@@ -167,7 +168,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <Envios />
+                    <Suspense fallback={<LoadingScreen />}>
+                      <Envios />
+                    </Suspense>
                   </Layout>
                 </ProtectedRoute>
               }
@@ -177,7 +180,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <Settings />
+                    <Suspense fallback={<LoadingScreen />}>
+                      <Settings />
+                    </Suspense>
                   </Layout>
                 </ProtectedRoute>
               }
@@ -187,7 +192,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <Inventario />
+                    <Suspense fallback={<LoadingScreen />}>
+                      <Inventario />
+                    </Suspense>
                   </Layout>
                 </ProtectedRoute>
               }
@@ -197,7 +204,9 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <Agenda />
+                    <Suspense fallback={<LoadingScreen />}>
+                      <Agenda />
+                    </Suspense>
                   </Layout>
                 </ProtectedRoute>
               }
@@ -207,22 +216,11 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Layout>
-                    <Buscador />
+                    <Suspense fallback={<LoadingScreen />}>
+                      <Buscador />
+                    </Suspense>
                   </Layout>
                 </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/chatbot"
-              element={
-                <RoleProtectedRoute
-                  allowedRoles={["Asesora energética"]}
-                  redirectTo="/panel-grafico"
-                >
-                  <Layout>
-                    <Chatbot />
-                  </Layout>
-                </RoleProtectedRoute>
               }
             />
             <Route path="/" element={<ProtectedRoute><DefaultRoute /></ProtectedRoute>} />

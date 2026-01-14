@@ -115,6 +115,7 @@ export interface Envio {
   provincia?: string;
   telefono?: string;
   conversationId?: string;
+  tecnico?: string | string[]; // Linked record a tabla Técnicos
 }
 
 export interface DashboardStats {

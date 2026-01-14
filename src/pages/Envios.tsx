@@ -94,6 +94,12 @@ export default function Envios() {
   const [servicios, setServicios] = useState<{ id: string; nombre: string; expediente?: string }[]>([]);
   const [serviciosInfo, setServiciosInfo] = useState<ServicioInfo[]>([]);
   const [catalogos, setCatalogos] = useState<CatalogoItem[]>([]);
+  
+  // Nuevos estados para el flujo de técnico
+  const [destinatarioType, setDestinatarioType] = useState<'cliente' | 'tecnico' | null>(null);
+  const [tecnicoSearch, setTecnicoSearch] = useState('');
+  const [tecnicos, setTecnicos] = useState<{ id: string; nombre: string }[]>([]);
+  const [selectedTecnico, setSelectedTecnico] = useState<{ id: string; nombre: string } | null>(null);
 
   // Determinar si el usuario es Gestora Operativa
   const isGestoraOperativa = user?.role === 'Gestora Operativa';
@@ -104,7 +110,18 @@ export default function Envios() {
     fetchEnvios();
     fetchServicios();
     fetchCatalogos();
+    fetchTecnicos();
   }, []);
+
+  const fetchTecnicos = async () => {
+    try {
+      const data = await airtableService.getTechnicians();
+      setTecnicos(data.map((t: any) => ({ id: t.id, nombre: t.nombre })));
+    } catch (error) {
+      console.error('Error fetching técnicos:', error);
+      setTecnicos([]);
+    }
+  };
 
   const fetchEnvios = async () => {
     try {
@@ -760,13 +777,114 @@ export default function Envios() {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-gray-900">Añadir Nuevo Envío</h2>
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => {
+                  setShowModal(false);
+                  setDestinatarioType(null);
+                  setSelectedTecnico(null);
+                  setTecnicoSearch('');
+                }}
                 className="text-gray-400 hover:text-gray-600"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form
+
+            {/* Paso 1: Seleccionar tipo de destinatario */}
+            {!destinatarioType && (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600 mb-4">¿El envío es para un cliente o un técnico?</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setDestinatarioType('cliente')}
+                    className="px-6 py-4 border-2 border-gray-300 rounded-lg hover:border-brand-primary hover:bg-brand-primary/5 transition-colors font-medium"
+                  >
+                    Cliente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDestinatarioType('tecnico')}
+                    className="px-6 py-4 border-2 border-gray-300 rounded-lg hover:border-brand-primary hover:bg-brand-primary/5 transition-colors font-medium"
+                  >
+                    Técnico
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Paso 2: Si es técnico, mostrar buscador de técnicos */}
+            {destinatarioType === 'tecnico' && !selectedTecnico && (
+              <div className="space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setDestinatarioType(null)}
+                  className="text-sm text-gray-600 hover:text-gray-900 mb-4"
+                >
+                  ← Volver
+                </button>
+                <div>
+                  <label htmlFor="tecnicoSearch" className="block text-sm font-medium text-gray-700 mb-1">
+                    Buscar Técnico
+                  </label>
+                  <input
+                    type="text"
+                    id="tecnicoSearch"
+                    value={tecnicoSearch}
+                    onChange={(e) => setTecnicoSearch(e.target.value)}
+                    placeholder="Escribe el nombre del técnico..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                    autoFocus
+                  />
+                </div>
+                {tecnicoSearch && (
+                  <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg divide-y">
+                    {tecnicos
+                      .filter(t => t.nombre.toLowerCase().includes(tecnicoSearch.toLowerCase()))
+                      .map(tecnico => (
+                        <button
+                          key={tecnico.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTecnico(tecnico);
+                            setNewEnvio(prev => ({
+                              ...prev,
+                              tecnico: tecnico.id,
+                            }));
+                          }}
+                          className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                        >
+                          <p className="font-medium text-gray-900">{tecnico.nombre}</p>
+                        </button>
+                      ))}
+                    {tecnicos.filter(t => t.nombre.toLowerCase().includes(tecnicoSearch.toLowerCase())).length === 0 && (
+                      <p className="px-4 py-3 text-sm text-gray-500">No se encontraron técnicos</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Paso 3: Formulario principal (cliente o después de seleccionar técnico) */}
+            {(destinatarioType === 'cliente' || (destinatarioType === 'tecnico' && selectedTecnico)) && (
+              <>
+                {selectedTecnico && (
+                  <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-gray-600">Envío para técnico:</p>
+                    <p className="font-medium text-gray-900">{selectedTecnico.nombre}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTecnico(null);
+                        setTecnicoSearch('');
+                        setNewEnvio(prev => ({ ...prev, tecnico: undefined }));
+                      }}
+                      className="text-xs text-brand-primary hover:text-brand-primary/80 mt-1"
+                    >
+                      Cambiar técnico
+                    </button>
+                  </div>
+                )}
+                <form
               onSubmit={async (e) => {
                 e.preventDefault();
                 if (!newEnvio.servicio) return;
@@ -774,7 +892,7 @@ export default function Envios() {
                 try {
                   // Crear el envío en Airtable
                   const numeroAuto = expedienteQuery?.trim() ? expedienteQuery.trim() : undefined;
-                  await airtableService.createEnvio({
+                  const envioData: any = {
                     numero: numeroAuto,
                     servicio: newEnvio.servicio || '',
                     catalogo: newEnvio.catalogo,
@@ -784,7 +902,14 @@ export default function Envios() {
                     codigoPostal: newEnvio.codigoPostal,
                     provincia: newEnvio.provincia,
                     telefono: newEnvio.telefono,
-                  });
+                  };
+                  
+                  // Si hay técnico seleccionado, añadirlo
+                  if (selectedTecnico) {
+                    envioData.tecnico = [selectedTecnico.id]; // Airtable linked records requieren array
+                  }
+                  
+                  await airtableService.createEnvio(envioData);
                   await fetchEnvios();
                   setNewEnvio({
                     servicio: '',
@@ -798,6 +923,9 @@ export default function Envios() {
                   });
                   setExpedienteQuery('');
                   setExpedienteError(null);
+                  setDestinatarioType(null);
+                  setSelectedTecnico(null);
+                  setTecnicoSearch('');
                   setShowModal(false);
                 } catch (error) {
                   alert('Error al crear el envío.');
@@ -834,7 +962,7 @@ export default function Envios() {
                 </div>
                 {expedienteError && <p className="text-xs text-red-600 mt-1">{expedienteError}</p>}
                 {newEnvio.servicio && !expedienteError && (
-                  <p className="text-xs text-green-600 mt-1">Expediente vinculado</p>
+                  <p className="text-xs text-green-600 mt-1">Número vinculado</p>
                 )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -945,7 +1073,12 @@ export default function Envios() {
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => {
+                    setShowModal(false);
+                    setDestinatarioType(null);
+                    setSelectedTecnico(null);
+                    setTecnicoSearch('');
+                  }}
                   className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Cancelar
@@ -959,6 +1092,8 @@ export default function Envios() {
                 </button>
               </div>
             </form>
+              </>
+            )}
           </div>
         </div>
       )}

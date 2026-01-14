@@ -1,10 +1,278 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, memo, useMemo } from 'react';
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Wrench, CheckCircle, AlertCircle, CheckSquare } from 'lucide-react';
 import { DashboardStats } from '../types';
 import { airtableService } from '../services/airtable';
 import { supabaseService } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
+
+// Componente memoizado para tarjetas de estadísticas
+const StatCard = memo<{ label: string; value: number }>(({ label, value }) => (
+  <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
+    <p className="text-sm font-medium text-gray-600">{label}</p>
+    <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
+  </div>
+));
+StatCard.displayName = 'StatCard';
+
+// Componente memoizado para gráfico de barras de tiempo
+const TimeBarChart = memo<{ 
+  data: { date: string; avgHours: number; count: number }[];
+  title: string;
+  description: string;
+  countLabel: string;
+}>(({ data, title, description, countLabel }) => (
+  <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
+    <h3 className="text-xl font-bold text-gray-900 mb-2">{title}</h3>
+    <p className="text-sm text-gray-500 mb-8">{description}</p>
+    <ResponsiveContainer width="100%" height={400}>
+      <BarChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" strokeOpacity={0.5} />
+        <XAxis 
+          dataKey="date" 
+          tickFormatter={(value) => new Date(value).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+          stroke="#6b7280"
+          style={{ fontSize: '12px', fontWeight: 500 }}
+        />
+        <YAxis 
+          label={{ value: 'Horas', angle: -90, position: 'insideLeft', style: { fontSize: '14px', fontWeight: 600, fill: '#374151' } }}
+          stroke="#6b7280"
+          style={{ fontSize: '12px', fontWeight: 500 }}
+        />
+        <Tooltip 
+          contentStyle={{
+            backgroundColor: 'rgba(255, 255, 255, 0.98)',
+            border: 'none',
+            borderRadius: '12px',
+            padding: '12px 16px'
+          }}
+          labelFormatter={(value) => new Date(value).toLocaleDateString('es-ES', { 
+            weekday: 'long', 
+            day: 'numeric', 
+            month: 'short',
+            year: 'numeric'
+          })}
+          formatter={(value: any, name: string | undefined) => {
+            if (name === 'avgHours') return [`${value} horas`, 'Tiempo promedio'];
+            if (name === 'count') return [`${value} ${countLabel}`, 'Completados'];
+            return [value, name || ''];
+          }}
+        />
+        <Bar 
+          dataKey="avgHours" 
+          fill="#008606" 
+          name="avgHours" 
+          radius={[8, 8, 0, 0]}
+          maxBarSize={60}
+        />
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+));
+TimeBarChart.displayName = 'TimeBarChart';
+
+// Componente memoizado para gráfico de dona (estados)
+const EstadosPieChart = memo<{
+  data: { name: string; value: number; percentage: number }[];
+  title: string;
+  description: string;
+}>(({ data, title, description }) => {
+  const colors = useMemo(() => [
+    '#1F4D11', '#2E7016', '#3D931A', '#4DB61F',
+    '#5CD923', '#6BFC28', '#008606'
+  ], []);
+  
+  const total = useMemo(() => 
+    data.reduce((sum, item) => sum + item.value, 0), 
+    [data]
+  );
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
+      <h3 className="text-xl font-bold text-gray-900 mb-2">{title}</h3>
+      <p className="text-sm text-gray-500 mb-8">{description}</p>
+      <div className="flex flex-col lg:flex-row items-center justify-center gap-12">
+        <div className="relative">
+          <ResponsiveContainer width={350} height={350}>
+            <PieChart>
+              <Pie
+                data={data}
+                cx="50%"
+                cy="50%"
+                innerRadius={85}
+                outerRadius={130}
+                fill="#8884d8"
+                dataKey="value"
+                paddingAngle={3}
+                stroke="#fff"
+                strokeWidth={3}
+              >
+                {data.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                ))}
+              </Pie>
+              <Tooltip 
+                contentStyle={{
+                  backgroundColor: 'rgba(255, 255, 255, 0.98)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  padding: '12px 16px'
+                }}
+                formatter={(value: any, _name: string | undefined, props: any) => [
+                  `${value} registros (${props.payload.percentage}%)`,
+                  props.payload.name
+                ]}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="text-center">
+              <div className="text-4xl font-bold text-gray-900">{total}</div>
+              <div className="text-sm text-gray-500 mt-1">Total</div>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col gap-3 max-w-md">
+          {data.map((estado, index) => (
+            <div 
+              key={estado.name} 
+              className="flex items-center gap-4 p-3 rounded-lg bg-white border border-gray-100"
+            >
+              <div 
+                className="w-3 h-3 rounded-full" 
+                style={{ backgroundColor: colors[index % colors.length] }}
+              />
+              <span className="text-sm font-semibold text-gray-900 flex-1">{estado.name}</span>
+              <div className="text-right">
+                <div className="text-sm font-bold text-gray-900">{estado.value}</div>
+                <div className="text-xs text-gray-500">{estado.percentage}%</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+});
+EstadosPieChart.displayName = 'EstadosPieChart';
+
+// Componente memoizado para gráficos de porcentaje (resolución remota, 24h)
+const PercentageBarChart = memo<{
+  data: { week: string; percentage24h?: number; remotePercentage?: number; totalCases?: number; totalServices?: number }[];
+  title: string;
+  description: string;
+  dataKey: string;
+  yAxisLabel: string;
+  tooltipLabel: string;
+}>(({ data, title, description, dataKey, yAxisLabel, tooltipLabel }) => (
+  <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
+    <h3 className="text-xl font-bold text-gray-900 mb-2">{title}</h3>
+    <p className="text-sm text-gray-500 mb-8">{description}</p>
+    <ResponsiveContainer width="100%" height={400}>
+      <BarChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" strokeOpacity={0.5} />
+        <XAxis 
+          dataKey="week" 
+          tickFormatter={(value) => {
+            const [year, month, day] = value.split('-');
+            const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            return `Sem ${date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`;
+          }}
+          stroke="#6b7280"
+          style={{ fontSize: '12px', fontWeight: 500 }}
+        />
+        <YAxis 
+          label={{ value: yAxisLabel, angle: -90, position: 'insideLeft', style: { fontSize: '14px', fontWeight: 600, fill: '#374151' } }}
+          stroke="#6b7280"
+          style={{ fontSize: '12px', fontWeight: 500 }}
+          domain={[0, 100]}
+        />
+        <Tooltip 
+          contentStyle={{
+            backgroundColor: 'rgba(255, 255, 255, 0.98)',
+            border: 'none',
+            borderRadius: '12px',
+            padding: '12px 16px'
+          }}
+          labelFormatter={(value) => {
+            const [year, month, day] = value.split('-');
+            const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+            return `Semana del ${date.toLocaleDateString('es-ES', { 
+              day: 'numeric', 
+              month: 'long',
+              year: 'numeric'
+            })}`;
+          }}
+          formatter={(value: any, name: string | undefined, props: any) => {
+            const total = props.payload.totalCases || props.payload.totalServices;
+            return [`${value}% (${total} casos)`, tooltipLabel];
+          }}
+        />
+        <Bar 
+          dataKey={dataKey} 
+          fill="#008606" 
+          name={dataKey}
+          radius={[8, 8, 0, 0]}
+          maxBarSize={60}
+        />
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+));
+PercentageBarChart.displayName = 'PercentageBarChart';
+
+// Componente memoizado para gráficos simples de barras (asignados, resueltos)
+const SimpleBarChart = memo<{
+  data: { date: string; count: number }[];
+  title: string;
+  description: string;
+  yAxisLabel: string;
+  tooltipLabel: string;
+}>(({ data, title, description, yAxisLabel, tooltipLabel }) => (
+  <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
+    <h3 className="text-xl font-bold text-gray-900 mb-2">{title}</h3>
+    <p className="text-sm text-gray-500 mb-8">{description}</p>
+    <ResponsiveContainer width="100%" height={400}>
+      <BarChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" strokeOpacity={0.5} />
+        <XAxis 
+          dataKey="date" 
+          tickFormatter={(value) => new Date(value).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+          stroke="#6b7280"
+          style={{ fontSize: '12px', fontWeight: 500 }}
+        />
+        <YAxis 
+          label={{ value: yAxisLabel, angle: -90, position: 'insideLeft', style: { fontSize: '14px', fontWeight: 600, fill: '#374151' } }}
+          stroke="#6b7280"
+          style={{ fontSize: '12px', fontWeight: 500 }}
+        />
+        <Tooltip 
+          contentStyle={{
+            backgroundColor: 'rgba(255, 255, 255, 0.98)',
+            border: 'none',
+            borderRadius: '12px',
+            padding: '12px 16px'
+          }}
+          labelFormatter={(value) => new Date(value).toLocaleDateString('es-ES', { 
+            weekday: 'long', 
+            day: 'numeric', 
+            month: 'short',
+            year: 'numeric'
+          })}
+          formatter={(value: any) => [`${value} ${tooltipLabel.toLowerCase()}`, tooltipLabel]}
+        />
+        <Bar 
+          dataKey="count" 
+          fill="#008606" 
+          name={tooltipLabel}
+          radius={[8, 8, 0, 0]}
+          maxBarSize={60}
+        />
+      </BarChart>
+    </ResponsiveContainer>
+  </div>
+));
+SimpleBarChart.displayName = 'SimpleBarChart';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -146,25 +414,10 @@ const Dashboard: React.FC = () => {
 
         {/* Tarjetas de resumen para Administrativa */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
-            <p className="text-sm font-medium text-gray-600">Pendientes de tramitar</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{adminStats.unsynchronizedCount}</p>
-          </div>
-          
-          <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
-            <p className="text-sm font-medium text-gray-600">Envíos pendientes</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{adminStats.enviosPendientesCount}</p>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
-            <p className="text-sm font-medium text-gray-600">Asesoramientos pendientes</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{asesoramientosStats.totalRegistros}</p>
-          </div>
-          
-          <div className="bg-white rounded-lg border border-gray-100 p-6 hover:border-gray-200 transition-colors">
-            <p className="text-sm font-medium text-gray-600">Reparaciones pendientes</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{adminStats.reparacionesPendientesCount}</p>
-          </div>
+          <StatCard label="Pendientes de tramitar" value={adminStats.unsynchronizedCount} />
+          <StatCard label="Envíos pendientes" value={adminStats.enviosPendientesCount} />
+          <StatCard label="Asesoramientos pendientes" value={asesoramientosStats.totalRegistros} />
+          <StatCard label="Reparaciones pendientes" value={adminStats.reparacionesPendientesCount} />
         </div>
 
         {/* Gráficos de asesoramientos lado a lado */}
@@ -172,137 +425,21 @@ const Dashboard: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Gráfico de tiempo de asesoramientos */}
             {asesoramientoTimeStats && asesoramientoTimeStats.dailyData.length > 0 && (
-              <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Tiempo de Asesoramientos</h3>
-                <p className="text-sm text-gray-500 mb-8">Promedio de horas desde que se crea el registro hasta que se marca como Informe/Ilocalizable/No interesado (Mes actual)</p>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={asesoramientoTimeStats.dailyData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" strokeOpacity={0.5} />
-                    <XAxis 
-                      dataKey="date" 
-                      tickFormatter={(value) => new Date(value).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                      stroke="#6b7280"
-                      style={{ fontSize: '12px', fontWeight: 500 }}
-                    />
-                    <YAxis 
-                      label={{ value: 'Horas', angle: -90, position: 'insideLeft', style: { fontSize: '14px', fontWeight: 600, fill: '#374151' } }}
-                      stroke="#6b7280"
-                      style={{ fontSize: '12px', fontWeight: 500 }}
-                    />
-                    <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                        border: 'none',
-                        borderRadius: '12px',
-                        padding: '12px 16px'
-                      }}
-                      labelFormatter={(value) => new Date(value).toLocaleDateString('es-ES', { 
-                        weekday: 'long', 
-                        day: 'numeric', 
-                        month: 'short',
-                        year: 'numeric'
-                      })}
-                      formatter={(value: any, name: string | undefined) => {
-                        if (name === 'avgHours') return [`${value} horas`, 'Tiempo promedio'];
-                        if (name === 'count') return [`${value} registros`, 'Completados'];
-                        return [value, name || ''];
-                      }}
-                    />
-                    <Bar 
-                      dataKey="avgHours" 
-                      fill="#008606" 
-                      name="avgHours" 
-                      radius={[8, 8, 0, 0]}
-                      maxBarSize={60}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <TimeBarChart 
+                data={asesoramientoTimeStats.dailyData}
+                title="Tiempo de Asesoramientos"
+                description="Promedio de horas desde que se crea el registro hasta que se marca como Informe/Ilocalizable/No interesado (Mes actual)"
+                countLabel="registros"
+              />
             )}
 
             {/* Gráfico de distribución de estados de asesoramientos */}
             {asesoramientosEstadosStats && asesoramientosEstadosStats.estadosData.length > 0 && (
-              <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Distribución de Estados de Asesoramientos</h3>
-            <p className="text-sm text-gray-500 mb-8">Registros del mes actual por estado</p>
-            <div className="flex flex-col lg:flex-row items-center justify-center gap-12">
-              <div className="relative">
-                <ResponsiveContainer width={350} height={350}>
-                  <PieChart>
-                    <Pie
-                      data={asesoramientosEstadosStats.estadosData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={85}
-                      outerRadius={130}
-                      fill="#8884d8"
-                      dataKey="value"
-                      paddingAngle={3}
-                      stroke="#fff"
-                      strokeWidth={3}
-                    >
-                      {asesoramientosEstadosStats.estadosData.map((_, index) => {
-                        const colors = [
-                          '#1F4D11', // Verde oscuro
-                          '#2E7016', // Verde medio oscuro
-                          '#3D931A', // Verde medio
-                          '#4DB61F', // Verde medio claro
-                          '#5CD923', // Verde claro medio
-                          '#6BFC28', // Verde claro
-                          '#008606', // Verde claro brillante
-                        ];
-                        return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
-                      })}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                        border: 'none',
-                        borderRadius: '12px',
-                        padding: '12px 16px'
-                      }}
-                      formatter={(value: any, _name: string | undefined, props: any) => [
-                        `${value} registros (${props.payload.percentage}%)`,
-                        props.payload.name
-                      ]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="text-center">
-                    <div className="text-4xl font-bold text-gray-900">
-                      {asesoramientosEstadosStats.estadosData.reduce((sum, item) => sum + item.value, 0)}
-                    </div>
-                    <div className="text-sm text-gray-500 mt-1">Total</div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-col gap-3 max-w-md">
-                {asesoramientosEstadosStats.estadosData.map((estado, index) => {
-                  const colors = [
-                    '#1F4D11', '#2E7016', '#3D931A', '#4DB61F',
-                    '#5CD923', '#6BFC28', '#008606'
-                  ];
-                  return (
-                    <div 
-                      key={estado.name} 
-                      className="flex items-center gap-4 p-3 rounded-lg bg-white border border-gray-100"
-                    >
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: colors[index % colors.length] }}
-                      />
-                      <span className="text-sm font-semibold text-gray-900 flex-1">{estado.name}</span>
-                      <div className="text-right">
-                        <div className="text-sm font-bold text-gray-900">{estado.value}</div>
-                        <div className="text-xs text-gray-500">{estado.percentage}%</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-              </div>
+              <EstadosPieChart
+                data={asesoramientosEstadosStats.estadosData}
+                title="Distribución de Estados de Asesoramientos"
+                description="Registros del mes actual por estado"
+              />
             )}
           </div>
         ) : null}
@@ -312,102 +449,22 @@ const Dashboard: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Gráfico de tiempo de recogida */}
             {recogidaTimeStats && recogidaTimeStats.dailyData.length > 0 && (
-              <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Tiempo de Recogida</h3>
-                <p className="text-sm text-gray-500 mb-8">Promedio de horas desde que se crea la recogida hasta que se envía (Mes actual)</p>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={recogidaTimeStats.dailyData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" strokeOpacity={0.5} />
-                    <XAxis 
-                      dataKey="date" 
-                      tickFormatter={(value) => new Date(value).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                      stroke="#6b7280"
-                      style={{ fontSize: '12px', fontWeight: 500 }}
-                    />
-                    <YAxis 
-                      label={{ value: 'Horas', angle: -90, position: 'insideLeft', style: { fontSize: '14px', fontWeight: 600, fill: '#374151' } }}
-                      stroke="#6b7280"
-                      style={{ fontSize: '12px', fontWeight: 500 }}
-                    />
-                    <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                        border: 'none',
-                        borderRadius: '12px',
-                        padding: '12px 16px'
-                      }}
-                      labelFormatter={(value) => new Date(value).toLocaleDateString('es-ES', { 
-                        weekday: 'long', 
-                        day: 'numeric', 
-                        month: 'short',
-                        year: 'numeric'
-                      })}
-                      formatter={(value: any, name: string | undefined) => {
-                        if (name === 'avgHours') return [`${value} horas`, 'Tiempo promedio'];
-                        if (name === 'count') return [`${value} recogidas`, 'Enviadas'];
-                        return [value, name || ''];
-                      }}
-                    />
-                    <Bar 
-                      dataKey="avgHours" 
-                      fill="#008606" 
-                      name="avgHours" 
-                      radius={[8, 8, 0, 0]}
-                      maxBarSize={60}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <TimeBarChart
+                data={recogidaTimeStats.dailyData}
+                title="Tiempo de Recogida"
+                description="Promedio de horas desde que se crea la recogida hasta que se envía (Mes actual)"
+                countLabel="recogidas"
+              />
             )}
 
             {/* Gráfico de tiempo de tramitación */}
             {tramitacionTimeStats && tramitacionTimeStats.dailyData.length > 0 && (
-              <div className="bg-white rounded-lg border border-gray-200 p-8 transition-shadow hover:shadow-md">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">Tiempo de Tramitación</h3>
-                <p className="text-sm text-gray-500 mb-8">Promedio de horas desde que aparece en Tramitaciones hasta que se tramita (Mes actual)</p>
-                <ResponsiveContainer width="100%" height={400}>
-                  <BarChart data={tramitacionTimeStats.dailyData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" strokeOpacity={0.5} />
-                    <XAxis 
-                      dataKey="date" 
-                      tickFormatter={(value) => new Date(value).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                      stroke="#6b7280"
-                      style={{ fontSize: '12px', fontWeight: 500 }}
-                    />
-                    <YAxis 
-                      label={{ value: 'Horas', angle: -90, position: 'insideLeft', style: { fontSize: '14px', fontWeight: 600, fill: '#374151' } }}
-                      stroke="#6b7280"
-                      style={{ fontSize: '12px', fontWeight: 500 }}
-                    />
-                    <Tooltip 
-                      contentStyle={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                        border: 'none',
-                        borderRadius: '12px',
-                        padding: '12px 16px'
-                      }}
-                      labelFormatter={(value) => new Date(value).toLocaleDateString('es-ES', { 
-                        weekday: 'long', 
-                        day: 'numeric', 
-                        month: 'short',
-                        year: 'numeric'
-                      })}
-                      formatter={(value: any, name: string | undefined) => {
-                        if (name === 'avgHours') return [`${value} horas`, 'Tiempo promedio'];
-                        if (name === 'count') return [`${value} registros`, 'Tramitados'];
-                        return [value, name || ''];
-                      }}
-                    />
-                    <Bar 
-                      dataKey="avgHours" 
-                      fill="#008606" 
-                      name="avgHours" 
-                      radius={[8, 8, 0, 0]}
-                      maxBarSize={60}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <TimeBarChart
+                data={tramitacionTimeStats.dailyData}
+                title="Tiempo de Tramitación"
+                description="Promedio de horas desde que aparece en Tramitaciones hasta que se tramita (Mes actual)"
+                countLabel="registros"
+              />
             )}
           </div>
         ) : null}

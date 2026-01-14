@@ -3,9 +3,20 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
+const compression = require('compression');
+const NodeCache = require('node-cache');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+
+// Configuración de caché en memoria
+// stdTTL: 180 segundos (3 minutos) - tiempo que los datos se consideran frescos
+// checkperiod: 60 segundos - cada cuánto limpia datos expirados
+const cache = new NodeCache({ 
+  stdTTL: 180, 
+  checkperiod: 60,
+  useClones: false // Mejora el rendimiento
+});
 
 // Configuración de Airtable
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
@@ -19,6 +30,9 @@ app.use(cors({
   credentials: true
 }));
 
+// Compresión GZIP para reducir tamaño de respuestas
+app.use(compression());
+
 app.use(express.json());
 
 // Función para crear cliente de Airtable
@@ -30,6 +44,42 @@ function createAirtableClient(baseId) {
       'Content-Type': 'application/json'
     }
   });
+}
+
+// ============================================
+// MIDDLEWARE DE CACHÉ
+// ============================================
+function cacheMiddleware(req, res, next) {
+  // Solo cachear peticiones GET
+  if (req.method !== 'GET') {
+    return next();
+  }
+
+  // Crear clave única basada en URL y query params
+  const cacheKey = `${req.path}?${JSON.stringify(req.query)}`;
+  
+  // Verificar si existe en caché
+  const cachedData = cache.get(cacheKey);
+  
+  if (cachedData) {
+    console.log(`💾 Cache HIT: ${req.path}`);
+    return res.json(cachedData);
+  }
+  
+  console.log(`🔄 Cache MISS: ${req.path}`);
+  
+  // Guardar función original de res.json
+  const originalJson = res.json.bind(res);
+  
+  // Sobrescribir res.json para cachear la respuesta
+  res.json = function(data) {
+    // Guardar en caché
+    cache.set(cacheKey, data);
+    // Enviar respuesta original
+    return originalJson(data);
+  };
+  
+  next();
 }
 
 // ============================================
@@ -46,7 +96,7 @@ app.get('/api/health', (req, res) => {
 // ============================================
 // PROXY SERVICIOS (sin autenticación JWT)
 // ============================================
-app.all('/api/servicios/:tableName*', async (req, res) => {
+app.all('/api/servicios/:tableName*', cacheMiddleware, async (req, res) => {
   try {
     const { tableName } = req.params;
     const path = req.params[0] || '';
@@ -71,7 +121,7 @@ app.all('/api/servicios/:tableName*', async (req, res) => {
   }
 });
 
-app.all('/servicios/:tableName*', async (req, res) => {
+app.all('/servicios/:tableName*', cacheMiddleware, async (req, res) => {
   try {
     const { tableName } = req.params;
     const path = req.params[0] || '';
@@ -99,7 +149,7 @@ app.all('/servicios/:tableName*', async (req, res) => {
 // ============================================
 // PROXY REGISTROS (sin autenticación JWT)
 // ============================================
-app.all('/api/registros/:tableName*', async (req, res) => {
+app.all('/api/registros/:tableName*', cacheMiddleware, async (req, res) => {
   try {
     const { tableName } = req.params;
     const path = req.params[0] || '';
@@ -124,7 +174,7 @@ app.all('/api/registros/:tableName*', async (req, res) => {
   }
 });
 
-app.all('/registros/:tableName*', async (req, res) => {
+app.all('/registros/:tableName*', cacheMiddleware, async (req, res) => {
   try {
     const { tableName } = req.params;
     const path = req.params[0] || '';
