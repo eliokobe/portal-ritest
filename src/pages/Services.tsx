@@ -545,12 +545,12 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
         // Verificar si hay "Pendiente revisión" antes del filtro de técnico
         const pendientesRevision = servicesWithAllowedStates.filter(s => s.estado === 'Pendiente revisión');
         console.log('Services - Pendientes revisión ANTES filtro técnico:', pendientesRevision.length, pendientesRevision.map(s => ({exp: s.expediente, tecnico: s.tecnico})));
-        // Excluir servicios que tienen la columna "Técnico" rellena, EXCEPTO si el estado es "Pendiente revisión"
+        // Excluir servicios que tienen la columna "Técnico" rellena, EXCEPTO si el estado es "Pendiente revisión" o "Presupuesto enviado"
         const beforeTecnicoFilter = servicesWithAllowedStates.length;
         servicesWithAllowedStates = servicesWithAllowedStates.filter(
           (s) => {
-            // Si es "Pendiente revisión", siempre incluirlo sin importar si tiene técnico asignado
-            if (s.estado === 'Pendiente revisión') return true;
+            // Si es "Pendiente revisión" o "Presupuesto enviado", siempre incluirlo sin importar si tiene técnico asignado
+            if (s.estado === 'Pendiente revisión' || s.estado === 'Presupuesto enviado') return true;
             
             if (!s.tecnico) return true;
             if (typeof s.tecnico === 'string') return s.tecnico.trim() === '';
@@ -2793,10 +2793,14 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                         pendingEstadoChange.newEstado
                       );
                       
-                      // Actualizar la resolución visita
+                      // Actualizar el campo correspondiente según el estado
+                      const fieldName = pendingEstadoChange.newEstado === 'Presupuesto enviado' 
+                        ? 'Presupuesto' 
+                        : 'Resolución visita';
+                      
                       await airtableService.updateServiceField(
                         pendingEstadoChange.serviceId,
-                        'Resolución visita',
+                        fieldName,
                         opcion
                       );
 
