@@ -1067,14 +1067,31 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     }
 
     const [, day, month, year, hours, minutes] = match;
+    const dayNum = parseInt(day);
+    const monthNum = parseInt(month);
+    const yearNum = parseInt(year);
+    const hoursNum = parseInt(hours);
+    const minutesNum = parseInt(minutes);
+
+    // Validar rangos básicos
+    if (monthNum < 1 || monthNum > 12) return null;
+    if (dayNum < 1 || dayNum > 31) return null;
+    if (hoursNum < 0 || hoursNum > 23) return null;
+    if (minutesNum < 0 || minutesNum > 59) return null;
+
     try {
-      const date = new Date(
-        parseInt(year),
-        parseInt(month) - 1,
-        parseInt(day),
-        parseInt(hours),
-        parseInt(minutes)
-      );
+      const date = new Date(yearNum, monthNum - 1, dayNum, hoursNum, minutesNum);
+      
+      // Verificar que la fecha creada corresponde a los valores ingresados
+      // (evita fechas como 31/02/2026 que JavaScript ajusta automáticamente)
+      if (date.getDate() !== dayNum || 
+          date.getMonth() !== monthNum - 1 || 
+          date.getFullYear() !== yearNum ||
+          date.getHours() !== hoursNum ||
+          date.getMinutes() !== minutesNum) {
+        return null;
+      }
+      
       return date;
     } catch {
       return null;
@@ -2507,11 +2524,44 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                   {(() => {
                     // Recolectar todas las fotos del formulario
                     const formulario = formularios.length > 0 ? formularios[0] : null;
-                    const fotoGeneral = formulario?.['Foto general'];
-                    const hasPhoto = Array.isArray(fotoGeneral) && fotoGeneral.length > 0;
                     
-                    // Si hay formulario pero no tiene foto general, usar fallback
-                    const displayFormulario = formulario && !hasPhoto ? _fallbackFormulario : formulario;
+                    // Verificar si el formulario tiene alguna foto
+                    const formularioTieneFotos = formulario && (
+                      (Array.isArray(formulario['Foto general']) && formulario['Foto general'].length > 0) ||
+                      (Array.isArray(formulario['Foto etiqueta']) && formulario['Foto etiqueta'].length > 0) ||
+                      (Array.isArray(formulario['Foto roto']) && formulario['Foto roto'].length > 0) ||
+                      (Array.isArray(formulario['Foto cuadro']) && formulario['Foto cuadro'].length > 0)
+                    );
+                    
+                    // Recolectar fotos de las reparaciones primero para verificar si existen
+                    const fotosReparacionesPrevias: Array<{ foto: any; tipo: string; reparacionNum: number }> = [];
+                    reparaciones.forEach((reparacion, idx) => {
+                      if (reparacion.Foto && Array.isArray(reparacion.Foto) && reparacion.Foto.length > 0) {
+                        reparacion.Foto.forEach((foto: any) => {
+                          fotosReparacionesPrevias.push({ foto, tipo: 'Foto reparación', reparacionNum: idx + 1 });
+                        });
+                      } else if (reparacion.foto && Array.isArray(reparacion.foto) && reparacion.foto.length > 0) {
+                        reparacion.foto.forEach((foto: any) => {
+                          fotosReparacionesPrevias.push({ foto, tipo: 'Foto reparación', reparacionNum: idx + 1 });
+                        });
+                      }
+                      
+                      if (reparacion['Foto de la etiqueta'] && Array.isArray(reparacion['Foto de la etiqueta']) && reparacion['Foto de la etiqueta'].length > 0) {
+                        reparacion['Foto de la etiqueta'].forEach((foto: any) => {
+                          fotosReparacionesPrevias.push({ foto, tipo: 'Foto etiqueta reparación', reparacionNum: idx + 1 });
+                        });
+                      } else if (reparacion.fotoEtiqueta && Array.isArray(reparacion.fotoEtiqueta) && reparacion.fotoEtiqueta.length > 0) {
+                        reparacion.fotoEtiqueta.forEach((foto: any) => {
+                          fotosReparacionesPrevias.push({ foto, tipo: 'Foto etiqueta reparación', reparacionNum: idx + 1 });
+                        });
+                      }
+                    });
+                    
+                    const reparacionesTieneFotos = fotosReparacionesPrevias.length > 0;
+                    
+                    // Lógica de fallback: si no hay fotos en formulario ni en reparaciones, usar fallback
+                    const usarFallback = !formularioTieneFotos && !reparacionesTieneFotos;
+                    const displayFormulario = usarFallback ? _fallbackFormulario : formulario;
                     
                     const fotosFormularioGeneral = displayFormulario?.['Foto general'] && Array.isArray(displayFormulario['Foto general']) && displayFormulario['Foto general'].length > 0
                       ? displayFormulario['Foto general']
@@ -2526,31 +2576,8 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
                       ? displayFormulario['Foto cuadro']
                       : [];
 
-                    // Recolectar todas las fotos de las reparaciones
-                    const fotosReparaciones: Array<{ foto: any; tipo: string; reparacionNum: number }> = [];
-                    reparaciones.forEach((reparacion, idx) => {
-                      // Foto principal de reparación
-                      if (reparacion.Foto && Array.isArray(reparacion.Foto) && reparacion.Foto.length > 0) {
-                        reparacion.Foto.forEach((foto: any) => {
-                          fotosReparaciones.push({ foto, tipo: 'Foto reparación', reparacionNum: idx + 1 });
-                        });
-                      } else if (reparacion.foto && Array.isArray(reparacion.foto) && reparacion.foto.length > 0) {
-                        reparacion.foto.forEach((foto: any) => {
-                          fotosReparaciones.push({ foto, tipo: 'Foto reparación', reparacionNum: idx + 1 });
-                        });
-                      }
-                      
-                      // Foto de la etiqueta de reparación
-                      if (reparacion['Foto de la etiqueta'] && Array.isArray(reparacion['Foto de la etiqueta']) && reparacion['Foto de la etiqueta'].length > 0) {
-                        reparacion['Foto de la etiqueta'].forEach((foto: any) => {
-                          fotosReparaciones.push({ foto, tipo: 'Foto etiqueta reparación', reparacionNum: idx + 1 });
-                        });
-                      } else if (reparacion.fotoEtiqueta && Array.isArray(reparacion.fotoEtiqueta) && reparacion.fotoEtiqueta.length > 0) {
-                        reparacion.fotoEtiqueta.forEach((foto: any) => {
-                          fotosReparaciones.push({ foto, tipo: 'Foto etiqueta reparación', reparacionNum: idx + 1 });
-                        });
-                      }
-                    });
+                    // Usar las fotos de reparaciones ya recolectadas
+                    const fotosReparaciones = fotosReparacionesPrevias;
 
                     // Verificar si hay al menos una foto para mostrar
                     const hayFotos = fotosFormularioGeneral.length > 0 || 

@@ -100,24 +100,34 @@ export default function Registros() {
 
   // Formatea entrada DD/MM/YYYY hh:mm a ISO para airtable
   const formatCitaInputWithAutoFormat = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target;
-    let value = input.value;
+    // Solo permitir números
+    let input = e.target.value.replace(/\D/g, '');
     
-    // Solo permitir números, /, : 
-    value = value.replace(/[^\d/:]/g, '');
-    
-    // Auto-formatear
-    if (value.length === 2 && !value.includes('/')) {
-      value = value + '/';
-    } else if (value.length === 5 && (value.match(/\//g) || []).length === 1) {
-      value = value + '/';
-    } else if (value.length === 10 && (value.match(/\//g) || []).length === 2) {
-      value = value + ' ';
-    } else if (value.length === 13 && (value.match(/\//g) || []).length === 2) {
-      value = value + ':';
+    // Auto-formatear a DD/MM/YYYY hh:mm
+    if (input.length > 0) {
+      // DD
+      if (input.length <= 2) {
+        e.target.value = input;
+      }
+      // DD/MM
+      else if (input.length <= 4) {
+        e.target.value = input.slice(0, 2) + '/' + input.slice(2);
+      }
+      // DD/MM/YYYY
+      else if (input.length <= 8) {
+        e.target.value = input.slice(0, 2) + '/' + input.slice(2, 4) + '/' + input.slice(4);
+      }
+      // DD/MM/YYYY hh
+      else if (input.length <= 10) {
+        e.target.value = input.slice(0, 2) + '/' + input.slice(2, 4) + '/' + input.slice(4, 8) + ' ' + input.slice(8);
+      }
+      // DD/MM/YYYY hh:mm
+      else {
+        e.target.value = input.slice(0, 2) + '/' + input.slice(2, 4) + '/' + input.slice(4, 8) + ' ' + input.slice(8, 10) + ':' + input.slice(10, 12);
+      }
+    } else {
+      e.target.value = '';
     }
-    
-    input.value = value;
   };
 
   // Parsea DD/MM/YYYY hh:mm a Date
@@ -128,9 +138,30 @@ export default function Registros() {
     if (!match) return null;
     
     const [, day, month, year, hours, minutes] = match;
-    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hours), parseInt(minutes));
+    const dayNum = parseInt(day);
+    const monthNum = parseInt(month);
+    const yearNum = parseInt(year);
+    const hoursNum = parseInt(hours);
+    const minutesNum = parseInt(minutes);
+
+    // Validar rangos básicos
+    if (monthNum < 1 || monthNum > 12) return null;
+    if (dayNum < 1 || dayNum > 31) return null;
+    if (hoursNum < 0 || hoursNum > 23) return null;
+    if (minutesNum < 0 || minutesNum > 59) return null;
+
+    const date = new Date(yearNum, monthNum - 1, dayNum, hoursNum, minutesNum);
     
-    if (isNaN(date.getTime())) return null;
+    // Verificar que la fecha creada corresponde a los valores ingresados
+    if (isNaN(date.getTime()) || 
+        date.getDate() !== dayNum || 
+        date.getMonth() !== monthNum - 1 || 
+        date.getFullYear() !== yearNum ||
+        date.getHours() !== hoursNum ||
+        date.getMinutes() !== minutesNum) {
+      return null;
+    }
+    
     return date;
   };
 
@@ -853,13 +884,6 @@ export default function Registros() {
                     const date = parseCitaInput(inputValue);
                     if (!date) {
                       alert('Fecha y hora inválidas');
-                      return;
-                    }
-
-                    // Verificar que el registro tenga PDF relleno si está siendo marcado como Citado
-                    const registroActual = registros.find(r => r.id === pendingEstadoChange.registroId);
-                    if (pendingEstadoChange.newEstado === 'Citado' && (!registroActual?.pdf || registroActual.pdf.length === 0)) {
-                      alert('Para marcar como Citado, el registro debe tener un PDF adjunto');
                       return;
                     }
 

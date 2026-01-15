@@ -256,14 +256,30 @@ const Reparaciones: React.FC = () => {
     }
 
     const [, day, month, year, hours, minutes] = match;
+    const dayNum = parseInt(day);
+    const monthNum = parseInt(month);
+    const yearNum = parseInt(year);
+    const hoursNum = parseInt(hours);
+    const minutesNum = parseInt(minutes);
+
+    // Validar rangos básicos
+    if (monthNum < 1 || monthNum > 12) return null;
+    if (dayNum < 1 || dayNum > 31) return null;
+    if (hoursNum < 0 || hoursNum > 23) return null;
+    if (minutesNum < 0 || minutesNum > 59) return null;
+
     try {
-      const date = new Date(
-        parseInt(year),
-        parseInt(month) - 1,
-        parseInt(day),
-        parseInt(hours),
-        parseInt(minutes)
-      );
+      const date = new Date(yearNum, monthNum - 1, dayNum, hoursNum, minutesNum);
+      
+      // Verificar que la fecha creada corresponde a los valores ingresados
+      if (date.getDate() !== dayNum || 
+          date.getMonth() !== monthNum - 1 || 
+          date.getFullYear() !== yearNum ||
+          date.getHours() !== hoursNum ||
+          date.getMinutes() !== minutesNum) {
+        return null;
+      }
+      
       return date;
     } catch {
       return null;
