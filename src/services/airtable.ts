@@ -3032,6 +3032,7 @@ export const airtableService = {
           console.log('[Valoraciones] Procesando registro:', record.id, record.fields);
           let cliente = undefined;
           let telefono = undefined;
+          let conversationId = undefined;
           
           // Si tiene servicios linkados, obtener el cliente del primer servicio
           if (record.fields['Servicios'] && Array.isArray(record.fields['Servicios']) && record.fields['Servicios'].length > 0) {
@@ -3047,7 +3048,11 @@ export const airtableService = {
               telefono = servicioResponse.data?.fields?.['Teléfono'] ||
                         servicioResponse.data?.fields?.['Telefono'] ||
                         servicioResponse.data?.fields?.['Phone'];
-              console.log('[Valoraciones] Cliente obtenido del servicio:', cliente, 'Teléfono:', telefono, 'para servicioId:', servicioId);
+              // Obtener conversationId - probar múltiples variantes del nombre
+              conversationId = servicioResponse.data?.fields?.['Conversation id'] ||
+                              servicioResponse.data?.fields?.['Conversation ID'] ||
+                              servicioResponse.data?.fields?.['ConversationId'];
+              console.log('[Valoraciones] Cliente obtenido del servicio:', cliente, 'Teléfono:', telefono, 'ConversationId:', conversationId, 'para servicioId:', servicioId);
             } catch (error) {
               console.warn(`[Valoraciones] No se pudo obtener el cliente del servicio ${servicioId}:`, error);
             }
@@ -3060,6 +3065,7 @@ export const airtableService = {
             servicios: record.fields['Servicios'],
             cliente: cliente,
             telefono: telefono,
+            conversationId: conversationId,
             valoracionCliente: record.fields['Valoración cliente'],
             estado: record.fields['Estado'],
             codigos: record.fields['Códigos'], // IDs de los códigos linked

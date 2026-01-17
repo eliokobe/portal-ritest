@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Search, Info, Star, X } from 'lucide-react';
+import { Search, Info, Star, X, MessageCircle } from 'lucide-react';
 import { airtableService } from '../services/airtable';
 
 interface Codigo {
@@ -13,6 +13,7 @@ interface Valoracion {
   servicios?: string[]; // IDs de los servicios linked
   cliente?: string; // Nombre del cliente obtenido del servicio
   telefono?: string; // Teléfono obtenido del servicio
+  conversationId?: string; // ID de conversación de Chatwoot obtenido del servicio
   valoracionCliente?: number;
   estado?: string;
   codigos?: string[]; // IDs de los códigos linked
@@ -315,10 +316,10 @@ const Valoraciones: React.FC = () => {
                     Teléfono
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valoración Cliente
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Estado
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Chat
                   </th>
                 </tr>
               </thead>
@@ -330,9 +331,6 @@ const Valoraciones: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
                       {valoracion.telefono || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
-                      {renderStars(valoracion)}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <select
@@ -357,6 +355,21 @@ const Valoraciones: React.FC = () => {
                           </option>
                         ))}
                       </select>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {valoracion.conversationId ? (
+                        <a
+                          href={`https://chat.ritest.es/app/accounts/1/inbox-view/conversation/${valoracion.conversationId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center p-2 rounded-full text-green-600 hover:bg-green-100 transition-colors"
+                          title="Abrir chat en Chatwoot"
+                        >
+                          <MessageCircle className="h-5 w-5" />
+                        </a>
+                      ) : (
+                        <span className="text-gray-400 text-xs">Sin chat</span>
+                      )}
                     </td>
                   </tr>
                 ))}
