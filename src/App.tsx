@@ -22,6 +22,7 @@ const Inventario = lazy(() => import('./pages/Inventario'));
 const Agenda = lazy(() => import('./pages/Agenda'));
 const Reparaciones = lazy(() => import('./pages/Reparaciones'));
 const Buscador = lazy(() => import('./pages/Buscador'));
+const Valoraciones = lazy(() => import('./pages/Valoraciones'));
 
 const DefaultRoute = () => {
   const { user } = useAuth();
@@ -221,6 +222,21 @@ function App() {
                     </Suspense>
                   </Layout>
                 </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/valoraciones"
+              element={
+                <RoleProtectedRoute
+                  allowedRoles={["Administrativa"]}
+                  redirectTo="/panel-grafico"
+                >
+                  <Layout>
+                    <Suspense fallback={<LoadingScreen />}>
+                      <Valoraciones />
+                    </Suspense>
+                  </Layout>
+                </RoleProtectedRoute>
               }
             />
             <Route path="/" element={<ProtectedRoute><DefaultRoute /></ProtectedRoute>} />

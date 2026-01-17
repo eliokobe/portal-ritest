@@ -2993,4 +2993,253 @@ export const airtableService = {
       return null;
     }
   },
+
+  // ============================================
+  // VALORACIONES
+  // ============================================
+
+  // Obtener todas las valoraciones
+  async getValoraciones(): Promise<any[]> {
+    try {
+      const TABLE_NAME = 'Valoraciones';
+      
+      // Crear cliente específico para la base de valoraciones
+      const valoracionesApi = axios.create({
+        baseURL: `${BACKEND_URL}/api/valoraciones`,
+        timeout: 30000,
+      });
+
+      // Interceptor para añadir token
+      valoracionesApi.interceptors.request.use(async (config) => {
+        const token = await getAuthToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      });
+
+      const response = await valoracionesApi.get(`/${TABLE_NAME}`, {
+        params: { pageSize: 100 },
+      });
+
+      const data = response.data as { records: any[] };
+      
+      console.log('[Valoraciones] Registros obtenidos de Airtable:', data.records.length);
+      
+      // Procesar cada valoración para obtener el campo Cliente del servicio linkado
+      const valoracionesConCliente = await Promise.all(
+        data.records.map(async (record: any) => {
+          console.log('[Valoraciones] Procesando registro:', record.id, record.fields);
+          let cliente = undefined;
+          let telefono = undefined;
+          
+          // Si tiene servicios linkados, obtener el cliente del primer servicio
+          if (record.fields['Servicios'] && Array.isArray(record.fields['Servicios']) && record.fields['Servicios'].length > 0) {
+            const servicioId = record.fields['Servicios'][0];
+            try {
+              // Usar serviciosApi para obtener el servicio de la base correcta
+              const servicioResponse = await serviciosApi.get(`/${AIRTABLE_SERVICES_TABLE}/${servicioId}`);
+              // Intentar varios nombres posibles para el campo cliente
+              cliente = servicioResponse.data?.fields?.['Cliente'] || 
+                       servicioResponse.data?.fields?.['Nombre'] ||
+                       servicioResponse.data?.fields?.['Name'];
+              // Obtener teléfono
+              telefono = servicioResponse.data?.fields?.['Teléfono'] ||
+                        servicioResponse.data?.fields?.['Telefono'] ||
+                        servicioResponse.data?.fields?.['Phone'];
+              console.log('[Valoraciones] Cliente obtenido del servicio:', cliente, 'Teléfono:', telefono, 'para servicioId:', servicioId);
+            } catch (error) {
+              console.warn(`[Valoraciones] No se pudo obtener el cliente del servicio ${servicioId}:`, error);
+            }
+          } else {
+            console.log('[Valoraciones] Registro sin servicios linkados:', record.id);
+          }
+          
+          return {
+            id: record.id,
+            servicios: record.fields['Servicios'],
+            cliente: cliente,
+            telefono: telefono,
+            valoracionCliente: record.fields['Valoración cliente'],
+            estado: record.fields['Estado'],
+            codigos: record.fields['Códigos'], // IDs de los códigos linked
+          };
+        })
+      );
+      
+      console.log('[Valoraciones] Valoraciones procesadas:', valoracionesConCliente);
+      
+      return valoracionesConCliente;
+    } catch (error: any) {
+      console.error('Error fetching valoraciones:', error);
+      throw new Error(error.response?.data?.error || 'Error al obtener valoraciones');
+    }
+  },
+
+  // Obtener códigos con estado "Sin enviar"
+  async getCodigosSinEnviar(): Promise<any[]> {
+    try {
+      const VALORACIONES_BASE_ID = 'appX3CBiSmPy4119D';
+      const TABLE_NAME = 'Códigos';
+      
+      // Crear cliente específico para la base de valoraciones
+      const valoracionesApi = axios.create({
+        baseURL: `${BACKEND_URL}/api/valoraciones`,
+        timeout: 30000,
+      });
+
+      // Interceptor para añadir token
+      valoracionesApi.interceptors.request.use(async (config) => {
+        const token = await getAuthToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      });
+
+      const response = await valoracionesApi.get(`/${TABLE_NAME}`, {
+        params: {
+          filterByFormula: "{Estado} = 'Sin enviar'",
+          pageSize: 100,
+        },
+      });
+
+      const data = response.data as { records: any[] };
+      return data.records.map((record: any) => ({
+        id: record.id,
+        codigo: record.fields['Código'],
+        estado: record.fields['Estado'],
+      }));
+    } catch (error: any) {
+      console.error('Error fetching códigos sin enviar:', error);
+      throw new Error(error.response?.data?.error || 'Error al obtener códigos');
+    }
+  },
+
+  // Actualizar estado de valoración
+  async updateValoracionEstado(valoracionId: string, estado: string): Promise<void> {
+    try {
+      const VALORACIONES_BASE_ID = 'appX3CBiSmPy4119D';
+      const TABLE_NAME = 'Valoraciones';
+      
+      // Crear cliente específico para la base de valoraciones
+      const valoracionesApi = axios.create({
+        baseURL: `${BACKEND_URL}/api/valoraciones`,
+        timeout: 30000,
+      });
+
+      // Interceptor para añadir token
+      valoracionesApi.interceptors.request.use(async (config) => {
+        const token = await getAuthToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      });
+
+      await valoracionesApi.patch(`/${TABLE_NAME}/${valoracionId}`, {
+        fields: {
+          Estado: estado,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error updating valoración estado:', error);
+      throw new Error(error.response?.data?.error || 'Error al actualizar estado');
+    }
+  },
+
+  // Actualizar valoración cliente (estrellas)
+  async updateValoracionCliente(valoracionId: string, valoracion: number): Promise<void> {
+    try {
+      const VALORACIONES_BASE_ID = 'appX3CBiSmPy4119D';
+      const TABLE_NAME = 'Valoraciones';
+      
+      // Crear cliente específico para la base de valoraciones
+      const valoracionesApi = axios.create({
+        baseURL: `${BACKEND_URL}/api/valoraciones`,
+        timeout: 30000,
+      });
+
+      // Interceptor para añadir token
+      valoracionesApi.interceptors.request.use(async (config) => {
+        const token = await getAuthToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      });
+
+      await valoracionesApi.patch(`/${TABLE_NAME}/${valoracionId}`, {
+        fields: {
+          'Valoración cliente': valoracion,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error updating valoración cliente:', error);
+      throw new Error(error.response?.data?.error || 'Error al actualizar valoración');
+    }
+  },
+
+  // Actualizar códigos de valoración
+  async updateValoracionCodigos(valoracionId: string, codigosIds: string[]): Promise<void> {
+    try {
+      const VALORACIONES_BASE_ID = 'appX3CBiSmPy4119D';
+      const TABLE_NAME = 'Valoraciones';
+      
+      // Crear cliente específico para la base de valoraciones
+      const valoracionesApi = axios.create({
+        baseURL: `${BACKEND_URL}/api/valoraciones`,
+        timeout: 30000,
+      });
+
+      // Interceptor para añadir token
+      valoracionesApi.interceptors.request.use(async (config) => {
+        const token = await getAuthToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      });
+
+      await valoracionesApi.patch(`/${TABLE_NAME}/${valoracionId}`, {
+        fields: {
+          Códigos: codigosIds,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error updating valoración códigos:', error);
+      throw new Error(error.response?.data?.error || 'Error al actualizar códigos');
+    }
+  },
+
+  // Actualizar estado de código
+  async updateCodigoEstado(codigoId: string, estado: string): Promise<void> {
+    try {
+      const TABLE_NAME = 'Códigos';
+      
+      // Crear cliente específico para la base de valoraciones
+      const valoracionesApi = axios.create({
+        baseURL: `${BACKEND_URL}/api/valoraciones`,
+        timeout: 30000,
+      });
+
+      // Interceptor para añadir token
+      valoracionesApi.interceptors.request.use(async (config) => {
+        const token = await getAuthToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+      });
+
+      await valoracionesApi.patch(`/${TABLE_NAME}/${codigoId}`, {
+        fields: {
+          Estado: estado,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error updating código estado:', error);
+      throw new Error(error.response?.data?.error || 'Error al actualizar estado del código');
+    }
+  },
 };   

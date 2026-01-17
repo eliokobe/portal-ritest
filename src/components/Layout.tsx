@@ -25,6 +25,7 @@ import {
   UserCheck,
   Search,
   Bot,
+  Star,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -72,6 +73,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Técnicos', href: '/tecnicos', icon: Users },
         { name: 'Envíos', href: '/envios', icon: Package },
         { name: 'Asesoramientos', href: '/asesoramientos', icon: Lightbulb },
+        { name: 'Valoraciones', href: '/valoraciones', icon: Star },
         { name: 'Ipartner', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
       ],
     },
