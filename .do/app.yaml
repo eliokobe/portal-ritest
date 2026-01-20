@@ -1,0 +1,92 @@
+name: portal-ritest
+region: ams
+
+alerts:
+- rule: DEPLOYMENT_FAILED
+- rule: DOMAIN_FAILED
+
+domains:
+- domain: portal.ritest.es
+  type: PRIMARY
+
+features:
+- buildpack-stack=ubuntu-22
+
+ingress:
+  rules:
+  - component:
+      name: backend
+    match:
+      path:
+        prefix: /api
+  - component:
+      name: portal-ritest
+    match:
+      path:
+        prefix: /
+
+# Backend (API Proxy) - Aquí está la API key SEGURA
+services:
+- name: backend
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: eliokobe/ritest
+  source_dir: server
+  build_command: npm install
+  run_command: npm start
+  environment_slug: node-js
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  
+  envs:
+  - key: AIRTABLE_API_KEY
+    scope: RUN_TIME
+    type: SECRET
+  - key: AIRTABLE_SERVICES_BASE_ID
+    scope: RUN_TIME
+    value: appX3CBiSmPy4119D
+  - key: AIRTABLE_REGISTROS_BASE_ID
+    scope: RUN_TIME
+    value: applcT2fcdNDpCRQ0
+  - key: CLIENT_URL
+    scope: RUN_TIME
+    value: https://portal.ritest.es
+  - key: SUPABASE_URL
+    scope: RUN_TIME
+    value: https://bmnwfimrcblnvmkbflwn.supabase.co
+  - key: SUPABASE_ANON_KEY
+    scope: RUN_TIME
+    value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtbndmaW1yY2JsbnZta2JmbHduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNTc4NDQsImV4cCI6MjA4MzYzMzg0NH0.Xdeil2_IPMFjprhFG7yoIwshqIhntNNZ3Hc6jEj6KjM
+  - key: PORT
+    scope: RUN_TIME
+    value: "8080"
+  
+  http_port: 8080
+  
+  health_check:
+    http_path: /health
+    port: 8080
+
+# Frontend (Static Site) - SIN API key
+- name: portal-ritest
+  dockerfile_path: /Dockerfile
+  github:
+    branch: main
+    deploy_on_push: true
+    repo: eliokobe/ritest
+  http_port: 80
+  instance_count: 1
+  instance_size_slug: apps-s-1vcpu-0.5gb
+  source_dir: /
+  
+  envs:
+  - key: VITE_BACKEND_URL
+    scope: RUN_AND_BUILD_TIME
+    value: https://portal.ritest.es
+  - key: VITE_SUPABASE_URL
+    scope: RUN_AND_BUILD_TIME
+    value: https://bmnwfimrcblnvmkbflwn.supabase.co
+  - key: VITE_SUPABASE_ANON_KEY
+    scope: RUN_AND_BUILD_TIME
+    value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtbndmaW1yY2JsbnZta2JmbHduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNTc4NDQsImV4cCI6MjA4MzYzMzg0NH0.Xdeil2_IPMFjprhFG7yoIwshqIhntNNZ3Hc6jEj6KjM
