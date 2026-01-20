@@ -85,3 +85,19 @@ export const MOTIVO_TECNICO_OPTIONS = [
   'Sustituir GDP',
   'Otros'
 ];
+
+export const ENVIOS_STATUS_OPTIONS = [
+  'Envío creado',
+  'Listo para enviar',
+  'Enviado',
+  'Entregado',
+  'Devuelto',
+  'Reclamado',
+  'Recogida hecha',
+  'Pendiente recogida',
+  'Recogida enviada'
+];
+
+export const ENVIOS_SEGUIMIENTO_OPTIONS = [
+  'Email enviado'
+];

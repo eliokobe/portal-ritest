@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Phone, MessageCircle } from 'lucide-react';
-import { Service, Formulario, AirtableAttachment } from '../../../types';
-import { formatDate, formatDateTime, formatDateTimeForInput, renderDetailValue, formatCitaInputWithAutoFormat, parseCitaInput } from '../../../utils/helpers';
+import { Service, AirtableAttachment } from '../../../types';
+import { formatDate, formatDateTime, formatDateTimeForInput, renderDetailValue, parseCitaInput } from '../../../utils/helpers';
 import { getStatusColors, getIpartnerColors } from '../../../utils/statusColors';
 import { STATUS_OPTIONS, IPARTNER_OPTIONS } from '../../../utils/constants';
 import { EditableField } from '../../ui/EditableField';
-import { Button } from '../../ui/Button';
 import { Textarea } from '../../ui/Textarea';
+import { Badge } from '../../ui/Badge';
 import { airtableService } from '../../../services/airtable';
+import { supabaseService } from '../../../services/supabase';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useFormularios } from '../../../hooks/useFormularios';
 
@@ -24,7 +25,6 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({
   variant = 'servicios',
   onUpdate,
   onStatusChange,
-  onClose,
 }) => {
   const { user } = useAuth();
   const isTramitacion = variant === 'tramitaciones';
@@ -38,7 +38,6 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({
   const [reparaciones, setReparaciones] = useState<any[]>([]);
   const [tecnicos, setTecnicos] = useState<{ id: string; nombre: string }[]>([]);
   const [selectedReparacionIndex, setSelectedReparacionIndex] = useState(0);
-  const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState<string | null>(null);
   const [newComment, setNewComment] = useState('');
 
@@ -74,7 +73,6 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({
   }, [initialService, isTramitacion, loadFormularios]);
 
   const handleFieldUpdate = async (field: string, value: any, airtableField?: string) => {
-    setSaving(true);
     try {
       await airtableService.updateServiceField(service.id, airtableField || field, value, tableName);
       
@@ -93,14 +91,11 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({
       onUpdate(updatedService);
     } catch (error) {
       alert('Error al actualizar el campo');
-    } finally {
-      setSaving(false);
     }
   };
 
   const handleCommentAdd = async (comment: string) => {
     if (!comment.trim()) return;
-    setSaving(true);
     try {
       const now = new Date();
       const formattedDate = formatDate(now.toISOString()) + ' ' + now.getHours() + ':' + now.getMinutes();
@@ -116,8 +111,6 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({
       onUpdate(updatedService);
     } catch (error) {
       alert('Error al guardar el comentario');
-    } finally {
-      setSaving(false);
     }
   };
 

@@ -144,7 +144,7 @@ export interface Envio {
   numeroRecogida?: number;
   seguimiento?: string;
   servicio?: string;
-  estado?: 'Envío creado' | 'Listo para enviar' | 'Enviado' | 'Entregado';
+  estado?: string;
   transporte?: string;
   catalogo?: string;
   comentarios?: string;

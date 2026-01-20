@@ -2719,8 +2719,8 @@ export const airtableService = {
     }
   },
 
-  // Subir foto a formulario (campo de attachments)
-  async uploadFormularioPhoto(formId: string, photoField: string, fileUrl: string): Promise<void> {
+  // Subir foto a formulario (campo de attachments) usando el backend proxy
+  async uploadFormularioPhoto(formId: string, photoField: string, file: File): Promise<void> {
     try {
       const fieldMap: Record<string, string> = {
         'fotoGeneral': 'Foto general',
@@ -2731,14 +2731,41 @@ export const airtableService = {
       
       const airtableField = fieldMap[photoField] || photoField;
       
-      await serviciosApi.patch(`/Formularios/${formId}`, {
-        fields: {
-          [airtableField]: [{ url: fileUrl }],
-        },
+      // Convertir archivo a base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          const base64String = result.split(',')[1];
+          resolve(base64String);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
       });
-    } catch (error) {
 
-      throw error;
+      // Usar el endpoint del backend para subir attachments
+      await axios.post(
+        `${BACKEND_URL}/api/upload-attachment`,
+        {
+          baseId: 'appX3CBiSmPy4119D', // Base de servicios
+          recordId: formId,
+          tableName: 'Formularios',
+          fieldName: airtableField,
+          file: {
+            contentType: file.type,
+            filename: file.name,
+            data: base64,
+          },
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+    } catch (error: any) {
+      console.error('Error uploading photo:', error);
+      throw new Error(error.response?.data?.error?.message || error.message || 'Error al subir foto');
     }
   },
 

@@ -53,8 +53,9 @@ function createAirtableClient(baseId) {
 // MIDDLEWARE DE CACHÉ
 // ============================================
 function cacheMiddleware(req, res, next) {
-  // Solo cachear peticiones GET y POST de lectura
-  if (req.method !== 'GET' && req.method !== 'POST') {
+  // Solo cachear peticiones GET y POST de lectura (con filtros)
+  const isReadPost = req.method === 'POST' && req.body && req.body.filterParams;
+  if (req.method !== 'GET' && !isReadPost) {
     return next();
   }
 
@@ -164,6 +165,14 @@ app.all('/api/servicios/:tableName*', cacheMiddleware, async (req, res) => {
     };
 
     const response = await client.request(config);
+
+    // Invalidar caché si es una mutación exitosa (POST de creación, PATCH, DELETE, etc.)
+    const isMutation = req.method !== 'GET' && !(req.method === 'POST' && req.body && req.body.filterParams);
+    if (isMutation) {
+      console.log(`🧹 Invalidad caché por mutación: ${req.method} ${req.path}`);
+      cache.flushAll();
+    }
+
     res.json(response.data);
   } catch (error) {
     console.error('Error en proxy Servicios:', error.response?.data || error.message);
@@ -198,6 +207,14 @@ app.all('/servicios/:tableName*', cacheMiddleware, async (req, res) => {
     };
 
     const response = await client.request(config);
+
+    // Invalidar caché si es una mutación exitosa (POST de creación, PATCH, DELETE, etc.)
+    const isMutation = req.method !== 'GET' && !(req.method === 'POST' && req.body && req.body.filterParams);
+    if (isMutation) {
+      console.log(`🧹 Invalidad caché por mutación: ${req.method} ${req.path}`);
+      cache.flushAll();
+    }
+
     res.json(response.data);
   } catch (error) {
     console.error('Error en proxy Servicios:', error.response?.data || error.message);
@@ -235,6 +252,14 @@ app.all('/api/registros/:tableName*', cacheMiddleware, async (req, res) => {
     };
 
     const response = await client.request(config);
+
+    // Invalidar caché si es una mutación exitosa (POST de creación, PATCH, DELETE, etc.)
+    const isMutation = req.method !== 'GET' && !(req.method === 'POST' && req.body && req.body.filterParams);
+    if (isMutation) {
+      console.log(`🧹 Invalidad caché por mutación: ${req.method} ${req.path}`);
+      cache.flushAll();
+    }
+
     res.json(response.data);
   } catch (error) {
     console.error('Error en proxy Registros:', error.response?.data || error.message);
@@ -269,6 +294,14 @@ app.all('/registros/:tableName*', cacheMiddleware, async (req, res) => {
     };
 
     const response = await client.request(config);
+
+    // Invalidar caché si es una mutación exitosa (POST de creación, PATCH, DELETE, etc.)
+    const isMutation = req.method !== 'GET' && !(req.method === 'POST' && req.body && req.body.filterParams);
+    if (isMutation) {
+      console.log(`🧹 Invalidad caché por mutación: ${req.method} ${req.path}`);
+      cache.flushAll();
+    }
+
     res.json(response.data);
   } catch (error) {
     console.error('Error en proxy Registros:', error.response?.data || error.message);
@@ -306,6 +339,14 @@ app.all('/api/valoraciones/:tableName*', cacheMiddleware, async (req, res) => {
     };
 
     const response = await client.request(config);
+
+    // Invalidar caché si es una mutación exitosa (POST de creación, PATCH, DELETE, etc.)
+    const isMutation = req.method !== 'GET' && !(req.method === 'POST' && req.body && req.body.filterParams);
+    if (isMutation) {
+      console.log(`🧹 Invalidad caché por mutación: ${req.method} ${req.path}`);
+      cache.flushAll();
+    }
+
     res.json(response.data);
   } catch (error) {
     console.error('Error en proxy Valoraciones:', error.response?.data || error.message);
@@ -340,6 +381,14 @@ app.all('/valoraciones/:tableName*', cacheMiddleware, async (req, res) => {
     };
 
     const response = await client.request(config);
+
+    // Invalidar caché si es una mutación exitosa (POST de creación, PATCH, DELETE, etc.)
+    const isMutation = req.method !== 'GET' && !(req.method === 'POST' && req.body && req.body.filterParams);
+    if (isMutation) {
+      console.log(`🧹 Invalidad caché por mutación: ${req.method} ${req.path}`);
+      cache.flushAll();
+    }
+
     res.json(response.data);
   } catch (error) {
     console.error('Error en proxy Valoraciones:', error.response?.data || error.message);
