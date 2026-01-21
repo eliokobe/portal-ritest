@@ -13,7 +13,7 @@
     "build": "vite build",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "start": "serve -s dist -l $PORT"
+    "start": "node server/index.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.90.1",

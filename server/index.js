@@ -433,3 +433,20 @@ app.listen(PORT, () => {
     console.log('✅ AIRTABLE_API_KEY configurada');
   }
 });
+
+// ============================================
+// SERVIR FRONTEND (PARA UNIFICACIÓN EN DO)
+// ============================================
+const path = require('path');
+// Servir archivos estáticos desde la carpeta 'dist' (generada por Vite)
+app.use(express.static(path.join(__dirname, '../dist')));
+
+// Cualquier ruta que no coincida con la API, sirve el index.html
+app.get('*', (req, res) => {
+  // Solo servir el index.html para rutas que no son archivos (no tienen extensión)
+  if (!req.path.includes('.')) {
+    res.sendFile(path.join(__dirname, '../dist/index.html'));
+  } else {
+    res.status(404).send('Not found');
+  }
+});
