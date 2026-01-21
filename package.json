@@ -6,6 +6,10 @@
   "engines": {
     "node": ">=20.x"
   },
+  "supportedArchitectures": {
+    "os": ["darwin", "linux"],
+    "cpu": ["arm64", "x64"]
+  },
   "scripts": {
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:frontend": "vite",
