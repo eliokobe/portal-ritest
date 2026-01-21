@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Phone, MessageCircle, X } from 'lucide-react';
 import { airtableService } from '../services/airtable';
 import { supabaseService } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,7 +18,6 @@ const Reparaciones: React.FC = () => {
   fetch('http://127.0.0.1:7243/ingest/9ae1826f-8438-41dd-a48f-f5e848b7c433',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Reparaciones.tsx:17',message:'Component render',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
   // #endregion
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'requiere-accion' | 'en-espera'>('requiere-accion');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [lastSelectedServiceId, setLastSelectedServiceId] = useState<string | null>(null);
   const [technicians, setTechnicians] = useState<{ id: string; nombre?: string }[]>([]);
@@ -73,79 +72,27 @@ const Reparaciones: React.FC = () => {
     setSearchTerm,
     setData,
   } = useEntityList<Service>({
-    fetchFn: () => airtableService.getReparaciones(user?.clinic),
+    fetchFn: () => airtableService.getReparaciones(),
     searchFields: ['cliente', 'telefono', 'estado', 'seguimiento', 'expediente'],
-    dependencies: [user?.clinic, user?.id, activeTab],
+    dependencies: [user?.id],
     sortFn: (a: Service, b: Service) => {
       const dateA = a.fechaEstado ? new Date(a.fechaEstado).getTime() : 0;
       const dateB = b.fechaEstado ? new Date(b.fechaEstado).getTime() : 0;
       return dateB - dateA; // Más recientes primero
     },
-    filterFn: (service: Service): boolean => {
-      // #region agent log
-      const logData = { id: service.id, estado: service.estado, fechaEstado: service.fechaEstado, fechaSeguimiento: service.fechaSeguimiento, activeTab, role: user?.role };
-      // #endregion
-      const allowedStates = new Set(['Asignado', 'Aceptado', 'Citado']);
-      const isTecnico = user?.role === 'Técnico';
-      const isAdministrativa = user?.role === 'Administrativa';
-      const now = new Date();
-      const HOURS_48_IN_MS = 48 * 60 * 60 * 1000;
-      const HOURS_4_IN_MS = 4 * 60 * 60 * 1000;
-
-      const estadoValido = service.estado && allowedStates.has(service.estado);
-      if (!estadoValido) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/9ae1826f-8438-41dd-a48f-f5e848b7c433',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Reparaciones.tsx:82',message:'filterFn: estado invalido',data:{...logData},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
-        return false;
-      }
-      
-      if (service.cita && new Date(service.cita) > now) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/9ae1826f-8438-41dd-a48f-f5e848b7c433',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Reparaciones.tsx:88',message:'filterFn: cita futura',data:{...logData, cita: service.cita},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
-        return false;
-      }
-
-      if (isTecnico) return true;
-
-      if (!service.fechaEstado) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/9ae1826f-8438-41dd-a48f-f5e848b7c433',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Reparaciones.tsx:98',message:'filterFn: sin fechaEstado',data:{...logData},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
-        return false;
-      }
-      const timeDiff = now.getTime() - new Date(service.fechaEstado).getTime();
-      
-      // Regla de las 48h para mostrar en Reparaciones (salvo técnicos)
-      if (timeDiff <= HOURS_48_IN_MS) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/9ae1826f-8438-41dd-a48f-f5e848b7c433',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Reparaciones.tsx:106',message:'filterFn: regla 48h',data:{...logData, timeDiffHours: timeDiff / (1000 * 60 * 60)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
-        return false;
-      }
-      
-      let result = true;
-      if (isAdministrativa) {
-        if (activeTab === 'requiere-accion') {
-          if (!service.fechaSeguimiento) result = false;
-          else result = (now.getTime() - new Date(service.fechaSeguimiento).getTime()) > HOURS_4_IN_MS;
-        } else if (activeTab === 'en-espera') {
-          if (!service.fechaSeguimiento) result = true;
-          else result = (now.getTime() - new Date(service.fechaSeguimiento).getTime()) <= HOURS_4_IN_MS;
-        }
-      }
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/9ae1826f-8438-41dd-a48f-f5e848b7c433',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Reparaciones.tsx:121',message:'filterFn result final',data:{...logData, result},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      return result;
-    }
   });
+
+  const technicianNameRef = useRef<Record<string, string>>({});
+
+  useEffect(() => {
+    filteredServices.forEach(s => {
+      technicianNameRef.current[s.id] = getTechnicianName(s);
+    });
+  }, [filteredServices, technicianMap]);
 
   // Ensure tramitaciones records exist
   useEffect(() => {
-    if (user?.role === 'Administrativa' && activeTab === 'requiere-accion' && filteredServices.length > 0) {
+    if (user?.role === 'Administrativa' && filteredServices.length > 0) {
       const numeros = filteredServices
         .map((s: Service) => s.numero)
         .filter((n: string | undefined): n is string => !!(n && !processedNumerosRef.current.has(`tramitacion-${n}`)));
@@ -155,7 +102,7 @@ const Reparaciones: React.FC = () => {
         supabaseService.ensureTramitaciones(numeros);
       }
     }
-  }, [filteredServices, activeTab, user?.role]);
+  }, [filteredServices, user?.role]);
 
   const handleStatusChange = async (s: Service, newValue: string) => {
     // #region agent log
@@ -300,26 +247,6 @@ const Reparaciones: React.FC = () => {
         </div>
       </div>
 
-      {user?.role === 'Administrativa' && (
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-          <div className="flex border-b border-gray-200">
-            {['requiere-accion', 'en-espera'].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab as any)}
-                className={`flex-1 px-6 py-2 text-sm font-medium transition-colors ${
-                  activeTab === tab
-                    ? 'bg-brand-primary text-white'
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                {tab === 'requiere-accion' ? 'Requiere Acción' : 'En Espera'}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       <DataTable
         data={filteredServices}
         columns={columns}
@@ -337,6 +264,38 @@ const Reparaciones: React.FC = () => {
         onClose={() => setSelectedService(null)}
         title="Detalle de la Reparación"
         size="lg"
+        showCloseButton={false}
+        actions={selectedService && (
+          <div className="flex items-center gap-2">
+            {selectedService.telefono && (
+              <a
+                href={`tel:${selectedService.telefono}`}
+                className="p-1.5 rounded-full text-green-600 hover:bg-green-100 transition-colors"
+                title="Llamar"
+              >
+                <Phone className="h-5 w-5" />
+              </a>
+            )}
+            {selectedService.conversationId && (
+              <a
+                href={`https://chat.ritest.es/app/accounts/1/inbox-view/conversation/${selectedService.conversationId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-1.5 rounded-full text-green-600 hover:bg-green-100 transition-colors"
+                title="Abrir chat"
+              >
+                <MessageCircle className="h-5 w-5" />
+              </a>
+            )}
+            <button
+              onClick={() => setSelectedService(null)}
+              className="ml-2 p-1.5 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+              title="Cerrar"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        )}
       >
         {selectedService && (
           <ServiceDetails
@@ -344,6 +303,7 @@ const Reparaciones: React.FC = () => {
             variant="reparaciones"
             onUpdate={(updated) => setData(prev => prev.map(s => s.id === updated.id ? updated : s))}
             onClose={() => setSelectedService(null)}
+            technicianName={technicianNameRef.current[selectedService.id]}
           />
         )}
       </Modal>

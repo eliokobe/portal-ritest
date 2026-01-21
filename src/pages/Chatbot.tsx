@@ -250,33 +250,22 @@ const Chatbot: React.FC = () => {
         return true;
       }
       
-      // Caso 2: Con PDF y estado Realizado, solo si la Fecha PDF es reciente (menos de 30 días)
-      if (isRealizado && hasPDF && c['Fecha PDF']) {
-        try {
-          const fechaPDF = new Date(c['Fecha PDF']);
-          const diffInDays = (now.getTime() - fechaPDF.getTime()) / (1000 * 60 * 60 * 24);
-          
-          if (c.Contrato === '945099198') {
-            console.log('Días desde PDF:', diffInDays);
+      // Caso 2: Con PDF
+      if (hasPDF) {
+        // Si está en estado Realizado, solo mostrar si es reciente (menos de 30 días)
+        if (isRealizado && c['Fecha PDF']) {
+          try {
+            const fechaPDF = new Date(c['Fecha PDF']);
+            const diffInDays = (now.getTime() - fechaPDF.getTime()) / (1000 * 60 * 60 * 24);
+            return diffInDays <= 30;
+          } catch {
+            return false;
           }
-          
-          const result = diffInDays <= 30;
-          if (c.Contrato === '945099198') {
-            console.log(result ? 'Aceptado: Realizado con PDF reciente' : 'Rechazado: PDF antiguo');
-          }
-          return result;
-        } catch {
-          if (c.Contrato === '945099198') {
-            console.log('Rechazado: error parsing fecha PDF');
-          }
-          return false;
         }
+        // Si tiene PDF pero NO está Realizado, lo mostramos para que el usuario pueda gestionarlo
+        return true;
       }
       
-      // Con PDF pero no Realizado, o Realizado sin Fecha PDF reciente -> no mostrar
-      if (c.Contrato === '945099198') {
-        console.log('Rechazado: tiene PDF pero no cumple criterios');
-      }
       return false;
     });
 
@@ -423,7 +412,11 @@ const Chatbot: React.FC = () => {
                         {contract.PDF && Array.isArray(contract.PDF) && contract.PDF.length > 0 && (
                           renderValue(contract.PDF)
                         )}
-                        <label className="cursor-pointer text-gray-400 hover:text-brand-primary transition-colors">
+                        <label className={`cursor-pointer transition-colors ${
+                          contract.PDF && Array.isArray(contract.PDF) && contract.PDF.length > 0 
+                            ? 'text-blue-600 hover:text-blue-800' 
+                            : 'text-gray-400 hover:text-brand-primary'
+                        }`}>
                           <Paperclip className="h-5 w-5" />
                           <input
                             type="file"
@@ -441,13 +434,21 @@ const Chatbot: React.FC = () => {
                               
                               setSaving(true);
                               try {
-                                await airtableService.uploadContractPDF(contract.id, file);
-                                // Recargar contratos para ver el PDF actualizado
+                                const result = await airtableService.uploadContractPDF(contract.id, file);
+                                
+                                // Actualizar el estado local inmediatamente
+                                if (result && result.id) {
+                                  setContracts(prev => prev.map(c => 
+                                    c.id === contract.id ? { ...c, PDF: result.fields?.PDF || result.PDF || [{ url: '#', filename: file.name }] } : c
+                                  ));
+                                }
+
+                                // Recargar contratos para asegurar sincronización total
                                 await loadContracts();
                                 alert('PDF subido correctamente');
-                              } catch (error) {
-                                console.error('Error uploading PDF:', error);
-                                alert('Error al subir el PDF');
+                              } catch (err: any) {
+                                console.error('Error uploading PDF:', err);
+                                alert('Error al subir el PDF: ' + (err.response?.data?.error || err.message));
                               } finally {
                                 setSaving(false);
                                 e.target.value = '';

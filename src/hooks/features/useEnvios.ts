@@ -43,7 +43,6 @@ export function useEnvios({ userClinic, userRole }: UseEnviosOptions = {}) {
   const [envios, setEnvios] = useState<Envio[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'requiere-accion' | 'en-espera'>('requiere-accion');
   const [saving, setSaving] = useState(false);
   
   const [catalogos, setCatalogos] = useState<CatalogoItem[]>([]);
@@ -183,33 +182,6 @@ export function useEnvios({ userClinic, userRole }: UseEnviosOptions = {}) {
 
   const filteredEnvios = useMemo(() => {
     return envios.filter(envio => {
-      const estadosExcluidos = ['Entregado', 'Devuelto', 'Recogida hecha'];
-      if (envio.estado && estadosExcluidos.includes(envio.estado)) return false;
-      
-      const now = new Date();
-      
-      if (activeTab === 'requiere-accion') {
-        if (envio.seguimiento === 'Email enviado') return false;
-        if (envio.fechaEnvio) {
-          const fechaEnvio = new Date(envio.fechaEnvio);
-          const businessHours = calculateBusinessHours(fechaEnvio, now);
-          return businessHours > 48;
-        }
-        return false;
-      }
-      
-      if (activeTab === 'en-espera') {
-        if (envio.seguimiento === 'Email enviado') return true;
-        if (envio.fechaEnvio) {
-          const fechaEnvio = new Date(envio.fechaEnvio);
-          const businessHours = calculateBusinessHours(fechaEnvio, now);
-          return businessHours <= 48;
-        }
-        return true;
-      }
-      
-      return false;
-    }).filter(envio => {
       if (!searchTerm) return true;
       const needle = searchTerm.toLowerCase();
       const normalizeText = (value?: string | number) => (value ?? '').toString().toLowerCase();
@@ -219,7 +191,7 @@ export function useEnvios({ userClinic, userRole }: UseEnviosOptions = {}) {
         normalizeText(envio.producto).includes(needle)
       );
     });
-  }, [envios, activeTab, searchTerm]);
+  }, [envios, searchTerm]);
 
   const sortedEnvios = useMemo(() => {
     return [...filteredEnvios].sort((a, b) => {
@@ -234,8 +206,6 @@ export function useEnvios({ userClinic, userRole }: UseEnviosOptions = {}) {
     loading,
     searchTerm,
     setSearchTerm,
-    activeTab,
-    setActiveTab,
     saving,
     catalogos,
     serviciosInfo,

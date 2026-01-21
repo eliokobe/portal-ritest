@@ -7,7 +7,7 @@ const compression = require('compression');
 const NodeCache = require('node-cache');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = 3001;
 
 // Configuración de caché en memoria
 // stdTTL: 180 segundos (3 minutos) - tiempo que los datos se consideran frescos
@@ -108,26 +108,35 @@ app.post('/api/upload-attachment', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
-    console.log(`📤 Uploading attachment to ${baseId}/${recordId}/${fieldName}`);
+    console.log(`📤 Uploading attachment directly to Airtable Content API: ${baseId}/${recordId}/${fieldName}`);
     
-    // Crear cliente de Airtable para esta base
-    const client = createAirtableClient(baseId);
-    
-    // Para Airtable, necesitamos una URL pública del archivo
-    // Como workaround, vamos a usar data URLs que Airtable soporta en algunos casos
-    const dataUrl = `data:${file.contentType};base64,${file.data}`;
-    
-    // Actualizar el registro con el attachment usando PATCH
-    const response = await client.patch(`/${recordId}`, {
-      fields: {
-        [fieldName]: [
-          {
-            url: dataUrl
-          }
-        ]
+    // Usar el endpoint de contenido de Airtable (soporta hasta 5MB directos)
+    // Documentación: https://content.airtable.com/v0/{baseId}/{recordId}/{fieldName}/uploadAttachment
+    const response = await axios.post(
+      `https://content.airtable.com/v0/${baseId}/${recordId}/${fieldName}/uploadAttachment`,
+      {
+        contentType: file.contentType,
+        file: file.data, // Airtable espera el base64 aquí según la documentación que enviaste
+        filename: file.filename
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        // Aumentar el timeout para archivos grandes
+        timeout: 60000
       }
-    });
+    );
     
+    console.log('✅ Attachment uploaded successfully');
+    
+    // Invalidar la caché para que al recargar se vean los cambios
+    if (typeof cache !== 'undefined' && cache.flushAll) {
+      console.log('🧹 Flushing cache after upload');
+      cache.flushAll();
+    }
+
     res.json(response.data);
   } catch (error) {
     console.error('Error uploading attachment:', error.response?.data || error.message);

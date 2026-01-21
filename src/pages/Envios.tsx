@@ -14,8 +14,6 @@ export default function Envios() {
     loading,
     searchTerm,
     setSearchTerm,
-    activeTab,
-    setActiveTab,
     catalogos,
     serviciosInfo,
     tecnicos,
@@ -63,32 +61,6 @@ export default function Envios() {
           >
             <Plus className="w-4 h-4" />
             Añadir
-          </button>
-        </div>
-      </div>
-
-      {/* Pestañas */}
-      <div className="bg-white rounded-lg transition-shadow hover:shadow-md border border-gray-200 overflow-hidden">
-        <div className="flex border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab('requiere-accion')}
-            className={`flex-1 px-6 py-2 text-sm font-medium transition-colors ${
-              activeTab === 'requiere-accion'
-                ? 'bg-brand-primary text-white border-b-2 border-brand-primary'
-                : 'text-gray-700 hover:bg-gray-50 hover:text-brand-primary'
-            }`}
-          >
-            Requiere Acción
-          </button>
-          <button
-            onClick={() => setActiveTab('en-espera')}
-            className={`flex-1 px-6 py-2 text-sm font-medium transition-colors ${
-              activeTab === 'en-espera'
-                ? 'bg-brand-primary text-white border-b-2 border-brand-primary'
-                : 'text-gray-700 hover:bg-gray-50 hover:text-brand-primary'
-            }`}
-          >
-            En Espera
           </button>
         </div>
       </div>

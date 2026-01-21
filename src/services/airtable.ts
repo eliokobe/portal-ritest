@@ -361,6 +361,7 @@ async function fetchServicesByTable(params: {
         seguimiento: f['Seguimiento'],
         resolucionVisita: f['Resolución visita'] ?? f['Resolucion visita'],
         requiereAccion: f['Requiere acción'],
+        motivoTecnico: f['Motivo técnico'] ?? f['Motivo tecnico'],
         numero: f['Número'] ?? f['Numero'],
       };
     });
@@ -1342,7 +1343,7 @@ export const airtableService = {
     referencia?: string;
   }[]> {
     try {
-      const records = await fetchAllServicios(AIRTABLE_ENVIOS_TABLE, { pageSize: 100 });
+      const records = await fetchAllServicios(AIRTABLE_ENVIOS_TABLE, { pageSize: 100, view: 'Portal' });
       return records.map((r: any) => {
         const f = r.fields ?? {};
         const materialField = f['Inventario'];
@@ -1713,16 +1714,9 @@ export const airtableService = {
   },
 
   // Obtener reparaciones (tabla "Reparaciones")
-  async getReparaciones(clinic?: string): Promise<any[]> {
+  async getReparaciones(_clinic?: string): Promise<any[]> {
     try {
-      const queryParams: Record<string, any> = {};
-      
-      if (clinic) {
-        const clinicEsc = escapeFormulaString(clinic);
-        queryParams.filterByFormula = `{Cliente} = '${clinicEsc}'`;
-      }
-      
-      const records = await fetchAllServicios('Reparaciones', { ...queryParams, pageSize: 100 });
+      const records = await fetchAllServicios('Reparaciones', { pageSize: 100, view: 'Reparaciones' });
       
       return records.map((r: any) => {
         const f = r.fields ?? {};
@@ -1754,6 +1748,8 @@ export const airtableService = {
           formularioId: f['Formulario'],
           direccion: f['Dirección'] ?? f['Direccion'] ?? f['Address'],
           poblacion: f['Población'] ?? f['Poblacion'],
+          provincia: f['Provincia'],
+          codigoPostal: f['Código postal'] ?? f['Codigo postal'] ?? f['CP'],
           servicioId: f['Servicios'],
         };
       });
@@ -2168,6 +2164,8 @@ export const airtableService = {
       
       if (updates.ipartner !== undefined) {
         fields['Ipartner'] = updates.ipartner;
+        // Si se actualiza Ipartner, también marcamos como Tramitado
+        fields['Tramitado'] = true;
       }
       
       await registrosApi.patch(`/Registros/${registroId}`, { fields });
@@ -2959,10 +2957,16 @@ export const airtableService = {
     }
   },
 
-  // Subir PDF a contrato
-  async uploadContractPDF(contractId: string, file: File): Promise<void> {
+  // Subir PDF a contrato usando endpoint directo de Airtable (evita límites de proxy/backend)
+  async uploadContractPDF(contractId: string, file: File): Promise<any> {
     try {
       const CONTRACTS_BASE_ID = 'applcT2fcdNDpCRQ0';
+      const FIELD_NAME = 'PDF';
+      const AIRTABLE_API_KEY = import.meta.env.VITE_AIRTABLE_API_KEY;
+
+      if (!AIRTABLE_API_KEY) {
+        throw new Error('No se ha encontrado la clave de API de Airtable (VITE_AIRTABLE_API_KEY)');
+      }
 
       // Convertir archivo a base64
       const base64 = await new Promise<string>((resolve, reject) => {
@@ -2977,29 +2981,28 @@ export const airtableService = {
         reader.readAsDataURL(file);
       });
 
-      // Usar el endpoint del backend para subir attachments
-      await axios.post(
-        `${BACKEND_URL}/api/upload-attachment`,
+      // Endpoint directo de Airtable para subida de adjuntos
+      const url = `https://content.airtable.com/v0/${CONTRACTS_BASE_ID}/${contractId}/${FIELD_NAME}/uploadAttachment`;
+
+      const response = await axios.post(
+        url,
         {
-          baseId: CONTRACTS_BASE_ID,
-          recordId: contractId,
-          fieldName: 'PDF',
-          file: {
-            contentType: file.type,
-            filename: file.name,
-            data: base64,
-          },
+          contentType: file.type,
+          file: base64,
+          filename: file.name,
         },
         {
           headers: {
+            'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
             'Content-Type': 'application/json',
           },
         }
       );
+
+      return response.data;
     } catch (error: any) {
-
-
-      throw new Error(error.response?.data?.error?.message || error.message || 'Error al subir PDF');
+      console.error('Error en uploadContractPDF (directo):', error);
+      throw new Error(error.response?.data?.error?.message || error.message || 'Error al subir PDF a Airtable');
     }
   },
 

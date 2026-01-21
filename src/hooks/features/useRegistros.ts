@@ -108,7 +108,7 @@ export function useRegistros({ userRole }: UseRegistrosOptions = {}) {
     try {
       await airtableService.updateRegistro(registroId, { ipartner: newValue });
       setRegistros(prev =>
-        prev.map(r => r.id === registroId ? { ...r, ipartner: newValue } : r)
+        prev.map(r => r.id === registroId ? { ...r, ipartner: newValue, tramitado: true } : r)
       );
       return true;
     } catch (error) {
@@ -119,6 +119,8 @@ export function useRegistros({ userRole }: UseRegistrosOptions = {}) {
 
   const filteredRegistros = useMemo(() => {
     return registros.filter(registro => {
+      if (registro.tramitado) return false;
+
       const matchesSearch = !searchTerm ||
         registro.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         registro.telefono?.includes(searchTerm) ||
