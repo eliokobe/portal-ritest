@@ -4,7 +4,19 @@ import { User, DashboardStats } from '../types';
 import { supabaseService } from './supabase';
 
 // Backend URL - todas las peticiones van al backend seguro
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+const getBackendUrl = () => {
+  const envUrl = import.meta.env.VITE_BACKEND_URL;
+  if (envUrl) return envUrl;
+  
+  // Si estamos en producción (no localhost) y no hay URL definida, usamos relativa
+  if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost')) {
+    return window.location.origin;
+  }
+  
+  return 'http://localhost:3001';
+};
+
+const BACKEND_URL = getBackendUrl();
 
 // Nombres de tablas
 const AIRTABLE_WORKERS_TABLE = import.meta.env.VITE_AIRTABLE_WORKERS_TABLE || 'Trabajadores';

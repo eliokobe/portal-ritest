@@ -103,7 +103,7 @@ app.get('/api/health', (req, res) => {
 // ============================================
 // UPLOAD ATTACHMENT
 // ============================================
-app.post('/api/upload-attachment', async (req, res) => {
+const uploadAttachmentHandler = async (req, res) => {
   try {
     const { baseId, recordId, fieldName, file } = req.body;
     
@@ -118,11 +118,12 @@ app.post('/api/upload-attachment', async (req, res) => {
       console.error('❌ AIRTABLE_API_KEY is not defined in backend');
       return res.status(500).json({ error: 'Backend configuration error: API Key missing' });
     }
+    
     const response = await axios.post(
       `https://content.airtable.com/v0/${baseId}/${recordId}/${fieldName}/uploadAttachment`,
       {
         contentType: file.contentType,
-        file: file.data, // Airtable espera el base64 aquí según la documentación que enviaste
+        file: file.data,
         filename: file.filename
       },
       {
@@ -130,14 +131,12 @@ app.post('/api/upload-attachment', async (req, res) => {
           'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
           'Content-Type': 'application/json'
         },
-        // Aumentar el timeout para archivos grandes
         timeout: 60000
       }
     );
     
     console.log('✅ Attachment uploaded successfully');
     
-    // Invalidar la caché para que al recargar se vean los cambios
     if (typeof cache !== 'undefined' && cache.flushAll) {
       console.log('🧹 Flushing cache after upload');
       cache.flushAll();
@@ -150,7 +149,10 @@ app.post('/api/upload-attachment', async (req, res) => {
       error: error.response?.data || error.message
     });
   }
-});
+};
+
+app.post('/api/upload-attachment', uploadAttachmentHandler);
+app.post('/upload-attachment', uploadAttachmentHandler);
 
 // ============================================
 // PROXY SERVICIOS (sin autenticación JWT)
