@@ -7,7 +7,10 @@ const compression = require('compression');
 const NodeCache = require('node-cache');
 
 const app = express();
-const PORT = 3001;
+// #region agent log
+fetch('http://127.0.0.1:7243/ingest/9ae1826f-8438-41dd-a48f-f5e848b7c433',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:10',message:'Checking PORT env variable',data:{envPort:process.env.PORT},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+// #endregion
+const PORT = process.env.PORT || 3001;
 
 // Configuración de caché en memoria
 // stdTTL: 180 segundos (3 minutos) - tiempo que los datos se consideran frescos
@@ -414,6 +417,9 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
+  // #region agent log
+  fetch('http://127.0.0.1:7243/ingest/9ae1826f-8438-41dd-a48f-f5e848b7c433',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server/index.js:417',message:'Server starting',data:{actualPort:PORT},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
   console.log(`🚀 Servidor backend ejecutándose en puerto ${PORT}`);
   console.log(`🌐 CORS: ${CLIENT_URL}`);
   if (!AIRTABLE_API_KEY) {
