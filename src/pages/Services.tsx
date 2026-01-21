@@ -28,19 +28,19 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   const { user } = useAuth();
   const isTramitacion = variant === 'tramitaciones';
   const isTecnico = user?.role === 'Técnico';
-  const isResponsableOrAdministrativa = user?.role === 'Responsable' || user?.role === 'Administrativa';
-
-  const [activeTab] = useState<'requiere-accion' | 'en-espera'>('requiere-accion');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [lastSelectedServiceId, setLastSelectedServiceId] = useState<string | null>(null);
   const [pendingStatusChange, setPendingStatusChange] = useState<{ serviceId: string; newStatus: string } | null>(null);
   const [modalToShow, setModalToShow] = useState<'cita' | 'resolucion' | 'motivo' | null>(null);
 
   const fetchFn = async () => {
-    const workerEmail = isTecnico ? user?.email : undefined;
-    return isTramitacion
-      ? await airtableService.getTramitaciones(user?.clinic, undefined, workerEmail, { onlyUnsynced: true })
-      : await airtableService.getServices(user?.clinic, undefined, workerEmail);
+    if (isTramitacion) {
+      const workerEmail = isTecnico ? user?.email : undefined;
+      return await airtableService.getTramitaciones(user?.clinic, undefined, workerEmail, { onlyUnsynced: true });
+    }
+
+    const workerEmail = user?.email;
+    return await airtableService.getServices(undefined, undefined, workerEmail, { view: 'Servicios' });
   };
 
   const {
@@ -53,43 +53,28 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   } = useEntityList<Service>({
     fetchFn,
     searchFields: ['expediente', 'nombre', 'telefono', 'direccion', 'estado', 'estadoIpas', 'numero'],
-    dependencies: [variant, user?.clinic, user?.id, activeTab],
+    dependencies: [variant, user?.clinic, user?.id, user?.email],
     sortFn: (a, b) => {
       const dateA = a.fechaRegistro ? new Date(a.fechaRegistro).getTime() : 0;
       const dateB = b.fechaRegistro ? new Date(b.fechaRegistro).getTime() : 0;
       return dateB - dateA; // Más recientes primero
     },
     filterFn: (s: Service): boolean => {
-      // 1. Filter by variant specific logic
-      if (isTramitacion) {
-        const accionStr = typeof s.accionIpartner === 'string' ? s.accionIpartner : 
-                         Array.isArray(s.accionIpartner) ? (s.accionIpartner as string[]).join(', ') : 
-                         String(s.accionIpartner || '');
-
-        return !!(!s.tramitado && accionStr.trim() !== '' && s.ipartner !== 'Cancelado' && s.ipartner !== 'Facturado');
+      if (!isTramitacion) {
+        if (s.estado === 'Citado') {
+          if (!s.cita) return false;
+          const citaDate = new Date(s.cita);
+          if (Number.isNaN(citaDate.getTime())) return false;
+          return citaDate.getTime() <= Date.now();
+        }
+        return true;
       }
 
-      // If Responsable/Administrativa in Services, show ALL
-      if (isResponsableOrAdministrativa) return true;
+      const accionStr = typeof s.accionIpartner === 'string' ? s.accionIpartner : 
+                       Array.isArray(s.accionIpartner) ? (s.accionIpartner as string[]).join(', ') : 
+                       String(s.accionIpartner || '');
 
-      // Base filter for Services: exclude Finalizado/Cancelado/Sin contactar for non-admin/non-responsable
-      if (s.estado) {
-        const estadoLower = s.estado.toLowerCase();
-        if (['finalizado', 'cancelado', 'sin contactar'].includes(estadoLower)) return false;
-      }
-
-      // 2. Filter for Technicians: only show those that require action
-      if (isTecnico) {
-        const now = new Date();
-        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        
-        const isCitaToday = !!(s.cita && new Date(s.cita).toDateString() === now.toDateString());
-        const isRecent = !!(s.fechaRegistro && new Date(s.fechaRegistro) >= yesterday);
-        
-        return isCitaToday || isRecent;
-      }
-
-      return true;
+      return !!(!s.tramitado && accionStr.trim() !== '' && s.ipartner !== 'Cancelado' && s.ipartner !== 'Facturado');
     }
   });
 

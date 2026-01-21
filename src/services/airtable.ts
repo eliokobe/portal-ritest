@@ -225,8 +225,9 @@ async function fetchServicesByTable(params: {
   workerId?: string;
   workerEmail?: string;
   onlyUnsynced?: boolean;
+  view?: string;
 }): Promise<ServicioListado[]> {
-  const { tableName, clinic, workerId, workerEmail, onlyUnsynced } = params;
+  const { tableName, clinic, workerId, workerEmail, onlyUnsynced, view } = params;
   try {
     const queryParams: Record<string, any> = {};
 
@@ -255,8 +256,8 @@ async function fetchServicesByTable(params: {
 
 
       // Email trabajador es un lookup, por lo tanto es un array
-      // Usar FIND para buscar el email en el array del lookup
-      formulaParts.push(`FIND('${emailEsc}', ARRAYJOIN({${emailField}}, ',')) > 0`);
+      // Igualdad exacta en el array convertido a string
+      formulaParts.push(`ARRAYJOIN({${emailField}}, ',') = '${emailEsc}'`);
 
     } else if (workerId) {
       const workerIdEsc = escapeFormulaString(workerId);
@@ -283,6 +284,10 @@ async function fetchServicesByTable(params: {
       if (serviciosFieldNames.has('Tramitado')) {
         formulaParts.push('OR({Tramitado}=BLANK(), {Tramitado}=FALSE())');
       }
+    }
+
+    if (view) {
+      queryParams.view = view;
     }
 
     if (formulaParts.length > 0) {
@@ -1692,8 +1697,19 @@ export const airtableService = {
   },
 
   // Obtener servicios (tabla "Servicios")
-  async getServices(clinic?: string, workerId?: string, workerEmail?: string): Promise<ServicioListado[]> {
-    return fetchServicesByTable({ tableName: AIRTABLE_SERVICES_TABLE, clinic, workerId, workerEmail });
+  async getServices(
+    clinic?: string,
+    workerId?: string,
+    workerEmail?: string,
+    options?: { view?: string },
+  ): Promise<ServicioListado[]> {
+    return fetchServicesByTable({
+      tableName: AIRTABLE_SERVICES_TABLE,
+      clinic,
+      workerId,
+      workerEmail,
+      view: options?.view,
+    });
   },
 
   // Obtener reparaciones (tabla "Reparaciones")
