@@ -456,7 +456,8 @@ app.listen(PORT, () => {
   console.log(`🌐 CORS: ${CLIENT_URL}`);
   if (!AIRTABLE_API_KEY) {
     console.error('⚠️  ADVERTENCIA: AIRTABLE_API_KEY no configurada');
+    console.log('Variables disponibles:', Object.keys(process.env).filter(k => k.includes('AIRTABLE') || k.includes('PORT')));
   } else {
-    console.log('✅ AIRTABLE_API_KEY configurada');
+    console.log('✅ AIRTABLE_API_KEY detectada');
   }
 });
