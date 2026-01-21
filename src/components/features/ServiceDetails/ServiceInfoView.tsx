@@ -1,6 +1,6 @@
 import React from 'react';
 import { Service } from '../../../types';
-import { renderDetailValue, formatDateTime, formatDateTimeForInput, parseCitaInput } from '../../../utils/helpers';
+import { renderDetailValue, formatDateTime, formatDateTimeForInput, parseCitaInput, formatDate, formatDateForInput, parseDateInput } from '../../../utils/helpers';
 import { getStatusColors, getIpartnerColors } from '../../../utils/statusColors';
 import { STATUS_OPTIONS, IPARTNER_OPTIONS } from '../../../utils/constants';
 import { EditableField } from '../../ui/EditableField';
@@ -111,6 +111,10 @@ export const ServiceInfoView: React.FC<ServiceInfoViewProps> = ({
                 {technicianName || 'Sin información'}
               </p>
             </div>
+            <div className="space-y-1">
+              <p className="text-xs uppercase text-gray-500">Fecha de instalación</p>
+              <p className="text-sm text-gray-900">{renderDetailValue(formatDate(service.fechaInstalacion))}</p>
+            </div>
           </>
         ) : (
           <>
@@ -179,6 +183,22 @@ export const ServiceInfoView: React.FC<ServiceInfoViewProps> = ({
                 />
               ) : (
                 <p className="text-sm text-gray-900">{renderDetailValue(service.numeroSerie)}</p>
+              )}
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs uppercase text-gray-500">Fecha de instalación</p>
+              {!isTramitacion ? (
+                <EditableField
+                  value={formatDateForInput(service.fechaInstalacion)}
+                  onSave={async (val) => {
+                    const date = parseDateInput(val);
+                    if (date) await handleFieldUpdate('fechaInstalacion', date.toISOString(), 'Fecha de instalación');
+                    else if (val === '') await handleFieldUpdate('fechaInstalacion', null, 'Fecha de instalación');
+                  }}
+                  placeholder="DD/MM/YYYY"
+                />
+              ) : (
+                <p className="text-sm text-gray-900">{renderDetailValue(formatDate(service.fechaInstalacion))}</p>
               )}
             </div>
             

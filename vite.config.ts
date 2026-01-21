@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react';
 // Force rebuild: 2026-01-19
 export default defineConfig({
   plugins: [react()],
+  envPrefix: ['VITE_', 'AIRTABLE_'],
   build: {
     minify: 'terser',
     sourcemap: false, // Evita la reconstrucción del código en el inspector

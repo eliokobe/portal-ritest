@@ -183,6 +183,10 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
       accessor: (s: Service) => formatDate(s.fechaRegistro),
     },
     {
+      header: 'Instalación',
+      accessor: (s: Service) => formatDate(s.fechaInstalacion),
+    },
+    {
       header: 'Nombre',
       accessor: 'nombre',
       className: 'max-w-[10rem] truncate',

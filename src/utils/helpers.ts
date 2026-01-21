@@ -17,6 +17,53 @@ export const formatDate = (dateString?: string): string => {
 };
 
 /**
+ * Formatea una fecha para ser usada en un input (DD/MM/YYYY)
+ */
+export const formatDateForInput = (dateString?: string): string => {
+  if (!dateString) return '';
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${day}/${month}/${year}`;
+  } catch {
+    return '';
+  }
+};
+
+/**
+ * Parsea un string de fecha (DD/MM/YYYY) a un objeto Date
+ */
+export const parseDateInput = (input: string): Date | null => {
+  const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+  const match = input.trim().match(regex);
+  
+  if (!match) return null;
+
+  const [, day, month, year] = match;
+  const dayNum = parseInt(day);
+  const monthNum = parseInt(month);
+  const yearNum = parseInt(year);
+
+  if (monthNum < 1 || monthNum > 12) return null;
+  if (dayNum < 1 || dayNum > 31) return null;
+
+  try {
+    const date = new Date(yearNum, monthNum - 1, dayNum);
+    if (date.getDate() !== dayNum || 
+        date.getMonth() !== monthNum - 1 || 
+        date.getFullYear() !== yearNum) {
+      return null;
+    }
+    return date;
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Formatea una fecha en formato ISO a DD/MM/YYYY HH:MM
  */
 export const formatDateTime = (dateString?: string): string => {
