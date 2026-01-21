@@ -139,7 +139,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
         await airtableService.updateServiceField(serviceId, field, extraValue);
       } else if (modalToShow === 'motivo') {
         await airtableService.updateServiceStatus(serviceId, newStatus);
-        await airtableService.updateServiceField(serviceId, 'Requiere acción', extraValue);
+        await airtableService.updateServiceField(serviceId, 'motivoTecnico', extraValue);
       }
 
       setData((prev: Service[]) => prev.map((item: Service) => {
@@ -150,7 +150,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
             if (newStatus === 'Cancelado') updated.motivoCancelacion = extraValue;
             else updated.resolucionVisita = extraValue;
           }
-          if (modalToShow === 'motivo') updated.requiereAccion = extraValue;
+          if (modalToShow === 'motivo') updated.motivoTecnico = extraValue;
           return updated;
         }
         return item;

@@ -65,6 +65,7 @@ export interface Service {
   ipartner?: string;
   resolucionVisita?: string;
   requiereAccion?: string;
+  motivoTecnico?: string;
   numero?: string;
   fechaEstado?: string; // Reparaciones.tsx
   seguimiento?: string; // Reparaciones.tsx
