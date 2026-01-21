@@ -11,6 +11,7 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   className?: string;
   showCloseButton?: boolean;
+  actions?: React.ReactNode;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -23,6 +24,7 @@ export const Modal: React.FC<ModalProps> = ({
   size = 'md',
   className = '',
   showCloseButton = true,
+  actions,
 }) => {
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -68,15 +70,18 @@ export const Modal: React.FC<ModalProps> = ({
             {title && <h2 className="text-xl font-bold text-gray-900">{title}</h2>}
             {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
           </div>
-          {showCloseButton && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {actions}
+            {showCloseButton && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-2 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Content */}

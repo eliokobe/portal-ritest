@@ -139,7 +139,40 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({
     }
   };
 
+  const hasFormularioPhotos = (form: any) => {
+    if (!form) return false;
+    const photoFields = ['Foto general', 'Foto etiqueta', 'Foto roto', 'Foto cuadro'];
+    return photoFields.some((field) => Array.isArray(form[field]) && form[field].length > 0);
+  };
+
+  const normalizeAttachments = (value: any): AirtableAttachment[] => (
+    Array.isArray(value) ? value : []
+  );
+
+  const reparacionPhotos = reparaciones.flatMap((reparacion) => ([
+    ...normalizeAttachments(reparacion['Foto'] ?? reparacion.foto ?? reparacion.fotoGeneral),
+    ...normalizeAttachments(reparacion['Foto de la etiqueta'] ?? reparacion.fotoEtiqueta),
+  ]));
+  const hasReparacionPhotos = reparacionPhotos.length > 0;
+
   const currentForm = formularios[selectedFormularioIndex] || (detailsView === 'fotos' ? fallbackFormulario : null);
+  const photoForm = (() => {
+    const primaryForm = formularios[selectedFormularioIndex];
+    if (primaryForm && hasFormularioPhotos(primaryForm)) return primaryForm;
+    if (!hasReparacionPhotos && fallbackFormulario) return fallbackFormulario;
+    return primaryForm || null;
+  })();
+
+  const formularioPhotos = photoForm
+    ? [
+        ...normalizeAttachments(photoForm['Foto general']),
+        ...normalizeAttachments(photoForm['Foto etiqueta']),
+        ...normalizeAttachments(photoForm['Foto roto']),
+        ...normalizeAttachments(photoForm['Foto cuadro']),
+      ]
+    : [];
+
+  const mixedPhotos = [...formularioPhotos, ...reparacionPhotos];
 
   return (
     <div className="space-y-4 -mt-4">
@@ -348,6 +381,12 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({
                   </select>
                 )}
               </div>
+              {isTramitacion && (
+                <div className="space-y-1">
+                  <p className="text-xs uppercase text-gray-500">Acción Ipartner</p>
+                  <p className="text-sm text-gray-900">{renderDetailValue(service.accionIpartner)}</p>
+                </div>
+              )}
             </div>
 
             {/* Description and Comments */}
@@ -602,24 +641,16 @@ export const ServiceDetails: React.FC<ServiceDetailsProps> = ({
         {detailsView === 'fotos' && (
           <div className="space-y-6">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Fotos de Referencia</h2>
-            {fallbackFormulario ? (
+            {mixedPhotos.length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {['Foto general', 'Foto etiqueta', 'Foto roto', 'Foto cuadro'].map(field => (
-                  <div key={field} className="space-y-2">
-                    <p className="text-xs font-medium text-gray-500 uppercase">{field}</p>
-                    {fallbackFormulario[field]?.map((file: AirtableAttachment, i: number) => (
-                      <img 
-                        key={i} 
-                        src={file.thumbnails?.large?.url || file.url} 
-                        className="w-full h-40 object-cover rounded border hover:opacity-80 cursor-pointer"
-                        onClick={() => window.open(file.url, '_blank')}
-                        alt={field}
-                      />
-                    ))}
-                    {(!fallbackFormulario[field] || fallbackFormulario[field].length === 0) && (
-                      <p className="text-xs text-gray-400 italic">Sin foto</p>
-                    )}
-                  </div>
+                {mixedPhotos.map((file: AirtableAttachment, i: number) => (
+                  <img 
+                    key={`${file.id || file.url || 'photo'}-${i}`}
+                    src={file.thumbnails?.large?.url || file.url} 
+                    className="w-full h-40 object-cover rounded border hover:opacity-80 cursor-pointer"
+                    onClick={() => window.open(file.url, '_blank')}
+                    alt="Foto"
+                  />
                 ))}
               </div>
             ) : (

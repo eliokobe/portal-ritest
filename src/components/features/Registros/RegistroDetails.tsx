@@ -66,7 +66,7 @@ export const RegistroDetails: React.FC<RegistroDetailsProps> = ({
       onClose={onClose}
       title="Detalles del Registro"
       size="md"
-      header={
+      actions={
         <div className="flex items-center gap-2">
           {registro.telefono && (
             <a
