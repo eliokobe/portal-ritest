@@ -108,13 +108,16 @@ app.post('/api/upload-attachment', async (req, res) => {
     const { baseId, recordId, fieldName, file } = req.body;
     
     if (!baseId || !recordId || !fieldName || !file) {
+      console.error('❌ Missing fields:', { baseId, recordId, fieldName, hasFile: !!file });
       return res.status(400).json({ error: 'Missing required fields' });
     }
     
-    console.log(`📤 Uploading attachment directly to Airtable Content API: ${baseId}/${recordId}/${fieldName}`);
+    console.log(`📤 Uploading attachment: ${file.filename} (${Math.round(file.data.length / 1024)} KB)`);
     
-    // Usar el endpoint de contenido de Airtable (soporta hasta 5MB directos)
-    // Documentación: https://content.airtable.com/v0/{baseId}/{recordId}/{fieldName}/uploadAttachment
+    if (!AIRTABLE_API_KEY) {
+      console.error('❌ AIRTABLE_API_KEY is not defined in backend');
+      return res.status(500).json({ error: 'Backend configuration error: API Key missing' });
+    }
     const response = await axios.post(
       `https://content.airtable.com/v0/${baseId}/${recordId}/${fieldName}/uploadAttachment`,
       {

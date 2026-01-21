@@ -2957,17 +2957,11 @@ export const airtableService = {
     }
   },
 
-  // Subir PDF a contrato usando endpoint directo de Airtable (evita límites de proxy/backend)
+  // Subir PDF a contrato a través del backend
   async uploadContractPDF(contractId: string, file: File): Promise<any> {
     try {
       const CONTRACTS_BASE_ID = 'applcT2fcdNDpCRQ0';
-      const FIELD_NAME = 'PDF';
-      // Intentar obtener la API Key de varias posibles variables de entorno
-      const AIRTABLE_API_KEY = import.meta.env.VITE_AIRTABLE_API_KEY || (import.meta.env as any).AIRTABLE_API_KEY;
-
-      if (!AIRTABLE_API_KEY) {
-        throw new Error('No se ha encontrado la clave de API de Airtable (AIRTABLE_API_KEY o VITE_AIRTABLE_API_KEY)');
-      }
+      const TABLE_ID = 'tblG2iusherLVxgSv';
 
       // Convertir archivo a base64
       const base64 = await new Promise<string>((resolve, reject) => {
@@ -2982,19 +2976,22 @@ export const airtableService = {
         reader.readAsDataURL(file);
       });
 
-      // Endpoint directo de Airtable para subida de adjuntos
-      const url = `https://content.airtable.com/v0/${CONTRACTS_BASE_ID}/${contractId}/${FIELD_NAME}/uploadAttachment`;
-
+      // Usar el endpoint del backend para subir attachments
       const response = await axios.post(
-        url,
+        `${BACKEND_URL}/api/upload-attachment`,
         {
-          contentType: file.type,
-          file: base64,
-          filename: file.name,
+          baseId: CONTRACTS_BASE_ID,
+          tableId: TABLE_ID,
+          recordId: contractId,
+          fieldName: 'PDF',
+          file: {
+            contentType: file.type,
+            filename: file.name,
+            data: base64,
+          },
         },
         {
           headers: {
-            'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
             'Content-Type': 'application/json',
           },
         }
@@ -3002,8 +2999,8 @@ export const airtableService = {
 
       return response.data;
     } catch (error: any) {
-      console.error('Error en uploadContractPDF (directo):', error);
-      throw new Error(error.response?.data?.error?.message || error.message || 'Error al subir PDF a Airtable');
+      console.error('Error al subir PDF (via backend):', error);
+      throw new Error(error.response?.data?.error || error.message || 'Error al subir PDF');
     }
   },
 
