@@ -438,15 +438,26 @@ app.listen(PORT, () => {
 // SERVIR FRONTEND (PARA UNIFICACIÓN EN DO)
 // ============================================
 const path = require('path');
-// Servir archivos estáticos desde la carpeta 'dist' (generada por Vite)
-app.use(express.static(path.join(__dirname, '../dist')));
+const distPath = path.resolve(__dirname, '../dist');
 
-// Cualquier ruta que no coincida con la API, sirve el index.html
+console.log(`📂 Sirviendo archivos estáticos desde: ${distPath}`);
+
+// Servir archivos estáticos desde la carpeta 'dist'
+app.use(express.static(distPath));
+
+// Cualquier ruta que no coincida con la API, sirve el index.html (para React Router)
 app.get('*', (req, res) => {
-  // Solo servir el index.html para rutas que no son archivos (no tienen extensión)
-  if (!req.path.includes('.')) {
-    res.sendFile(path.join(__dirname, '../dist/index.html'));
-  } else {
-    res.status(404).send('Not found');
+  // Si es una petición a la API que no existe, dar 404 real
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'API endpoint not found' });
   }
+  
+  // Para el resto, servir el index.html del frontend
+  const indexPath = path.join(distPath, 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      console.error('❌ Error al enviar index.html:', err);
+      res.status(500).send('Error cargando el frontend. Asegúrate de que "npm run build" se ejecutó correctamente.');
+    }
+  });
 });
