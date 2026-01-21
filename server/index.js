@@ -415,6 +415,33 @@ app.all('/valoraciones/:tableName*', cacheMiddleware, async (req, res) => {
   }
 });
 
+// ============================================
+// SERVIR FRONTEND (PARA UNIFICACIÓN EN DO)
+// ============================================
+const path = require('path');
+const distPath = path.resolve(__dirname, '../dist');
+
+console.log(`📂 Sirviendo archivos estáticos desde: ${distPath}`);
+
+// Servir archivos estáticos desde la carpeta 'dist'
+app.use(express.static(distPath));
+
+// Cualquier ruta que no coincida con la API, sirve el index.html (para React Router)
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/') || req.path === '/health') {
+    return next();
+  }
+
+  // Para el resto, servir el index.html del frontend
+  const indexPath = path.join(distPath, 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      console.error('❌ Error al enviar index.html:', err);
+      res.status(500).send('Error cargando el frontend. Asegúrate de que "npm run build" se ejecutó correctamente.');
+    }
+  });
+});
+
 // Manejo de errores global
 app.use((err, req, res, next) => {
   console.error('Error global:', err);
@@ -432,32 +459,4 @@ app.listen(PORT, () => {
   } else {
     console.log('✅ AIRTABLE_API_KEY configurada');
   }
-});
-
-// ============================================
-// SERVIR FRONTEND (PARA UNIFICACIÓN EN DO)
-// ============================================
-const path = require('path');
-const distPath = path.resolve(__dirname, '../dist');
-
-console.log(`📂 Sirviendo archivos estáticos desde: ${distPath}`);
-
-// Servir archivos estáticos desde la carpeta 'dist'
-app.use(express.static(distPath));
-
-// Cualquier ruta que no coincida con la API, sirve el index.html (para React Router)
-app.get('*', (req, res) => {
-  // Si es una petición a la API que no existe, dar 404 real
-  if (req.path.startsWith('/api/')) {
-    return res.status(404).json({ error: 'API endpoint not found' });
-  }
-  
-  // Para el resto, servir el index.html del frontend
-  const indexPath = path.join(distPath, 'index.html');
-  res.sendFile(indexPath, (err) => {
-    if (err) {
-      console.error('❌ Error al enviar index.html:', err);
-      res.status(500).send('Error cargando el frontend. Asegúrate de que "npm run build" se ejecutó correctamente.');
-    }
-  });
 });
