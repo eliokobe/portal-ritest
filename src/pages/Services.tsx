@@ -21,15 +21,16 @@ type ServicesVariant = 'servicios' | 'tramitaciones';
 interface ServicesProps {
   variant?: ServicesVariant;
   initialSelectedServiceId?: string;
+  initialService?: Service | null;
   onClose?: () => void;
 }
 
-const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelectedServiceId, onClose }) => {
+const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelectedServiceId, initialService, onClose }) => {
   const { user } = useAuth();
   const isTramitacion = variant === 'tramitaciones';
   const isTecnico = user?.role === 'Técnico';
-  const [selectedService, setSelectedService] = useState<Service | null>(null);
-  const [lastSelectedServiceId, setLastSelectedServiceId] = useState<string | null>(null);
+  const [selectedService, setSelectedService] = useState<Service | null>(initialService || null);
+  const [lastSelectedServiceId, setLastSelectedServiceId] = useState<string | null>(initialSelectedServiceId || null);
   const [pendingStatusChange, setPendingStatusChange] = useState<{ serviceId: string; newStatus: string } | null>(null);
   const [modalToShow, setModalToShow] = useState<'cita' | 'resolucion' | 'motivo' | null>(null);
 
@@ -40,7 +41,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     }
 
     const workerEmail = user?.email;
-    return await airtableService.getServices(undefined, undefined, workerEmail, { view: 'Servicios' });
+    return await airtableService.getServices(undefined, undefined, workerEmail);
   }, [isTramitacion, isTecnico, user?.clinic, user?.email]);
 
   const {
@@ -60,6 +61,9 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
       return dateA - dateB; // Más antiguos primero
     },
     filterFn: (s: Service): boolean => {
+      // Si es el servicio seleccionado inicialmente, mostrarlo siempre
+      if (initialSelectedServiceId && s.id === initialSelectedServiceId) return true;
+
       if (!isTramitacion) {
         if (s.estado === 'Citado') {
           if (!s.cita) return false;
@@ -118,9 +122,12 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     }
 
     // Default: update immediately
-    airtableService.updateServiceStatus(service.id, newStatus)
+    airtableService.updateServiceFields(service.id, {
+      'Estado': newStatus,
+      'Tramitado': false,
+    })
       .then(() => {
-        setData(prev => prev.map(item => item.id === service.id ? { ...item, estado: newStatus, cita: undefined } : item));
+        setData(prev => prev.map(item => item.id === service.id ? { ...item, estado: newStatus, cita: undefined, tramitado: false } : item));
       })
       .catch(() => alert('Error al actualizar el estado'));
   };
@@ -133,24 +140,27 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
       if (modalToShow === 'cita') {
         await airtableService.updateServiceFields(serviceId, {
           'Estado': newStatus,
-          'Cita': extraValue
+          'Cita': extraValue,
+          'Tramitado': false,
         });
       } else if (modalToShow === 'resolucion') {
         await airtableService.updateServiceFields(serviceId, {
           'Estado': newStatus,
           'Resolución visita': extraValue,
-          'Motivo técnico': null  // Limpiar motivo técnico al finalizar/cancelar
+          'Motivo técnico': null,  // Limpiar motivo técnico al finalizar/cancelar
+          'Tramitado': false,
         });
       } else if (modalToShow === 'motivo') {
         await airtableService.updateServiceFields(serviceId, {
           'Estado': newStatus,
-          'Motivo técnico': extraValue
+          'Motivo técnico': extraValue,
+          'Tramitado': false,
         });
       }
 
       setData((prev: Service[]) => prev.map((item: Service) => {
         if (item.id === serviceId) {
-          const updated = { ...item, estado: newStatus };
+          const updated = { ...item, estado: newStatus, tramitado: false };
           if (modalToShow === 'cita') updated.cita = extraValue;
           if (modalToShow === 'resolucion') {
             updated.resolucionVisita = extraValue;
@@ -166,7 +176,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
       if (selectedService?.id === serviceId) {
         setSelectedService(prev => {
           if (!prev) return null;
-          const updated = { ...prev, estado: newStatus };
+          const updated = { ...prev, estado: newStatus, tramitado: false };
           if (modalToShow === 'cita') updated.cita = extraValue;
           if (modalToShow === 'resolucion') {
             updated.resolucionVisita = extraValue;

@@ -2,17 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, XCircle } from 'lucide-react';
 import { airtableService } from '../services/airtable';
 import { useAuth } from '../contexts/AuthContext';
-import Services from './Services';
-
-interface Service {
-  id: string;
-  expediente?: string;
-  nombre?: string;
-  estado?: string;
-  cita?: string;
-  telefono?: string;
-  tecnico?: string;
-}
+import { Service } from '../types';
+import { Modal } from '../components/common/Modal';
+import { ServiceDetails } from '../components/features/ServiceDetails/ServiceDetails';
+import { CitaModal } from '../components/features/ServiceDetails/CitaModal';
+import { ResolucionModal } from '../components/features/ServiceDetails/ResolucionModal';
+import { MotivoTecnicoModal } from '../components/features/ServiceDetails/MotivoTecnicoModal';
 
 interface AppointmentSlot {
   time: string;
@@ -26,6 +21,10 @@ const Agenda: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
+  
+  // Estados para manejo de cambios de estado (copiados de Services.tsx para consistencia)
+  const [pendingStatusChange, setPendingStatusChange] = useState<{ serviceId: string; newStatus: string } | null>(null);
+  const [modalToShow, setModalToShow] = useState<'cita' | 'resolucion' | 'motivo' | null>(null);
 
   useEffect(() => {
     loadAppointments();
@@ -42,23 +41,112 @@ const Agenda: React.FC = () => {
       const allServices = await airtableService.getServices(undefined, undefined, user.email);
       
       // Filtrar solo los que tienen cita, estado Citado y sin técnico asignado
-      const withAppointments: Service[] = allServices
-        .filter(s => s.cita && s.estado === 'Citado' && !s.tecnico)
-        .map(s => ({
-          id: s.id,
-          expediente: s.expediente,
-          nombre: s.nombre,
-          estado: s.estado,
-          cita: s.cita,
-          telefono: s.telefono,
-          tecnico: typeof s.tecnico === 'string' ? s.tecnico : undefined
-        }));
+      const withAppointments = allServices.filter(s => s.cita && s.estado === 'Citado' && !s.tecnico);
       
-      setServices(withAppointments);
+      setServices(withAppointments as Service[]);
     } catch (err) {
       setError('Error al cargar las citas');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleStatusSelect = (service: Service, newStatus: string) => {
+    if (!newStatus || newStatus === service.estado) return;
+
+    if (newStatus === 'Citado') {
+      setPendingStatusChange({ serviceId: service.id, newStatus });
+      setModalToShow('cita');
+      return;
+    }
+      
+    if (newStatus === 'Pendiente de asignar' || newStatus === 'Material enviado') {
+      setPendingStatusChange({ serviceId: service.id, newStatus });
+      setModalToShow('motivo');
+      return;
+    }
+
+    if (['Cancelado', 'Finalizado', 'Presupuesto enviado'].includes(newStatus)) {
+      setPendingStatusChange({ serviceId: service.id, newStatus });
+      setModalToShow('resolucion');
+      return;
+    }
+
+    // Default: update immediately
+    airtableService.updateServiceFields(service.id, {
+      'Estado': newStatus,
+      'Tramitado': false,
+    })
+      .then(() => {
+        setServices(prev => prev.map(item => item.id === service.id ? { ...item, estado: newStatus, cita: undefined, tramitado: false } : item));
+        if (selectedService?.id === service.id) {
+          setSelectedService(prev => prev ? { ...prev, estado: newStatus, cita: undefined, tramitado: false } : null);
+        }
+        loadAppointments();
+      })
+      .catch(() => alert('Error al actualizar el estado'));
+  };
+
+  const handleModalSave = async (extraValue: string) => {
+    if (!pendingStatusChange) return;
+    const { serviceId, newStatus } = pendingStatusChange;
+
+    try {
+      if (modalToShow === 'cita') {
+        await airtableService.updateServiceFields(serviceId, {
+          'Estado': newStatus,
+          'Cita': extraValue,
+          'Tramitado': false,
+        });
+      } else if (modalToShow === 'resolucion') {
+        await airtableService.updateServiceFields(serviceId, {
+          'Estado': newStatus,
+          'Resolución visita': extraValue,
+          'Motivo técnico': null,
+          'Tramitado': false,
+        });
+      } else if (modalToShow === 'motivo') {
+        await airtableService.updateServiceFields(serviceId, {
+          'Estado': newStatus,
+          'Motivo técnico': extraValue,
+          'Tramitado': false,
+        });
+      }
+
+      setServices(prev => prev.map(item => {
+        if (item.id === serviceId) {
+          const updated = { ...item, estado: newStatus, tramitado: false };
+          if (modalToShow === 'cita') updated.cita = extraValue;
+          if (modalToShow === 'resolucion') {
+            updated.resolucionVisita = extraValue;
+            updated.motivoTecnico = undefined;
+          }
+          if (modalToShow === 'motivo') updated.motivoTecnico = extraValue;
+          return updated;
+        }
+        return item;
+      }));
+      
+      if (selectedService?.id === serviceId) {
+        setSelectedService(prev => {
+          if (!prev) return null;
+          const updated = { ...prev, estado: newStatus, tramitado: false };
+          if (modalToShow === 'cita') updated.cita = extraValue;
+          if (modalToShow === 'resolucion') {
+            updated.resolucionVisita = extraValue;
+            updated.motivoTecnico = undefined;
+          }
+          if (modalToShow === 'motivo') updated.motivoTecnico = extraValue;
+          return updated;
+        });
+      }
+      loadAppointments();
+    } catch (error) {
+      alert('Error al guardar los cambios');
+      throw error;
+    } finally {
+      setPendingStatusChange(null);
+      setModalToShow(null);
     }
   };
 
@@ -109,19 +197,6 @@ const Agenda: React.FC = () => {
 
   const appointments = getAppointmentsForDay(currentDate);
   const appointmentsCount = appointments.filter(a => a.service).length;
-
-  // Si hay un servicio seleccionado, mostrar el componente Services con ese servicio
-  if (selectedService) {
-    return (
-      <div>
-        <Services 
-          variant="servicios" 
-          initialSelectedServiceId={selectedService.id}
-          onClose={() => setSelectedService(null)}
-        />
-      </div>
-    );
-  }
 
   if (loading) {
     return (
@@ -236,6 +311,58 @@ const Agenda: React.FC = () => {
           ))}
         </div>
       </div>
+
+      <Modal
+        isOpen={!!selectedService}
+        onClose={() => {
+          setSelectedService(null);
+          loadAppointments();
+        }}
+        title="Detalle del Servicio"
+        size="lg"
+      >
+        {selectedService && (
+          <ServiceDetails
+            service={selectedService}
+            onUpdate={(updated) => {
+              setServices(prev => prev.map(s => s.id === updated.id ? updated : s));
+              setSelectedService(updated);
+            }}
+            onStatusChange={handleStatusSelect}
+            onClose={() => {
+              setSelectedService(null);
+              loadAppointments();
+            }}
+          />
+        )}
+      </Modal>
+
+      {modalToShow === 'cita' && (
+        <CitaModal
+          isOpen={true}
+          onClose={() => setModalToShow(null)}
+          onSave={handleModalSave}
+          initialDate={services.find(s => s.id === pendingStatusChange?.serviceId)?.cita}
+        />
+      )}
+
+      {modalToShow === 'resolucion' && pendingStatusChange && (
+        <ResolucionModal
+          isOpen={true}
+          onClose={() => setModalToShow(null)}
+          onSave={handleModalSave}
+          estado={pendingStatusChange.newStatus}
+        />
+      )}
+
+      {modalToShow === 'motivo' && pendingStatusChange && (
+        <MotivoTecnicoModal
+          isOpen={true}
+          onClose={() => setModalToShow(null)}
+          onSave={handleModalSave}
+          estado={pendingStatusChange.newStatus}
+        />
+      )}
     </div>
   );
 };
