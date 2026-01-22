@@ -112,6 +112,12 @@ export const ServiceInfoView: React.FC<ServiceInfoViewProps> = ({
               </p>
             </div>
             <div className="space-y-1">
+              <p className="text-xs uppercase text-gray-500">Teléfono técnico</p>
+              <p className="text-sm text-gray-900 font-medium">
+                {service.telefonoTecnico || 'Sin información'}
+              </p>
+            </div>
+            <div className="space-y-1">
               <p className="text-xs uppercase text-gray-500">Fecha de instalación</p>
               <p className="text-sm text-gray-900">{renderDetailValue(formatDate(service.fechaInstalacion))}</p>
             </div>

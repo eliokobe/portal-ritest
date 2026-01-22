@@ -44,7 +44,12 @@ const IPARTNER_OPTIONS = [
   'Facturado'
 ];
 
-export default function Registros() {
+interface RegistrosProps {
+  initialSelectedRegistroId?: string;
+  onClose?: () => void;
+}
+
+export default function Registros({ initialSelectedRegistroId, onClose }: RegistrosProps) {
   const { user } = useAuth();
   const {
     registros,
@@ -63,6 +68,16 @@ export default function Registros() {
   const [selectedRegistro, setSelectedRegistro] = useState<Registro | null>(null);
   const [showCitaModal, setShowCitaModal] = useState(false);
   const [pendingEstadoChange, setPendingEstadoChange] = useState<{ registroId: string, newEstado: string } | null>(null);
+
+  // Auto-select registro if initialSelectedRegistroId is provided
+  useEffect(() => {
+    if (initialSelectedRegistroId && registros.length > 0 && !selectedRegistro) {
+      const registro = registros.find(r => r.id === initialSelectedRegistroId);
+      if (registro) {
+        setSelectedRegistro(registro);
+      }
+    }
+  }, [initialSelectedRegistroId, registros, selectedRegistro]);
 
   const isGestoraTecnica = user?.role === 'Gestora Técnica';
   const isGestoraOperativa = user?.role === 'Gestora Operativa';
@@ -123,7 +138,10 @@ export default function Registros() {
         <RegistroDetails
           registro={selectedRegistro}
           isOpen={!!selectedRegistro}
-          onClose={() => setSelectedRegistro(null)}
+          onClose={() => {
+            setSelectedRegistro(null);
+            onClose?.();
+          }}
           onUpdateStatus={onUpdateStatus}
           onUpdateIpartner={handleUpdateIpartner}
           onUpdateCita={handleUpdateCita}

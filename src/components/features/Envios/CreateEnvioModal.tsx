@@ -39,6 +39,7 @@ export const CreateEnvioModal: React.FC<CreateEnvioModalProps> = ({
     codigoPostal: '',
     provincia: '',
     telefono: '',
+    comentarios: '',
   });
 
   const handleClose = () => {
@@ -56,6 +57,7 @@ export const CreateEnvioModal: React.FC<CreateEnvioModalProps> = ({
       codigoPostal: '',
       provincia: '',
       telefono: '',
+      comentarios: '',
     });
     onClose();
   };
@@ -336,6 +338,20 @@ export const CreateEnvioModal: React.FC<CreateEnvioModalProps> = ({
                   <option key={c.id} value={c.id}>{c.nombre}</option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label htmlFor="comentarios" className="block text-sm font-medium text-gray-700 mb-1">
+                Comentarios
+              </label>
+              <textarea
+                id="comentarios"
+                rows={3}
+                value={newEnvio.comentarios || ''}
+                onChange={(e) => setNewEnvio((prev) => ({ ...prev, comentarios: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+                placeholder="Añade comentarios del envío"
+              />
             </div>
 
             <div className="flex gap-3 pt-4">

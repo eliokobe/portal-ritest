@@ -20,7 +20,7 @@ ingress:
       path:
         prefix: /
 
-# Backend (API Proxy) - Aquí está la API key SEGURA
+# Backend (API Proxy)
 services:
 - name: backend
   github:
@@ -36,25 +36,25 @@ services:
   
   envs:
   - key: AIRTABLE_API_KEY
-    scope: RUN_TIME
+    scope: RUN_AND_BUILD_TIME
     type: SECRET
   - key: AIRTABLE_SERVICES_BASE_ID
-    scope: RUN_TIME
+    scope: RUN_AND_BUILD_TIME
     value: appX3CBiSmPy4119D
   - key: AIRTABLE_REGISTROS_BASE_ID
-    scope: RUN_TIME
+    scope: RUN_AND_BUILD_TIME
     value: applcT2fcdNDpCRQ0
   - key: CLIENT_URL
-    scope: RUN_TIME
+    scope: RUN_AND_BUILD_TIME
     value: https://portal.ritest.es
   - key: SUPABASE_URL
-    scope: RUN_TIME
+    scope: RUN_AND_BUILD_TIME
     value: https://bmnwfimrcblnvmkbflwn.supabase.co
   - key: SUPABASE_ANON_KEY
-    scope: RUN_TIME
+    scope: RUN_AND_BUILD_TIME
     value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtbndmaW1yY2JsbnZta2JmbHduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNTc4NDQsImV4cCI6MjA4MzYzMzg0NH0.Xdeil2_IPMFjprhFG7yoIwshqIhntNNZ3Hc6jEj6KjM
   - key: PORT
-    scope: RUN_TIME
+    scope: RUN_AND_BUILD_TIME
     value: "8080"
   - key: VITE_BACKEND_URL
     scope: RUN_AND_BUILD_TIME

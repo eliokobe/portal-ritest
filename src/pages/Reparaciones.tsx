@@ -267,11 +267,11 @@ const Reparaciones: React.FC = () => {
         showCloseButton={false}
         actions={selectedService && (
           <div className="flex items-center gap-2">
-            {selectedService.telefono && (
+            {selectedService.telefonoTecnico && (
               <a
-                href={`tel:${selectedService.telefono}`}
+                href={`tel:${selectedService.telefonoTecnico}`}
                 className="p-1.5 rounded-full text-green-600 hover:bg-green-100 transition-colors"
-                title="Llamar"
+                title="Llamar al técnico"
               >
                 <Phone className="h-5 w-5" />
               </a>

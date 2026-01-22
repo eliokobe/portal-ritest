@@ -122,6 +122,15 @@ export const EnvioTable: React.FC<EnvioTableProps> = ({
       accessor: 'producto'
     },
     {
+      header: 'Comentarios',
+      accessor: (envio: Envio) => (
+        <span className="block max-w-xs truncate" title={envio.comentarios || ''}>
+          {envio.comentarios || '-'}
+        </span>
+      ),
+      className: 'max-w-xs'
+    },
+    {
       header: 'Seguimiento',
       accessor: (envio: Envio) => (
         <div onClick={(e) => e.stopPropagation()}>

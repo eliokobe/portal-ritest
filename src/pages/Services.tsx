@@ -24,7 +24,7 @@ interface ServicesProps {
   onClose?: () => void;
 }
 
-const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelectedServiceId }) => {
+const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelectedServiceId, onClose }) => {
   const { user } = useAuth();
   const isTramitacion = variant === 'tramitaciones';
   const isTecnico = user?.role === 'Técnico';
@@ -33,7 +33,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   const [pendingStatusChange, setPendingStatusChange] = useState<{ serviceId: string; newStatus: string } | null>(null);
   const [modalToShow, setModalToShow] = useState<'cita' | 'resolucion' | 'motivo' | null>(null);
 
-  const fetchFn = async () => {
+  const fetchFn = React.useCallback(async () => {
     if (isTramitacion) {
       const workerEmail = isTecnico ? user?.email : undefined;
       return await airtableService.getTramitaciones(user?.clinic, undefined, workerEmail, { onlyUnsynced: true });
@@ -41,7 +41,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
 
     const workerEmail = user?.email;
     return await airtableService.getServices(undefined, undefined, workerEmail, { view: 'Servicios' });
-  };
+  }, [isTramitacion, isTecnico, user?.clinic, user?.email]);
 
   const {
     data: services,
@@ -53,11 +53,11 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   } = useEntityList<Service>({
     fetchFn,
     searchFields: ['expediente', 'nombre', 'telefono', 'direccion', 'estado', 'estadoIpas', 'numero'],
-    dependencies: [variant, user?.clinic, user?.id, user?.email],
+    dependencies: [fetchFn, variant, user?.clinic, user?.id, user?.email],
     sortFn: (a, b) => {
       const dateA = a.fechaRegistro ? new Date(a.fechaRegistro).getTime() : 0;
       const dateB = b.fechaRegistro ? new Date(b.fechaRegistro).getTime() : 0;
-      return dateB - dateA; // Más recientes primero
+      return dateA - dateB; // Más antiguos primero
     },
     filterFn: (s: Service): boolean => {
       if (!isTramitacion) {
@@ -65,7 +65,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
           if (!s.cita) return false;
           const citaDate = new Date(s.cita);
           if (Number.isNaN(citaDate.getTime())) return false;
-          return citaDate.getTime() <= Date.now();
+          return true; // Quitamos la restricción de fecha futura
         }
         return true;
       }
@@ -131,15 +131,21 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
 
     try {
       if (modalToShow === 'cita') {
-        await airtableService.updateServiceStatus(serviceId, newStatus);
-        await airtableService.updateServiceField(serviceId, 'Cita', extraValue);
+        await airtableService.updateServiceFields(serviceId, {
+          'Estado': newStatus,
+          'Cita': extraValue
+        });
       } else if (modalToShow === 'resolucion') {
-        await airtableService.updateServiceStatus(serviceId, newStatus);
-        const field = newStatus === 'Cancelado' ? 'Motivo cancelación' : 'Resolución visita';
-        await airtableService.updateServiceField(serviceId, field, extraValue);
+        await airtableService.updateServiceFields(serviceId, {
+          'Estado': newStatus,
+          'Resolución visita': extraValue,
+          'Motivo técnico': null  // Limpiar motivo técnico al finalizar/cancelar
+        });
       } else if (modalToShow === 'motivo') {
-        await airtableService.updateServiceStatus(serviceId, newStatus);
-        await airtableService.updateServiceField(serviceId, 'motivoTecnico', extraValue);
+        await airtableService.updateServiceFields(serviceId, {
+          'Estado': newStatus,
+          'Motivo técnico': extraValue
+        });
       }
 
       setData((prev: Service[]) => prev.map((item: Service) => {
@@ -147,8 +153,8 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
           const updated = { ...item, estado: newStatus };
           if (modalToShow === 'cita') updated.cita = extraValue;
           if (modalToShow === 'resolucion') {
-            if (newStatus === 'Cancelado') updated.motivoCancelacion = extraValue;
-            else updated.resolucionVisita = extraValue;
+            updated.resolucionVisita = extraValue;
+            updated.motivoTecnico = undefined;  // Limpiar motivo técnico
           }
           if (modalToShow === 'motivo') updated.motivoTecnico = extraValue;
           return updated;
@@ -158,7 +164,17 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
       
       // If the selected service is the one being updated, refresh it too
       if (selectedService?.id === serviceId) {
-        setSelectedService(prev => prev ? { ...prev, estado: newStatus } : null);
+        setSelectedService(prev => {
+          if (!prev) return null;
+          const updated = { ...prev, estado: newStatus };
+          if (modalToShow === 'cita') updated.cita = extraValue;
+          if (modalToShow === 'resolucion') {
+            updated.resolucionVisita = extraValue;
+            updated.motivoTecnico = undefined;  // Limpiar motivo técnico
+          }
+          if (modalToShow === 'motivo') updated.motivoTecnico = extraValue;
+          return updated;
+        });
       }
     } catch (error) {
       alert('Error al guardar los cambios');
@@ -325,7 +341,10 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
 
       <Modal
         isOpen={!!selectedService}
-        onClose={() => setSelectedService(null)}
+        onClose={() => {
+          setSelectedService(null);
+          onClose?.();
+        }}
         title={isTramitacion ? 'Detalle de Tramitación' : 'Detalle del Servicio'}
         size="lg"
       >
@@ -335,7 +354,10 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
             variant={variant}
             onUpdate={(updated) => setData(prev => prev.map(s => s.id === updated.id ? updated : s))}
             onStatusChange={handleStatusSelect}
-            onClose={() => setSelectedService(null)}
+            onClose={() => {
+              setSelectedService(null);
+              onClose?.();
+            }}
           />
         )}
       </Modal>
