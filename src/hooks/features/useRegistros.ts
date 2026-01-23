@@ -19,7 +19,7 @@ export function useRegistros({ userRole }: UseRegistrosOptions = {}) {
   const fetchRegistros = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await airtableService.getRegistros();
+      const data = await airtableService.getRegistros({ view: 'Asesoramientos' });
       setRegistros(data);
     } catch (error) {
       console.error('Error fetching registros:', error);
@@ -118,36 +118,16 @@ export function useRegistros({ userRole }: UseRegistrosOptions = {}) {
   };
 
   const filteredRegistros = useMemo(() => {
-    return registros.filter(registro => {
-      if (registro.tramitado) return false;
+    if (!searchTerm) return registros;
+    const normalizedSearch = searchTerm.toLowerCase();
 
-      const matchesSearch = !searchTerm ||
-        registro.nombre?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        registro.telefono?.includes(searchTerm) ||
-        registro.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        registro.direccion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        registro.contrato?.toString().includes(searchTerm);
-
-      const ipartnerExcluidos = ['No interesado', 'Ilocalizable', 'Facturado', 'Cancelado'];
-      const isIpartnerExcluded = registro.ipartner && ipartnerExcluidos.includes(registro.ipartner);
-
-      const isCitadoWithoutPdf = registro.estado === 'Citado' && (!registro.pdf || registro.pdf.length === 0);
-      const isInformeWithoutPdf = registro.estado === 'Informe' && (!registro.pdf || registro.pdf.length === 0);
-
-      const isInformeWithRecentCitedIpartnerAndNoPdf =
-        registro.estado === 'Informe' &&
-        registro.ipartner === 'Citado' &&
-        (!registro.pdf || registro.pdf.length === 0) &&
-        registro.fechaIpartner &&
-        (() => {
-          const fechaIpartner = new Date(registro.fechaIpartner);
-          const now = new Date();
-          const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          return fechaIpartner > sevenDaysAgo;
-        })();
-
-      return matchesSearch && !isIpartnerExcluded && !isCitadoWithoutPdf && !isInformeWithoutPdf && !isInformeWithRecentCitedIpartnerAndNoPdf;
-    });
+    return registros.filter(registro =>
+      registro.nombre?.toLowerCase().includes(normalizedSearch) ||
+      registro.telefono?.includes(searchTerm) ||
+      registro.email?.toLowerCase().includes(normalizedSearch) ||
+      registro.direccion?.toLowerCase().includes(normalizedSearch) ||
+      registro.contrato?.toString().includes(searchTerm)
+    );
   }, [registros, searchTerm]);
 
   return {

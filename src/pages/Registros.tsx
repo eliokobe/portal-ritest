@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useRegistros } from '../hooks/features/useRegistros';
 import { SearchBar } from '../components/common/ui/SearchBar';

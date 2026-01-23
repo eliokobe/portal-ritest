@@ -2058,7 +2058,7 @@ export const airtableService = {
   },
 
   // Obtener registros (tabla "Registros")
-  async getRegistros(): Promise<{
+  async getRegistros(options: { view?: string } = {}): Promise<{
     id: string;
     contrato?: string;
     nombre?: string;
@@ -2077,7 +2077,10 @@ export const airtableService = {
     pdf?: any[];
   }[]> {
     try {
-      const records = await fetchAllRegistros('Registros', { pageSize: 100 });
+      const records = await fetchAllRegistros('Registros', {
+        pageSize: 100,
+        ...(options.view ? { view: options.view } : {}),
+      });
       return records.map((r: any) => {
         const f = r.fields ?? {};
         return {

@@ -41,7 +41,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
     }
 
     const workerEmail = user?.email;
-    return await airtableService.getServices(undefined, undefined, workerEmail);
+    return await airtableService.getServices(undefined, undefined, workerEmail, { view: 'Servicios' });
   }, [isTramitacion, isTecnico, user?.clinic, user?.email]);
 
   const {
