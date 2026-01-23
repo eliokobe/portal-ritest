@@ -338,6 +338,7 @@ async function fetchServicesByTable(params: {
         comentarios: f['Comentarios'],
         motivoCancelacion: f['Motivo cancelación'] ?? f['Motivo Cancelacion'] ?? f['Motivo cancelacion'],
         cita: f['Cita'],
+        presupuesto: f['Presupuesto'],
         tecnico: f['Técnico'] ?? f['Tecnico'] ?? f['Technician'],
         trabajadorId: f['Trabajador'],
         formularioId: f['Formulario'],
@@ -390,6 +391,16 @@ export const airtableService = {
     } catch (error) {
 
       return [];
+    }
+  },
+
+  async getPresupuestoOptions(): Promise<string[]> {
+    try {
+      const response = await serviciosApi.get('/presupuesto-options');
+      return response.data?.options || [];
+    } catch (error) {
+      console.error('Error al cargar opciones de presupuesto:', error);
+      throw error;
     }
   },
 
@@ -2166,8 +2177,6 @@ export const airtableService = {
       
       if (updates.ipartner !== undefined) {
         fields['Ipartner'] = updates.ipartner;
-        // Si se actualiza Ipartner, también marcamos como Tramitado
-        fields['Tramitado'] = true;
       }
       
       await registrosApi.patch(`/Registros/${registroId}`, { fields });

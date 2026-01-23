@@ -12,6 +12,7 @@ import { ServiceDetails } from '../components/features/ServiceDetails/ServiceDet
 import { CitaModal } from '../components/features/ServiceDetails/CitaModal';
 import { ResolucionModal } from '../components/features/ServiceDetails/ResolucionModal';
 import { MotivoTecnicoModal } from '../components/features/ServiceDetails/MotivoTecnicoModal';
+import { PresupuestoModal } from '../components/features/ServiceDetails/PresupuestoModal';
 import { getStatusColors, getIpartnerColors } from '../utils/statusColors';
 import { formatDate } from '../utils/helpers';
 import { STATUS_OPTIONS, IPARTNER_OPTIONS } from '../utils/constants';
@@ -32,7 +33,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
   const [selectedService, setSelectedService] = useState<Service | null>(initialService || null);
   const [lastSelectedServiceId, setLastSelectedServiceId] = useState<string | null>(initialSelectedServiceId || null);
   const [pendingStatusChange, setPendingStatusChange] = useState<{ serviceId: string; newStatus: string } | null>(null);
-  const [modalToShow, setModalToShow] = useState<'cita' | 'resolucion' | 'motivo' | null>(null);
+  const [modalToShow, setModalToShow] = useState<'cita' | 'resolucion' | 'motivo' | 'presupuesto' | null>(null);
 
   const fetchFn = React.useCallback(async () => {
     if (isTramitacion) {
@@ -115,9 +116,15 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
       return;
     }
 
-    if (['Cancelado', 'Finalizado', 'Presupuesto enviado'].includes(newStatus)) {
+    if (['Cancelado', 'Finalizado'].includes(newStatus)) {
       setPendingStatusChange({ serviceId: service.id, newStatus });
       setModalToShow('resolucion');
+      return;
+    }
+
+    if (newStatus === 'Presupuesto enviado') {
+      setPendingStatusChange({ serviceId: service.id, newStatus });
+      setModalToShow('presupuesto');
       return;
     }
 
@@ -156,6 +163,12 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
           'Motivo técnico': extraValue,
           'Tramitado': false,
         });
+      } else if (modalToShow === 'presupuesto') {
+        await airtableService.updateServiceFields(serviceId, {
+          'Estado': newStatus,
+          'Presupuesto': extraValue,
+          'Tramitado': false,
+        });
       }
 
       setData((prev: Service[]) => prev.map((item: Service) => {
@@ -167,6 +180,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
             updated.motivoTecnico = undefined;  // Limpiar motivo técnico
           }
           if (modalToShow === 'motivo') updated.motivoTecnico = extraValue;
+          if (modalToShow === 'presupuesto') updated.presupuesto = extraValue;
           return updated;
         }
         return item;
@@ -183,6 +197,7 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
             updated.motivoTecnico = undefined;  // Limpiar motivo técnico
           }
           if (modalToShow === 'motivo') updated.motivoTecnico = extraValue;
+          if (modalToShow === 'presupuesto') updated.presupuesto = extraValue;
           return updated;
         });
       }
@@ -396,6 +411,14 @@ const Services: React.FC<ServicesProps> = ({ variant = 'servicios', initialSelec
           onClose={() => setModalToShow(null)}
           onSave={handleModalSave}
           estado={pendingStatusChange.newStatus}
+        />
+      )}
+
+      {modalToShow === 'presupuesto' && pendingStatusChange && (
+        <PresupuestoModal
+          isOpen={true}
+          onClose={() => setModalToShow(null)}
+          onSave={handleModalSave}
         />
       )}
     </div>

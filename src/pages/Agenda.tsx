@@ -8,6 +8,7 @@ import { ServiceDetails } from '../components/features/ServiceDetails/ServiceDet
 import { CitaModal } from '../components/features/ServiceDetails/CitaModal';
 import { ResolucionModal } from '../components/features/ServiceDetails/ResolucionModal';
 import { MotivoTecnicoModal } from '../components/features/ServiceDetails/MotivoTecnicoModal';
+import { PresupuestoModal } from '../components/features/ServiceDetails/PresupuestoModal';
 
 interface AppointmentSlot {
   time: string;
@@ -24,7 +25,7 @@ const Agenda: React.FC = () => {
   
   // Estados para manejo de cambios de estado (copiados de Services.tsx para consistencia)
   const [pendingStatusChange, setPendingStatusChange] = useState<{ serviceId: string; newStatus: string } | null>(null);
-  const [modalToShow, setModalToShow] = useState<'cita' | 'resolucion' | 'motivo' | null>(null);
+  const [modalToShow, setModalToShow] = useState<'cita' | 'resolucion' | 'motivo' | 'presupuesto' | null>(null);
 
   useEffect(() => {
     loadAppointments();
@@ -66,9 +67,15 @@ const Agenda: React.FC = () => {
       return;
     }
 
-    if (['Cancelado', 'Finalizado', 'Presupuesto enviado'].includes(newStatus)) {
+    if (['Cancelado', 'Finalizado'].includes(newStatus)) {
       setPendingStatusChange({ serviceId: service.id, newStatus });
       setModalToShow('resolucion');
+      return;
+    }
+
+    if (newStatus === 'Presupuesto enviado') {
+      setPendingStatusChange({ serviceId: service.id, newStatus });
+      setModalToShow('presupuesto');
       return;
     }
 
@@ -111,6 +118,12 @@ const Agenda: React.FC = () => {
           'Motivo técnico': extraValue,
           'Tramitado': false,
         });
+      } else if (modalToShow === 'presupuesto') {
+        await airtableService.updateServiceFields(serviceId, {
+          'Estado': newStatus,
+          'Presupuesto': extraValue,
+          'Tramitado': false,
+        });
       }
 
       setServices(prev => prev.map(item => {
@@ -122,6 +135,7 @@ const Agenda: React.FC = () => {
             updated.motivoTecnico = undefined;
           }
           if (modalToShow === 'motivo') updated.motivoTecnico = extraValue;
+          if (modalToShow === 'presupuesto') updated.presupuesto = extraValue;
           return updated;
         }
         return item;
@@ -137,6 +151,7 @@ const Agenda: React.FC = () => {
             updated.motivoTecnico = undefined;
           }
           if (modalToShow === 'motivo') updated.motivoTecnico = extraValue;
+          if (modalToShow === 'presupuesto') updated.presupuesto = extraValue;
           return updated;
         });
       }
@@ -361,6 +376,14 @@ const Agenda: React.FC = () => {
           onClose={() => setModalToShow(null)}
           onSave={handleModalSave}
           estado={pendingStatusChange.newStatus}
+        />
+      )}
+
+      {modalToShow === 'presupuesto' && pendingStatusChange && (
+        <PresupuestoModal
+          isOpen={true}
+          onClose={() => setModalToShow(null)}
+          onSave={handleModalSave}
         />
       )}
     </div>

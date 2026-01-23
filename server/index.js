@@ -26,6 +26,7 @@ const cache = new NodeCache({
 // Configuración de Airtable
 const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
 const SERVICIOS_BASE_ID = process.env.AIRTABLE_SERVICES_BASE_ID || 'appX3CBiSmPy4119D';
+const SERVICIOS_TABLE_NAME = process.env.AIRTABLE_SERVICES_TABLE || 'Servicios';
 const REGISTROS_BASE_ID = process.env.AIRTABLE_REGISTROS_BASE_ID || 'applcT2fcdNDpCRQ0';
 const VALORACIONES_BASE_ID = process.env.AIRTABLE_VALORACIONES_BASE_ID || 'appX3CBiSmPy4119D';
 
@@ -100,6 +101,49 @@ app.get('/health', (req, res) => {
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ============================================
+// PRESUPUESTO OPTIONS (META API)
+// ============================================
+app.get('/api/servicios/presupuesto-options', async (req, res) => {
+  try {
+    const cacheKey = 'servicios:presupuesto-options';
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return res.json({ options: cached });
+    }
+
+    if (!AIRTABLE_API_KEY) {
+      return res.status(500).json({ error: 'Backend configuration error: API Key missing' });
+    }
+
+    const metaResponse = await axios.get(
+      `https://api.airtable.com/v0/meta/bases/${SERVICIOS_BASE_ID}/tables`,
+      {
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 30000
+      }
+    );
+
+    const tables = metaResponse.data?.tables || [];
+    const serviciosTable = tables.find((t) => t.name === SERVICIOS_TABLE_NAME);
+    const fields = serviciosTable?.fields || [];
+    const presupuestoField = fields.find((f) => f.name === 'Presupuesto');
+    const choices = presupuestoField?.options?.choices || [];
+    const options = choices.map((c) => c.name).filter(Boolean);
+
+    cache.set(cacheKey, options, 300);
+    return res.json({ options });
+  } catch (error) {
+    console.error('Error fetching presupuesto options:', error.response?.data || error.message);
+    return res.status(error.response?.status || 500).json({
+      error: error.response?.data || error.message
+    });
+  }
 });
 
 // ============================================

@@ -45,6 +45,7 @@ export interface Service {
   comentarios?: string;
   motivoCancelacion?: string;
   cita?: string;
+  presupuesto?: string;
   tecnico?: string | string[];
   trabajadorId?: string[];
   formularioId?: string[];

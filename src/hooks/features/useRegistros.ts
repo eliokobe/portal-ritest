@@ -108,7 +108,7 @@ export function useRegistros({ userRole }: UseRegistrosOptions = {}) {
     try {
       await airtableService.updateRegistro(registroId, { ipartner: newValue });
       setRegistros(prev =>
-        prev.map(r => r.id === registroId ? { ...r, ipartner: newValue, tramitado: true } : r)
+        prev.map(r => r.id === registroId ? { ...r, ipartner: newValue } : r)
       );
       return true;
     } catch (error) {
