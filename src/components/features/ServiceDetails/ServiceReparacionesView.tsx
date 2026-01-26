@@ -1,5 +1,6 @@
 import React from 'react';
 import { renderDetailValue, formatDateTime } from '../../../utils/helpers';
+import { AirtableAttachment } from '../../../types';
 
 interface ServiceReparacionesViewProps {
   reparaciones: any[];
@@ -12,6 +13,27 @@ export const ServiceReparacionesView: React.FC<ServiceReparacionesViewProps> = (
   selectedReparacionIndex,
   setSelectedReparacionIndex,
 }) => {
+  const selectedReparacion = reparaciones[selectedReparacionIndex] ?? {};
+  const pick = (...keys: string[]) => {
+    for (const key of keys) {
+      const value = selectedReparacion[key];
+      if (value !== undefined && value !== null && value !== '') {
+        return value;
+      }
+    }
+    return undefined;
+  };
+  const normalizeAttachments = (value: any): AirtableAttachment[] => (
+    Array.isArray(value) ? value : []
+  );
+  const fotoPrincipal = normalizeAttachments(
+    selectedReparacion['Foto'] ?? selectedReparacion.foto ?? selectedReparacion.fotoGeneral
+  );
+  const fotoEtiqueta = normalizeAttachments(
+    selectedReparacion['Foto de la etiqueta'] ?? selectedReparacion.fotoEtiqueta
+  );
+  const fotosReparacion = [...fotoPrincipal, ...fotoEtiqueta];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">
@@ -40,41 +62,55 @@ export const ServiceReparacionesView: React.FC<ServiceReparacionesViewProps> = (
           <div className="space-y-4">
             <div className="space-y-1">
               <p className="text-xs font-semibold text-gray-700 uppercase">Estado</p>
-              <p className="text-sm text-gray-900">{renderDetailValue(reparaciones[selectedReparacionIndex].Estado)}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs font-semibold text-gray-700 uppercase">Resultado</p>
-              <p className="text-sm text-gray-900">{renderDetailValue(reparaciones[selectedReparacionIndex].Resultado)}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs font-semibold text-gray-700 uppercase">Reparación</p>
-              <p className="text-sm text-gray-900">{renderDetailValue(reparaciones[selectedReparacionIndex].Reparación)}</p>
+              <p className="text-sm text-gray-900">{renderDetailValue(pick('Estado', 'estado', 'resultado'))}</p>
             </div>
             <div className="space-y-1">
               <p className="text-xs font-semibold text-gray-700 uppercase">Técnico</p>
-              <p className="text-sm text-gray-900">{renderDetailValue(reparaciones[selectedReparacionIndex].Técnico)}</p>
+              <p className="text-sm text-gray-900">{renderDetailValue(pick('Técnico', 'tecnico'))}</p>
             </div>
           </div>
           <div className="space-y-4">
             <div className="space-y-1">
               <p className="text-xs font-semibold text-gray-700 uppercase">Detalles</p>
               <p className="text-sm text-gray-900 whitespace-pre-line">
-                {renderDetailValue(reparaciones[selectedReparacionIndex].Detalles)}
+                {renderDetailValue(pick('Detalles', 'detalles'))}
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-xs font-semibold text-gray-700 uppercase">Comentarios</p>
               <p className="text-sm text-gray-900 whitespace-pre-line">
-                {renderDetailValue(reparaciones[selectedReparacionIndex].Comentarios)}
+                {renderDetailValue(pick('Comentarios', 'comentarios'))}
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-xs font-semibold text-gray-700 uppercase">Cita técnico</p>
               <p className="text-sm text-gray-900">
-                {formatDateTime(reparaciones[selectedReparacionIndex]['Cita técnico'])}
+                {formatDateTime(pick('Cita técnico', 'cita'))}
               </p>
             </div>
           </div>
+        </div>
+      )}
+      {reparaciones.length > 0 && (
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-gray-700 uppercase">Fotos</p>
+          {fotosReparacion.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {fotosReparacion.map((file: AirtableAttachment, i: number) => (
+                <img
+                  key={`${file.id || file.url || 'foto'}-${i}`}
+                  src={file.thumbnails?.large?.url || file.url}
+                  className="w-full h-40 object-cover rounded border hover:opacity-80 cursor-pointer"
+                  onClick={() => window.open(file.url, '_blank')}
+                  alt="Foto"
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 italic py-6 text-center border border-dashed rounded-lg">
+              No se encontraron fotos para esta reparación.
+            </p>
+          )}
         </div>
       )}
     </div>

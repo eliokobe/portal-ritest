@@ -2610,14 +2610,30 @@ export const airtableService = {
             tecnicoValue = nombres.join(', ');
           }
           
+          const tecnicoResolved = tecnicoValue || f['Técnico'] || f['Technician'];
+          const estadoResolved = f['Estado'] || f['Resultado'] || f['Result'];
+          const resultadoResolved = f['Resultado'] || f['Result'] || f['Estado'];
+          const reparacionResolved = f['Motivo'] || f['Reparación'] || f['Repair'];
+          const detallesResolved = f['Detalles'] || f['Details'] || f['Descripción'];
+          const comentariosResolved = f['Comentarios'];
+          const citaTecnicoResolved = f['Cita técnico'] || f['Cita'];
+
           results.push({
             id: data.id,
             numero: f['Número'],
-            tecnico: tecnicoValue || f['Técnico'] || f['Technician'],
-            resultado: f['Estado'] || f['Resultado'] || f['Result'],
-            reparacion: f['Motivo'] || f['Reparación'] || f['Repair'],
+            tecnico: tecnicoResolved,
+            resultado: resultadoResolved,
+            reparacion: reparacionResolved,
             cuadroElectrico: f['Material'] || f['Cuadro eléctrico'] || f['Electrical Panel'],
-            detalles: f['Detalles'] || f['Details'] || f['Descripción'],
+            detalles: detallesResolved,
+            // Campos esperados por la vista
+            Estado: estadoResolved,
+            Resultado: resultadoResolved,
+            Reparación: reparacionResolved,
+            Técnico: tecnicoResolved,
+            Detalles: detallesResolved,
+            Comentarios: comentariosResolved,
+            'Cita técnico': citaTecnicoResolved,
             // Campos adicionales disponibles
             cliente: f['Cliente'],
             direccion: f['Dirección'],
@@ -2625,8 +2641,8 @@ export const airtableService = {
             provincia: f['Provincia'],
             telefono: f['Teléfono'],
             telefonoTecnico: f['Teléfono técnico'],
-            cita: f['Cita'],
-            comentarios: f['Comentarios'],
+            cita: citaTecnicoResolved,
+            comentarios: comentariosResolved,
             seguimiento: f['Seguimiento'],
             // Campo de foto principal
             Foto: f['Foto'],
@@ -3067,7 +3083,7 @@ export const airtableService = {
       });
 
       const response = await valoracionesApi.get(`/${TABLE_NAME}`, {
-        params: { pageSize: 100 },
+        params: { pageSize: 100, view: 'Valoraciones' },
       });
 
       const data = response.data as { records: any[] };
