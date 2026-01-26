@@ -12,6 +12,7 @@ interface UseEnviosOptions {
 interface CatalogoItem {
   id: string;
   nombre: string;
+  categoria?: string;
 }
 
 interface ServicioInfo {
@@ -47,7 +48,6 @@ export function useEnvios({ userClinic, userRole }: UseEnviosOptions = {}) {
   
   const [catalogos, setCatalogos] = useState<CatalogoItem[]>([]);
   const [serviciosInfo, setServiciosInfo] = useState<ServicioInfo[]>([]);
-  const [tecnicos, setTecnicos] = useState<{ id: string; nombre: string }[]>([]);
 
   const isGestoraOperativa = userRole === 'Gestora Operativa';
   const isGestoraTecnica = userRole === 'Gestora Técnica';
@@ -91,14 +91,12 @@ export function useEnvios({ userClinic, userRole }: UseEnviosOptions = {}) {
 
   const fetchAuxiliarData = useCallback(async () => {
     try {
-      const [catalogosData, serviciosData, tecnicosData] = await Promise.all([
+      const [catalogosData, serviciosData] = await Promise.all([
         airtableService.getCatalogos(),
-        airtableService.getServices(userClinic),
-        airtableService.getTechnicians()
+        airtableService.getServices(userClinic)
       ]);
 
       setCatalogos(catalogosData);
-      setTecnicos(tecnicosData.map((t: any) => ({ id: t.id, nombre: t.nombre })));
 
       // Aplicar filtros de servicios según el rol
       let serviciosFiltrados = serviciosData;
@@ -209,7 +207,6 @@ export function useEnvios({ userClinic, userRole }: UseEnviosOptions = {}) {
     saving,
     catalogos,
     serviciosInfo,
-    tecnicos,
     updateEnvio,
     createEnvio,
     refresh: fetchEnvios

@@ -78,7 +78,7 @@ export const MOTIVO_TECNICO_OPTIONS = [
   'Carga en espera',
   'Carga a menor potencia',
   'Salta la luz del contador',
-  'No se conecta por Bluetooth',
+  'No se conecta por bluetooth',
   'No reconoce el GDP',
   'Sustituir cargador',
   'Sustituir protecciones',

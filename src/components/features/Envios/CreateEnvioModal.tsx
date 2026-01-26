@@ -8,8 +8,7 @@ interface CreateEnvioModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (envioData: any) => Promise<boolean>;
-  tecnicos: { id: string; nombre: string }[];
-  catalogos: { id: string; nombre: string }[];
+  catalogos: { id: string; nombre: string; categoria?: string }[];
   serviciosInfo: any[];
 }
 
@@ -19,13 +18,9 @@ export const CreateEnvioModal: React.FC<CreateEnvioModalProps> = ({
   isOpen,
   onClose,
   onCreate,
-  tecnicos,
   catalogos,
   serviciosInfo
 }) => {
-  const [destinatarioType, setDestinatarioType] = useState<'cliente' | 'tecnico' | null>(null);
-  const [tecnicoSearch, setTecnicoSearch] = useState('');
-  const [selectedTecnico, setSelectedTecnico] = useState<{ id: string; nombre: string } | null>(null);
   const [expedienteQuery, setExpedienteQuery] = useState('');
   const [expedienteError, setExpedienteError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -42,10 +37,16 @@ export const CreateEnvioModal: React.FC<CreateEnvioModalProps> = ({
     comentarios: '',
   });
 
+  const catalogosAgrupados = catalogos.reduce((acc, item) => {
+    const categoria = (item.categoria ?? '').trim() || 'Sin categoría';
+    if (!acc.has(categoria)) {
+      acc.set(categoria, []);
+    }
+    acc.get(categoria)?.push(item);
+    return acc;
+  }, new Map<string, { id: string; nombre: string; categoria?: string }[]>());
+
   const handleClose = () => {
-    setDestinatarioType(null);
-    setSelectedTecnico(null);
-    setTecnicoSearch('');
     setExpedienteQuery('');
     setExpedienteError(null);
     setNewEnvio({
@@ -95,11 +96,7 @@ export const CreateEnvioModal: React.FC<CreateEnvioModalProps> = ({
       ...newEnvio,
       numero: numeroAuto,
     };
-    
-    if (selectedTecnico) {
-      envioData.tecnico = [selectedTecnico.id];
-    }
-    
+
     const success = await onCreate(envioData);
     if (success) {
       handleClose();
@@ -115,97 +112,7 @@ export const CreateEnvioModal: React.FC<CreateEnvioModalProps> = ({
       size="md"
     >
       <div className="space-y-4">
-        {/* Paso 1: Seleccionar tipo de destinatario */}
-        {!destinatarioType && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600 mb-4">¿El envío es para un cliente o un técnico?</p>
-            <div className="grid grid-cols-2 gap-4">
-              <button
-                type="button"
-                onClick={() => setDestinatarioType('cliente')}
-                className="px-6 py-4 border-2 border-gray-300 rounded-lg hover:border-brand-primary hover:bg-brand-primary/5 transition-colors font-medium"
-              >
-                Cliente
-              </button>
-              <button
-                type="button"
-                onClick={() => setDestinatarioType('tecnico')}
-                className="px-6 py-4 border-2 border-gray-300 rounded-lg hover:border-brand-primary hover:bg-brand-primary/5 transition-colors font-medium"
-              >
-                Técnico
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Paso 2: Si es técnico, mostrar buscador de técnicos */}
-        {destinatarioType === 'tecnico' && !selectedTecnico && (
-          <div className="space-y-4">
-            <button
-              type="button"
-              onClick={() => setDestinatarioType(null)}
-              className="text-sm text-gray-600 hover:text-gray-900 mb-4"
-            >
-              ← Volver
-            </button>
-            <div>
-              <label htmlFor="tecnicoSearch" className="block text-sm font-medium text-gray-700 mb-1">
-                Buscar Técnico
-              </label>
-              <input
-                type="text"
-                id="tecnicoSearch"
-                value={tecnicoSearch}
-                onChange={(e) => setTecnicoSearch(e.target.value)}
-                placeholder="Escribe el nombre del técnico..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
-                autoFocus
-              />
-            </div>
-            {tecnicoSearch && (
-              <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-lg divide-y">
-                {tecnicos
-                  .filter(t => t.nombre.toLowerCase().includes(tecnicoSearch.toLowerCase()))
-                  .map(tecnico => (
-                    <button
-                      key={tecnico.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedTecnico(tecnico);
-                      }}
-                      className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors"
-                    >
-                      <p className="font-medium text-gray-900">{tecnico.nombre}</p>
-                    </button>
-                  ))}
-                {tecnicos.filter(t => t.nombre.toLowerCase().includes(tecnicoSearch.toLowerCase())).length === 0 && (
-                  <p className="px-4 py-3 text-sm text-gray-500">No se encontraron técnicos</p>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Paso 3: Formulario principal */}
-        {(destinatarioType === 'cliente' || (destinatarioType === 'tecnico' && selectedTecnico)) && (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {selectedTecnico && (
-              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-gray-600">Envío para técnico:</p>
-                <p className="font-medium text-gray-900">{selectedTecnico.nombre}</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedTecnico(null);
-                    setTecnicoSearch('');
-                  }}
-                  className="text-xs text-brand-primary hover:text-brand-primary/80 mt-1"
-                >
-                  Cambiar técnico
-                </button>
-              </div>
-            )}
-
+        <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="expediente" className="block text-sm font-medium text-gray-700 mb-1">
                 Número *
@@ -334,8 +241,12 @@ export const CreateEnvioModal: React.FC<CreateEnvioModalProps> = ({
                 style={{ appearance: 'none', backgroundImage: 'none', paddingLeft: '0.5rem', paddingRight: '0.5rem', minWidth: '120px' }}
               >
                 <option value="">Seleccionar producto</option>
-                {catalogos.map((c) => (
-                  <option key={c.id} value={c.id}>{c.nombre}</option>
+                {Array.from(catalogosAgrupados.entries()).map(([categoria, items]) => (
+                  <optgroup key={categoria} label={categoria}>
+                    {items.map((c) => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>
@@ -371,7 +282,6 @@ export const CreateEnvioModal: React.FC<CreateEnvioModalProps> = ({
               </button>
             </div>
           </form>
-        )}
       </div>
     </Modal>
   );

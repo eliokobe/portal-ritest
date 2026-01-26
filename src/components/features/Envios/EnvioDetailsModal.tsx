@@ -13,7 +13,7 @@ interface EnvioDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdate: (id: string, fields: Partial<Envio>) => Promise<boolean>;
-  catalogos: { id: string; nombre: string }[];
+  catalogos: { id: string; nombre: string; categoria?: string }[];
   serviciosInfo: any[];
   user: User | null;
 }

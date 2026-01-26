@@ -378,14 +378,15 @@ async function fetchServicesByTable(params: {
 
 export const airtableService = {
   // Obtener catálogo (linked records) tabla "Catálogo"
-  async getCatalogos(): Promise<{ id: string; nombre: string }[]> {
+  async getCatalogos(): Promise<{ id: string; nombre: string; categoria?: string }[]> {
     try {
-      const records = await fetchAllServicios('Catálogo', { pageSize: 100 });
+      const records = await fetchAllServicios('Catálogo', { pageSize: 100, view: 'Portal' });
       return records.map((r: any) => {
         const f = r.fields ?? {};
         return {
           id: r.id,
           nombre: f['Nombre'] ?? 'Sin nombre',
+          categoria: f['Categoría'] ?? f['Categoria'],
         };
       });
     } catch (error) {

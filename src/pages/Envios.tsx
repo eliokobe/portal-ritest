@@ -16,7 +16,6 @@ export default function Envios() {
     setSearchTerm,
     catalogos,
     serviciosInfo,
-    tecnicos,
     updateEnvio,
     createEnvio
   } = useEnvios({ userClinic: user?.clinic, userRole: user?.role });
@@ -91,7 +90,6 @@ export default function Envios() {
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onCreate={createEnvio}
-        tecnicos={tecnicos}
         catalogos={catalogos}
         serviciosInfo={serviciosInfo}
       />
