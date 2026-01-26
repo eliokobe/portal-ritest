@@ -270,6 +270,7 @@ export const EnvioDetailsModal: React.FC<EnvioDetailsModalProps> = ({
                 <option value="Revalco">Revalco</option>
                 <option value="Saltoki">Saltoki</option>
                 <option value="Packlink">Packlink</option>
+                <option value="Tipsa">Tipsa</option>
               </select>
             </div>
           </div>
