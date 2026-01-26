@@ -1529,7 +1529,7 @@ export const airtableService = {
         'Estado': envio.estado ?? 'Envío creado',
         'Fecha de envío': envio.fechaEnvio,
         'Inventario': envio.material ? [envio.material] : undefined,
-        'Transporte': envio.transporte ?? 'Inbound Logística',
+        'Transporte': envio.transporte ?? 'Tipsa',
         'Catálogo': envio.catalogo
           ? (String(envio.catalogo).startsWith('rec') ? [envio.catalogo] : envio.catalogo)
           : undefined,
