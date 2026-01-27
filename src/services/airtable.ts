@@ -2892,7 +2892,7 @@ export const airtableService = {
   },
 
   // Obtener tareas desde la tabla "Tareas" en la base de servicios
-  async getTasks(): Promise<{
+  async getTasks(workerEmail?: string): Promise<{
     id: string;
     tarea: string;
     estado: string;
@@ -2902,7 +2902,12 @@ export const airtableService = {
     fechaModificacion?: string;
   }[]> {
     try {
-      const records = await fetchAllServicios('Tareas', { pageSize: 100 });
+      const queryParams: Record<string, any> = { pageSize: 100, view: 'Portal' };
+      if (workerEmail) {
+        queryParams.filterByFormula = `{Email trabajador} = '${escapeFormulaString(workerEmail)}'`;
+      }
+
+      const records = await fetchAllServicios('Tareas', queryParams);
       return records.map((r: any) => {
         const f = r.fields ?? {};
         

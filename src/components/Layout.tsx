@@ -65,13 +65,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   // Navegación para Administrativa
   const navigationGroupsAdministrativa: NavigationGroup[] = [
     {
-      title: 'Punto de Recarga',
       items: [
         { name: 'Panel Gráfico', href: '/panel-grafico', icon: BarChart3 },
         { name: 'Tramitación', href: '/tramitacion', icon: ClipboardList },
         { name: 'Reparaciones', href: '/seguimiento-tecnicos', icon: UserCheck },
         { name: 'Técnicos', href: '/tecnicos', icon: Users },
         { name: 'Envíos', href: '/envios', icon: Package },
+        { name: 'Tareas', href: '/tareas', icon: CheckSquare },
         { name: 'Asesoramientos', href: '/asesoramientos', icon: Lightbulb },
         { name: 'Valoraciones', href: '/valoraciones', icon: Star },
         { name: 'Ipartner', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
@@ -90,6 +90,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     {
       items: [
         { name: 'Chatbot', href: '/chatbot', icon: Bot },
+        { name: 'Tareas', href: '/tareas', icon: CheckSquare },
       ],
     },
   ];
@@ -97,7 +98,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   // Navegación para Técnico
   const navigationGroupsTecnico: NavigationGroup[] = [
     {
-      title: 'Punto de Recarga',
       items: [
         { name: 'Panel Gráfico', href: '/panel-grafico', icon: BarChart3 },
         { name: 'Agenda', href: '/agenda', icon: Calendar },
@@ -105,6 +105,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Reparaciones', href: '/seguimiento-tecnicos', icon: UserCheck },
         { name: 'Técnicos', href: '/tecnicos', icon: Users },
         { name: 'Envíos', href: '/envios', icon: Package },
+        { name: 'Tareas', href: '/tareas', icon: CheckSquare },
       ],
     },
     {
@@ -118,7 +119,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   // Navegación completa para otros roles
   const navigationGroups: NavigationGroup[] = [
     {
-      title: 'Punto de Recarga',
       items: [
         { name: 'Panel Gráfico', href: '/panel-grafico', icon: BarChart3 },
         { name: 'Servicios', href: '/servicios', icon: Wrench },
@@ -126,6 +126,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         { name: 'Reparaciones', href: '/seguimiento-tecnicos', icon: UserCheck },
         { name: 'Técnicos', href: '/tecnicos', icon: Users },
         { name: 'Envíos', href: '/envios', icon: Package },
+        { name: 'Tareas', href: '/tareas', icon: CheckSquare },
         { name: 'Asesoramientos', href: '/asesoramientos', icon: Lightbulb },
         { name: 'Ipartner', href: 'https://red.ipartner.es/Account/Login?ReturnUrl=%2fenergyefficiencyvisit%2fenergyefficiencyvisit', icon: ExternalLink, external: true },
       ],
@@ -189,7 +190,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
             {finalNavigationGroups.map((group, groupIndex) => (
-              <div key={groupIndex} className={groupIndex > 0 ? 'pt-3 mt-3' : ''}>
+              <div key={groupIndex} className={groupIndex > 0 && group.title ? 'pt-3 mt-3' : ''}>
                 {group.title && (
                   <h3 className="px-3 mb-1.5 text-xs font-medium text-gray-400 uppercase tracking-wide">
                     {group.title}
@@ -277,7 +278,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
           <nav className={`flex-1 ${sidebarCollapsed ? 'px-2' : 'px-3'} py-4 space-y-1 overflow-y-auto`}>
             {finalNavigationGroups.map((group, groupIndex) => (
-              <div key={groupIndex} className={groupIndex > 0 ? 'pt-3 mt-3' : ''}>
+              <div key={groupIndex} className={groupIndex > 0 && group.title ? 'pt-3 mt-3' : ''}>
                 {group.title && !sidebarCollapsed && (
                   <h3 className="px-3 mb-1.5 text-xs font-medium text-gray-400 uppercase tracking-wide">
                     {group.title}

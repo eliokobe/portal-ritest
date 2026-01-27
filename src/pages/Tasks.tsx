@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Check } from 'lucide-react';
 import { airtableService } from '../services/airtable';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Task {
   id: string;
@@ -13,16 +14,26 @@ interface Task {
 }
 
 export default function Tasks() {
+  const { user, loading: authLoading } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchTasks();
-  }, []);
+    if (authLoading) return;
+    setLoading(true);
 
-  const fetchTasks = async () => {
+    if (!user?.email) {
+      setTasks([]);
+      setLoading(false);
+      return;
+    }
+
+    fetchTasks(user.email);
+  }, [user?.email, authLoading]);
+
+  const fetchTasks = async (workerEmail: string) => {
     try {
-      const data = await airtableService.getTasks();
+      const data = await airtableService.getTasks(workerEmail);
       setTasks(data);
     } catch (error) {
     } finally {
