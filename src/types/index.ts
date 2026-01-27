@@ -163,6 +163,9 @@ export interface Envio {
   codigoPostal?: string;
   provincia?: string;
   telefono?: string;
+  referencia?: string;
+  bultos?: number;
+  idProducto?: string;
   conversationId?: string;
   tecnico?: string | string[]; // Linked record a tabla Técnicos
 }

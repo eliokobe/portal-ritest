@@ -239,6 +239,27 @@ export const EnvioDetailsModal: React.FC<EnvioDetailsModalProps> = ({
             />
           </div>
 
+          <div>
+            <p className="text-xs uppercase text-gray-500">Bultos</p>
+            <input
+              type="number"
+              defaultValue={envio.bultos || ''}
+              onBlur={(e) => {
+                const val = e.target.value === '' ? null : Number(e.target.value);
+                if (val !== envio.bultos) {
+                  handleFieldUpdate('bultos', val);
+                }
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
+              placeholder="Número de bultos"
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <p className="text-xs uppercase text-gray-500">ID producto</p>
+            <p className="text-sm text-gray-900 py-2">{envio.idProducto || '-'}</p>
+          </div>
+
           <div className="flex flex-col sm:col-span-2">
             <p className="text-xs uppercase text-gray-500 mb-1">Producto / Catálogo</p>
             <div>

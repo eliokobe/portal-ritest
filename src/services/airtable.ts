@@ -1352,6 +1352,8 @@ export const airtableService = {
     provincia?: string;
     telefono?: string;
     referencia?: string;
+    bultos?: number;
+    idProducto?: string;
   }[]> {
     try {
       const records = await fetchAllServicios(AIRTABLE_ENVIOS_TABLE, { pageSize: 100, view: 'Portal' });
@@ -1382,13 +1384,15 @@ export const airtableService = {
           transporte: f['Transporte'],
           catalogo: Array.isArray(catalogoField) ? catalogoField[0] : catalogoField,
           comentarios: f['Comentarios'],
-          cliente: f['Cliente'],
+          cliente: f['Destinatario'] ?? f['Cliente'],
           direccion: f['Dirección'] ?? f['Direccion'],
-          poblacion: f['Población'] ?? f['Poblacion'],
+          poblacion: f['Ciudad'] ?? f['Población'] ?? f['Poblacion'],
           codigoPostal: f['Código postal'] ?? f['Codigo postal'],
           provincia: f['Provincia'],
           telefono: f['Teléfono'] ?? f['Telefono'],
           referencia: Array.isArray(referenciaField) ? referenciaField[0] : referenciaField,
+          bultos: f['Bultos'] !== undefined ? Number(f['Bultos']) : undefined,
+          idProducto: f['ID producto'] ?? f['ID Producto'],
         };
       });
     } catch (error) {
@@ -1411,12 +1415,15 @@ export const airtableService = {
         transporte: 'Transporte',
         catalogo: 'Catálogo',
         comentarios: 'Comentarios',
-        cliente: 'Cliente',
+        cliente: 'Destinatario',
         direccion: 'Dirección',
-        poblacion: 'Población',
+        poblacion: 'Ciudad',
         codigoPostal: 'Código postal',
         provincia: 'Provincia',
         telefono: 'Teléfono',
+        referencia: 'Referencia',
+        bultos: 'Bultos',
+        idProducto: 'ID producto',
       };
 
       const fields: Record<string, any> = {};
@@ -1521,6 +1528,9 @@ export const airtableService = {
     codigoPostal?: string;
     provincia?: string;
     telefono?: string;
+    referencia?: string;
+    bultos?: number;
+    idProducto?: string;
     tecnico?: string[];
   }): Promise<void> {
     try {
@@ -1542,6 +1552,9 @@ export const airtableService = {
           : undefined,
         'Provincia': envio.provincia,
         'Teléfono': envio.telefono,
+        'Referencia': envio.referencia,
+        'Bultos': envio.bultos,
+        'ID producto': envio.idProducto,
         'Técnicos': envio.tecnico, // Linked record a tabla Técnicos
       };
 

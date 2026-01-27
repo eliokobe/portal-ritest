@@ -1,9 +1,8 @@
 import React from 'react';
-import { ExternalLink } from 'lucide-react';
 import { DataTable, Column } from '../../common/DataTable';
 import { Envio } from '../../../types';
 import { StatusSelect } from '../../common/forms/StatusSelect';
-import { ENVIOS_STATUS_OPTIONS, ENVIOS_SEGUIMIENTO_OPTIONS } from '../../../utils/constants';
+import { ENVIOS_STATUS_OPTIONS } from '../../../utils/constants';
 
 interface EnvioTableProps {
   envios: Envio[];
@@ -14,8 +13,6 @@ interface EnvioTableProps {
   onUpdateFechaEnvio: (id: string, newDate: string) => Promise<void>;
   servicios: { id: string; nombre?: string }[];
 }
-
-const TRACKING_BASE = 'https://app.cttexpress.com/Forms/Destinatarios.aspx?c=00828000964&r=IL88P';
 
 export const EnvioTable: React.FC<EnvioTableProps> = ({
   envios,
@@ -40,38 +37,17 @@ export const EnvioTable: React.FC<EnvioTableProps> = ({
 
   const columns: Column<Envio>[] = [
     {
-      header: 'Seguimiento',
-      accessor: (envio: Envio) => {
-        const estadosRecogida = ['Pendiente recogida', 'Recogida enviada', 'Recogida hecha'];
-        const usarCttExpress = estadosRecogida.includes(envio.estado || '');
-        
-        const trackingUrl = usarCttExpress 
-          ? 'https://www.cttexpress.com/localizador-de-envios/'
-          : (envio.seguimiento || (envio.numero ? `${TRACKING_BASE}${envio.numero}` : undefined));
-        
-        if (!trackingUrl) return '-';
-        return (
-          <div className="flex flex-col">
-            <a
-              href={trackingUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-brand-primary hover:text-brand-primary/80"
-              onClick={(e) => e.stopPropagation()}
-            >
-              Ver seguimiento
-              <ExternalLink className="h-4 w-4" />
-            </a>
-            {envio.numero && (
-              <span className="text-xs text-gray-500">Nº {envio.numero}</span>
-            )}
-          </div>
-        );
-      }
+      header: 'Número',
+      accessor: (envio: Envio) => envio.numero || '-'
     },
     {
-      header: 'Servicio',
-      accessor: (envio: Envio) => servicios.find(s => s.id === envio.servicio)?.nombre || '-'
+      header: 'Destinatario',
+      accessor: (envio: Envio) => envio.cliente || '-',
+      className: 'min-w-[200px]'
+    },
+    {
+      header: 'Provincia',
+      accessor: (envio: Envio) => envio.provincia || '-'
     },
     {
       header: 'Estado',
@@ -116,44 +92,6 @@ export const EnvioTable: React.FC<EnvioTableProps> = ({
           </div>
         );
       }
-    },
-    {
-      header: 'Producto',
-      accessor: 'producto'
-    },
-    {
-      header: 'Comentarios',
-      accessor: (envio: Envio) => (
-        <span className="block max-w-xs truncate" title={envio.comentarios || ''}>
-          {envio.comentarios || '-'}
-        </span>
-      ),
-      className: 'max-w-xs'
-    },
-    {
-      header: 'Seguimiento',
-      accessor: (envio: Envio) => (
-        <div onClick={(e) => e.stopPropagation()}>
-          <StatusSelect
-            value={envio.seguimiento || ''}
-            options={ENVIOS_SEGUIMIENTO_OPTIONS}
-            onChange={(val) => onUpdateSeguimiento(envio.id, val)}
-            className="bg-white text-gray-700 border border-gray-300"
-          />
-        </div>
-      )
-    },
-    {
-      header: 'Detalles',
-      align: 'right',
-      accessor: (envio: Envio) => (
-        <button
-          onClick={() => onViewDetails(envio)}
-          className="text-brand-primary hover:text-brand-primary/80 font-medium"
-        >
-          Ver detalles
-        </button>
-      )
     }
   ];
 
@@ -164,6 +102,7 @@ export const EnvioTable: React.FC<EnvioTableProps> = ({
         data={envios}
         isLoading={loading}
         emptyMessage="No se encontraron envíos"
+        onRowClick={onViewDetails}
       />
     </div>
   );
