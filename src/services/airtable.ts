@@ -1364,7 +1364,7 @@ export const airtableService = {
         const catalogoField = f['Catálogo'] ?? f['Catalogo'];
 
         const numeroField = f['Número'] ?? f['Numero'];
-        const numeroRecogidaField = f['Número de recogida'];
+        const numeroRecogidaField = f['Número de albarán'] ?? f['Número de recogida']; // Retrocompatibilidad
         const referenciaField = f['Referencia'] ?? f['Reference'];
 
         return {
@@ -1406,7 +1406,7 @@ export const airtableService = {
     try {
       const fieldMap: Record<string, string> = {
         numero: 'Número',
-        numeroRecogida: 'Número de recogida',
+        numeroRecogida: 'Número de albarán',
         servicio: 'Servicio',
         estado: 'Estado',
         seguimiento: 'Seguimiento',

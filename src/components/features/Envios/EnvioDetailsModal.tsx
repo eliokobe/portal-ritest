@@ -107,7 +107,7 @@ export const EnvioDetailsModal: React.FC<EnvioDetailsModalProps> = ({
           </div>
 
           <div className="sm:col-span-2">
-            <p className="text-xs uppercase text-gray-500 mb-1">Número de recogida</p>
+            <p className="text-xs uppercase text-gray-500 mb-1">Número de albarán</p>
             <input
               type="number"
               defaultValue={envio.numeroRecogida || ''}
@@ -118,7 +118,7 @@ export const EnvioDetailsModal: React.FC<EnvioDetailsModalProps> = ({
                 }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent text-sm"
-              placeholder="Introduce el número de recogida"
+              placeholder="Introduce el número de albarán"
             />
           </div>
 
