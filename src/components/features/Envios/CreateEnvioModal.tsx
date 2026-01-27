@@ -35,7 +35,6 @@ export const CreateEnvioModal: React.FC<CreateEnvioModalProps> = ({
     provincia: '',
     telefono: '',
     comentarios: '',
-    referencia: '',
   });
 
   const catalogosAgrupados = catalogos.reduce((acc, item) => {
@@ -60,7 +59,6 @@ export const CreateEnvioModal: React.FC<CreateEnvioModalProps> = ({
       provincia: '',
       telefono: '',
       comentarios: '',
-      referencia: '',
     });
     onClose();
   };
@@ -229,20 +227,6 @@ export const CreateEnvioModal: React.FC<CreateEnvioModalProps> = ({
                   placeholder="Provincia"
                 />
               </div>
-            </div>
-
-            <div>
-              <label htmlFor="referencia" className="block text-sm font-medium text-gray-700 mb-1">
-                Referencia
-              </label>
-              <input
-                type="text"
-                id="referencia"
-                value={newEnvio.referencia || ''}
-                onChange={(e) => setNewEnvio((prev) => ({ ...prev, referencia: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-primary focus:border-transparent"
-                placeholder="Referencia del envío"
-              />
             </div>
 
             <div>

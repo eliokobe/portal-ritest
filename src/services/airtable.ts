@@ -1558,8 +1558,20 @@ export const airtableService = {
         'Técnicos': envio.tecnico, // Linked record a tabla Técnicos
       };
 
-      // Eliminar claves undefined para evitar errores 422
-      Object.keys(fields).forEach((k) => fields[k] === undefined && delete fields[k]);
+      // Eliminar claves undefined, null, strings vacíos y arrays vacíos para evitar errores 422
+      Object.keys(fields).forEach((k) => {
+        const value = fields[k];
+        if (
+          value === undefined || 
+          value === null || 
+          value === '' || 
+          (Array.isArray(value) && value.length === 0)
+        ) {
+          delete fields[k];
+        }
+      });
+
+      console.log('📦 Creando envío con campos:', fields);
 
       await serviciosApi.post(`/${AIRTABLE_ENVIOS_TABLE}`, {
         records: [
@@ -1569,8 +1581,19 @@ export const airtableService = {
         ],
       });
     } catch (error) {
-      const message = (error as any)?.response?.data?.error?.message;
-      throw error;
+      const errorData = (error as any)?.response?.data;
+      console.error('❌ Error creando envío:', {
+        status: (error as any)?.response?.status,
+        statusText: (error as any)?.response?.statusText,
+        error: errorData,
+        fields: Object.keys(fields).filter(k => fields[k] !== undefined),
+      });
+      
+      // Mostrar mensaje más descriptivo al usuario
+      const message = errorData?.error?.message || 'Error al crear el envío';
+      const detailedError = new Error(message);
+      (detailedError as any).details = errorData;
+      throw detailedError;
     }
   },
 

@@ -166,12 +166,24 @@ export function useEnvios({ userClinic, userRole }: UseEnviosOptions = {}) {
   const createEnvio = async (envioData: any) => {
     setSaving(true);
     try {
+      console.log('🔵 Datos del envío a crear:', envioData);
       await airtableService.createEnvio(envioData);
       await fetchEnvios();
       return true;
-    } catch (error) {
-      console.error('Error creating envio:', error);
-      alert('Error al crear el envío.');
+    } catch (error: any) {
+      console.error('❌ Error creating envio:', error);
+      
+      // Mostrar mensaje de error más detallado
+      let errorMessage = 'Error al crear el envío.';
+      
+      if (error?.details?.error) {
+        const airtableError = error.details.error;
+        errorMessage = `Error de Airtable: ${airtableError.type}\n${airtableError.message}`;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      alert(errorMessage);
       return false;
     } finally {
       setSaving(false);
